@@ -1,0 +1,71 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<commande type="P62" format="Fixed">
+  <header>
+    <value Id="File" Position="0"       Size="3" Description="File code" datatype="string" />
+    <value Id="Date" Position="3"       Size="3" Description="Number of the day in the year" datatype="int" convert="{0:000}"/>
+    <value Id="NumeroFichier" Position="6"    Size="3" Description="Transmission number-sequential number for the file" datatype="int" convert="{0:000}"/>
+    <value Id="Segment" Position="9"    Size="3" Description="Segment" datatype="string"/>
+    <value Id="Emet" Position="12"      Size="3" Description="Rmetteur" datatype="string"/>
+    <value Id="Recepteur" Position="15" Size="3" Description="Recepteur" datatype="string"/>
+    <value Id="libre" Position="18"     Size="62" Description="Réserve" datatype="string"/>
+  </header>
+  <message type="P62" index="0">
+    <value Id="File" Position="0"                     Size="3" Description="File code" datatype="string"/>
+    <value Id="Date" Position="3"                     Size="3" Description="Number of the day in the year" datatype="int" convert="{0:000}"/>
+    <value Id="NumeroFichier" Position="6"            Size="3" Description="Transmission number" datatype="int" convert="{0:000}"/>
+    <value Id="Segment" Position="9"                  Size="3" Description="Segment" datatype="string"/>
+    <value Id="Element" Position="12"                 Size="1" Description="Element" datatype="string"/>
+    <value Id="Transaction" Position="13"             Size="2" Description="ElTransactionement" datatype="string"/>
+    <value Id="HeureEnvoi" Position="15"              Size="4" Description="Heure envoi" datatype="int" convert="{0:0000}"/>
+    <value Id="DateEnvoi" Position="19"               Size="6" Description="Date envoi" datatype="datetime" convert="{0:ddMMyy}"/>
+    <value Id="Reserve1" Position="25"                Size="1" Description="Element" datatype="string"/>
+    <value Id="OF" Position="26"                      Size="7" Description="OF" datatype="int" convert="{0:0000000}"/>
+    <value Id="Reserve2" Position="33"                Size="1" Description="Reserve" datatype="string"/>
+    <value Id="Nuance" Position="34"                  Size="7" Description="Nuance" datatype="string"/>
+    <value Id="Coulee" Position="41"                  Size="6" Description="Coulee" datatype="int" convert="{0:000000}"/>
+    <value Id="Reserve3" Position="47"                Size="1" Description="Element" datatype="string"/>
+    <value Id="Profil" Position="48"                  Size="1" Description="Profil produit fini" datatype="string"/>
+    <value Id="Section" Position="49"                 Size="4" Description="999v9 en 10ieme mm" datatype="int" convert="{0:0000}"/>
+    <value Id="LettreType" Position="53"              Size="1" Description="Lettre type OF" datatype="string"/>
+    <value Id="Montage" Position="54"                 Size="3" Description="Numéro de montage" datatype="int" convert="{0:000}"/>
+    <value Id="Reserve4" Position="57"                Size="1" Description="Reserve" datatype="string"/>
+    <value Id="ConsigneScarfing" Position="58"        Size="1" Description="Reserve" datatype="string"/>
+    <value Id="Reserve5" Position="59"                Size="1" Description="Reserve" datatype="string"/>
+    <value Id="TauxHydrogene" Position="60"           Size="3" Description="Taux d'hydrogène" datatype="string"/>
+    <value Id="PoidsUnitaireMise" Position="63"       Size="4" Description="Poids Unitaire de mise" datatype="int" convert="{0:0000}"/>
+    <value Id="Reserve6" Position="67"                Size="2" Description="Reserve" datatype="string"/>
+    <value Id="NombreMisesLam" Position="69"          Size="2" Description="Nombre de mises laminées" datatype="int" convert="{0:00}"/>
+    <value Id="PoidsMisesLam" Position="71"           Size="8" Description="Poids de mises laminées" datatype="int" convert="{0:00000000}" />
+    <value Id="PoidsRebutsTrain" Position="79"        Size="8" Description="Poids des rebuts train" datatype="int" convert="{0:00000000}"/>
+    <value Id="TempsMarche" Position="87"             Size="4" Description="Temps de marche" datatype="int" convert="{0:0000}"/>
+    <value Id="PoidsSortiesRefroid" Position="91"     Size="8" Description="Poids sorties aux refroidissoirs" datatype="int" convert="{0:00000000}"/>
+    <value Id="NombreSousProduit" Position="99"       Size="4" Description="Nombre de sous-produits" datatype="int" convert="{0:0000}"/>
+    <value Id="Reserve7" Position="103"               Size="1" Description="Réserve" datatype="string" />
+    <value Id="CodePesee" Position="104"              Size="1" Description="Code pesée t:théorique, P=pesée" datatype="string"/>
+    <value Id="Reserve8" Position="105"               Size="1" Description="Réserve" datatype="string"/>
+    <value Id="SectionChargeRefroid" Position="106"   Size="3" Description="" datatype="string"/>
+    <value Id="ConsigneRefroid" Position="109"        Size="2" Description="Consigne Reroidissement" datatype="string"/>
+    <value Id="ConsigneXC" Position="111"             Size="12" Description="Consigne XC" datatype="string"/>
+    <value Id="Reserve9" Position="123"               Size="6" Description="Réserve" datatype="string"/>
+    <value Id="AnomaliePitsFour1" Position="124"      Size="65" Description="Anomalie Pits Four1" datatype="string"/>
+    <value Id="AnomaliePitsFour2" Position="194"      Size="65" Description="Anomalie Pits Four2" datatype="string"/>
+    <value Id="AnomalieBlooming1" Position="259"      Size="65" Description="Anomalie Blooming 1" datatype="string"/>
+    <value Id="AnomalieBlooming2" Position="324"      Size="65" Description="Anomalie Blooming 2" datatype="string"/>
+    <value Id="AnomalieCisaille1500T" Position="389"  Size="65" Description="Anomalie Cisaille 1500T" datatype="string"/>
+    <value Id="AnomalieScarfing" Position="454"       Size="65" Description="Anomalie Scarfing" datatype="string"/>
+    <value Id="AnomalieBillette1" Position="519"      Size="65" Description="Anomalie Billette 1 " datatype="string"/>
+    <value Id="AnomalieBillette2" Position="584"      Size="65" Description="AnomalieBillette2 " datatype="string"/>
+    <value Id="AnomalieDecoupe" Position="649"        Size="65" Description="Anomalie Découpe" datatype="string"/>
+    <value Id="AnomalieMarquage" Position="714"       Size="65" Description="Anomalie Marquage" datatype="string"/>
+    <value Id="AnomalieRefroid" Position="779"        Size="65" Description="Anomalie Refroidissement" datatype="string"/>
+    <value Id="AnomalieArrets" Position="844"         Size="65" Description="Anomalie Arrêts" datatype="string"/>
+  </message>
+  <footer>
+    <value Id="File" Position="0"           Size="3" Description="File code" datatype="string"/>
+    <value Id="Date" Position="3"           Size="3" Description="Number of the day in the year" datatype="int" convert="{0:000}"/>
+    <value Id="NumeroFichier" Position="6"  Size="3" Description="Transmission number" datatype="int" convert="{0:000}"/>
+    <value Id="Segment" Position="9"        Size="3" Description="Segment" datatype="string"/>
+    <value Id="Records" Position="12"       Size="5" Description="Nombre d'enregistrement" datatype="int" convert="{0:00000}"/>
+    <value Id="Libre" Position="17"        Size="63" Description="Réserve" datatype="string"/>
+  </footer>
+</commande>

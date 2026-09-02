@@ -1,0 +1,37 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<commande type="STOCK" format="Fixed">
+  <header>
+    <value Id="CODLOT" Position="0" Size="3" Description="Code Lot" Remarque ="Code Lot = P91" Type="C"/>
+    <value Id="QTIEME" Position="3" Size="3" Description="Quantième" Remarque="Nombre de jour depuis le 01 janvier" Type="N"/>
+    <value Id="NUMTRS" Position="6" Size="3" Description="Numéro chrono" Remarque="Numéro séquentiel caractérisant le lot" Type="N"/>
+    <value Id="SEGMENT" Position="9" Size="3" Description="Segment" Remarque="000" Type="C"/>
+    <value Id="EMET" Position="12" Size="3" Description="Emetteur" Remarque="Emetteur 617" Type="C"/>
+    <value Id="RECEP" Position="15" Size="3" Description="Recepteur" Remarque="Recepteur" Type="C"/>
+  </header>
+  <message type="STOCK" index="0">
+    <value Id="CODLOT" Position="0" Size="3" Description="Code Lot" Remarque="Code Lot = P91" Type="C"/>
+    <value Id="QTIEME" Position="3" Size="3" Description="Quantième" Remarque="Nombre de jour depuis le 01 janvier" Type="N"/>
+    <value Id="NUMTRS" Position="6" Size="3" Description="Numéro chrono" Remarque="Numéro séquentiel caractérisant le lot" Type="N"/>
+    <value Id="SEGMENT" Position="9" Size="3" Description="Segment" Remarque="STK"  Type="C"/>
+    <value Id="NOSE" Position="12" Size="1" Description="N° du sous enregistrement" Remarque="N° du sous enregistrement" Type="C"/>
+    <value Id="DATE_RECEP" Position="13" Size="8" Description="Date de mouvement" Remarque="Date de mouvement de stock" Type="N"/>
+    <value Id="MATNR" Position="21" Size="18" Description="Article SAP" Remarque="ZFH_NUANCE_USINE_PSO du lot" Type="C"/>
+    <value Id="NUANC" Position="39" Size="6" Description="Nuance usine" Remarque="Configuration article" Type="C"/>
+    <value Id="MCHA" Position="45" Size="10" Description="Lot MM" Remarque="Lot c" Type="N"/>
+    <value Id="COUL" Position="55" Size="5" Description="Numéro de coulée" Remarque="LOBM_UCCHA du lot" Type="C"/>
+    <value Id="NB_BAR_LOT" Position="60" Size="3" Description="Nombre de pièce du lot" Remarque="Quantité mouvementé / poids pièce du lot" Type="N"/>
+    <value Id="TON_LOT" Position="63" Size="10" Description="Tonnage du lot (kg)" Remarque="Quantité mouvementé" Type="N"/>
+    <value Id="DIA_REEL" Position="73" Size="5" Description="Diamètre réel article reçu (en mm)" Remarque="Diamètre du lot" Type="C"/>
+    <value Id="LG_REEL" Position="78" Size="6" Description="Longueur réelle article (en mm)" Remarque="Longueur du lingot" Type="C"/>
+    <value Id="TYPE_PROD" Position="84" Size="1" Description="Type de produit" Remarque="L pour lingots, K pour dégros" Type="C"/>
+    <value Id="TYPE_LIN" Position="85" Size="4" Description="Type de lingot" Remarque="ZFP_TYPE_LINGOT_PSO du lot" Type="C"/>
+    <!--vérifier position-->
+  </message>
+  <footer>
+    <value Id="CODLOT" Position="0" Size="3" Description="Code Lot" Remarque ="Code Lot = P91" Type="C"/>
+    <value Id="QTIEME" Position="3" Size="3" Description="Quantième" Remarque="Nombre de jour depuis le 01 janvier" Type="N"/>
+    <value Id="NUMTRS" Position="6" Size="3" Description="Numéro chrono" Remarque="Numéro séquentiel caractérisant le lot" Type="N"/>
+    <value Id="SEGMENT" Position="9" Size="3" Description="Segment" Remarque="999" Type="C"/>
+    <value Id="RECORDS" Position="12" Size="5" Description="Nombre d'enregistrement" Remarque="Nombre d'enregistrement du lot y compris l'enregistrement 000 (entête de lot) et 999 (fin de lot)" Type="N"/>
+  </footer>
+</commande>

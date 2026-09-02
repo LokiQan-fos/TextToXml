@@ -1,0 +1,124 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<commande type="KAPE22" format="Fixed">
+  <header>
+      <value Id="File" Position="0" Size="3" Description="File code" />
+      <value Id="Date" Position="3" Size="3" Description="Number of the day in the year" />
+      <value Id="NumeroFichier" Position="6" Size="3" Description="Transmission number"/>
+      <value Id="Segment" Position="9" Size="3" Description="Segment" />
+      <value Id="Emet" Position="12" Size="3" Description="Rmetteur" />
+      <value Id="Recepteur" Position="15" Size="3" Description="Recepteur" />
+      <value Id="Filler" Position="18" Size="62" Description="Réserve" />
+  </header>
+  <message type="KAPE22" index="0">
+    <value Id="File" Position="0" Size="3" Description="File code" />
+    <value Id="Date" Position="3" Size="3" Description="Number of the day in the year" />
+    <value Id="NumeroFichier" Position="6" Size="3" Description="Transmission number"/>
+    <value Id="Segment" Position="9" Size="3" Description="Segment" />
+    <value Id="Element" Position="12" Size="1" Description="Element" />
+    <value Id="KAP" Position="13" Size="2" Description="Numéro de la transaction KAP" />
+    <value Id="Reserve" Position="15" Size="6" Description="Réserve" />
+    <value Id="Type" Position="21" Size="1" Description="lettre type de commande client" />
+    <value Id="OF" Position="22" Size="7" Description="numéro de commande fos" />
+    <value Id="Indice" Position="29" Size="1" Description="indice Numéro de commande " />
+    <value Id="Client" Position="30" Size="13" Description="Numéro de client" />
+    <value Id="Nuance" Position="43" Size="7" Description="Nuance" />
+    <value Id="Coulee" Position="50" Size="6" Description="Numéro de coulée" />
+    <value Id="ProfilProduit" Position="56" Size="3" Description="profil produit" />
+    <value Id="DiametreProduit" Position="59" Size="4" Description="diamètre produit" />
+    <value Id="ToleranceMaxSection" Position="63" Size="2" Description="tolérence plus Section" />
+    <value Id="ToleranceMinSection" Position="65" Size="2" Description="tolérence moins Section" />
+    <value Id="Epaisseur" Position="67" Size="4" Description="Epaisseur" />
+    <value Id="ToleranceMaxEpaisseur" Position="71" Size="2" Description="tolérance plus Epaisseur" />
+    <value Id="ToleranceMinEpaisseur" Position="73" Size="2" Description="tolérance moins Epaisseur" />
+    <value Id="ClasseDeChute" Position="75" Size="4" Description="classe de chute" />
+    <value Id="LongueurCD" Position="79" Size="5" Description="longueur CD" />
+    <value Id="ToleranceMaxLongueur" Position="84" Size="4" Description="tolérance plus LonGueur" />
+    <value Id="ToleranceMinLongueur" Position="88" Size="4" Description="tolérance moins LonGueur" />
+    <value Id="MarqueCommerciale" Position="92" Size="9" Description="marque commerciale" />
+    <value Id="NumeroMontage" Position="101" Size="3" Description="numéro de montage" />
+    <value Id="CodeDemiProduit" Position="104" Size="4" Description="code demi produit" />
+    <value Id="PoidsDemiProduitUnitaire" Position="108" Size="5" Description="poids demi produit unitaire" />
+    <value Id="NombreDemiProduit" Position="113" Size="2" Description="nombre demi-produit" />
+    <value Id="AcompteSolde" Position="115" Size="1" Description="acompte – solde" />
+    <value Id="PoidsPrevuDemiProduit" Position="116" Size="6" Description="poids prévu demi produit" />
+    <value Id="RangOpePits" Position="122" Size="3" Description="suivi laminage consigne PC1 (Pits)- rang opération consigne" />
+    <value Id="CodeOpePits" Position="125" Size="3" Description="suivi laminage consigne PC1 (Pits 6) - code opération" />
+    <value Id="LibelleConsignePits" Position="128" Size="18" Description="suivi laminage consigne PC1 (Pits) - libellé consigne" />
+    <value Id="CodeConsignePits" Position="146" Size="12" Description="suivi laminage consigne PC1 (Pits) - consigne" />
+    <value Id="H2Coulee" Position="158" Size="2" Description="suivi laminage consigne PC1 (Pits) - taux H2 hydrogène" />
+    <value Id="NumeroFour1" Position="160" Size="2" Description="suivi laminage consigne PC1 (Pits) - numéro de four 1" />
+    <value Id="DateEnfournementFour1_Date" Position="162" Size="4" Description="suivi laminage consigne PC1 (Pits) - date enfournement four 1" />
+    <value Id="DateEnfournementFour1_Heure" Position="166" Size="4" Description="suivi laminage consigne PC1 (Pits) - heure enfournement four 1" />
+    <value Id="NumeroFour2" Position="170" Size="2" Description="suivi laminage consigne PC1 (Pits) - numéro de four 2" />
+    <value Id="DateEnfournementFour2_Date" Position="172" Size="4" Description="suivi laminage consigne PC1 (Pits) - date enfournement four 2" />
+    <value Id="DateEnfournementFour2_Heure" Position="176" Size="4" Description="suivi laminage consigne PC1 (Pits) - heure enfournement four 2" />
+    <value Id="RangOpeLingot" Position="180" Size="3" Description="suivi laminage consigne LA1 (lingot) - rang opération consigne" />
+    <value Id="CodeOpeLingot" Position="183" Size="3" Description="suivi laminage consigne LA1 (lingot) - code opération" />
+    <value Id="LibelleConsigneLingot" Position="186" Size="18" Description="suivi laminage consigne LA1 (lingot) - libellé consigne" />
+    <value Id="CodeConsigneLingot" Position="204" Size="12" Description="suivi laminage consigne LA1 (lingot) - Consigne" />
+    <value Id="ProfileLamine" Position="216" Size="1" Description="suivi laminage consigne LA1 (lingot) - profil laminé" />
+    <value Id="SectionLaminage" Position="217" Size="4" Description="suivi laminage consigne LA1 (lingot) - section de laminage" />
+    <value Id="ToleranceMaxSection1" Position="221" Size="2" Description="suivi laminage consigne LA1 (lingot) - tolérance plus Section" />
+    <value Id="ToleranceMinSection1" Position="223" Size="2" Description="suivi laminage consigne LA1 (lingot) - tolérance moins Section" />
+    <value Id="EpaisseurEnLaminage" Position="225" Size="4" Description="suivi laminage consigne LA1 (lingot) - épaisseur en laminage" />
+    <value Id="ToleranceMaxEpaisseur1" Position="229" Size="2" Description="suivi laminage consigne LA1 (lingot) - tolérance plus Epaisseur" />
+    <value Id="ToleranceMinEpaisseur1" Position="231" Size="2" Description="suivi laminage consigne LA1 (lingot) - tolérance moins Epaisseur" />
+    <value Id="PriseDeFer" Position="233" Size="5" Description="suivi laminage consigne LA1 (lingot) - prise de fer" />
+    <value Id="RangOpeChutage" Position="238" Size="3" Description="suivi laminage consigne XC1 (chutage) - rang opération consigne" />
+    <value Id="CodeOpeChutage" Position="241" Size="3" Description="suivi laminage consigne XC1 (chutage) - code opération" />
+    <value Id="LibelleConsigneChutage" Position="244" Size="18" Description="suivi laminage consigne XC1 (chutage) - libellé consigne" />
+    <value Id="CodeConsigneChutage" Position="262" Size="12" Description="suivi laminage consigne XC1 (chutage) - consigne" />
+    <value Id="Destination" Position="274" Size="1" Description="suivi laminage consigne XC1 (chutage) - destination" />
+    <value Id="ChutageTete" Position="275" Size="3" Description="suivi laminage consigne XC1 (chutage) - chûtage tête" />
+    <value Id="ChutagePied" Position="278" Size="3" Description="suivi laminage consigne XC1 (chutage) - chûtage pied" />
+    <value Id="RangOpeDecoupe" Position="281" Size="3" Description="suivi laminage consigne XP1 (découpe lingot) - rang opération consigne" />
+    <value Id="CodeOpeDecoupe" Position="284" Size="3" Description="suivi laminage consigne XP1 (découpe lingot) - code opération" />
+    <value Id="LibelleConsigneDecoupe" Position="287" Size="18" Description="suivi laminage consigne XP1 (découpe lingot) - libellé consigne" />
+    <value Id="CodeConsigneDecoupe" Position="305" Size="12" Description="suivi laminage consigne XP1 (découpe lingot) - consigne" />
+    <value Id="LongueurMoyenne" Position="317" Size="5" Description="suivi laminage consigne XP1 (découpe lingot) - longueur moyenne" />
+    <value Id="OutilDecoupe" Position="322" Size="1" Description="suivi laminage consigne XP1 (découpe lingot) - outil de découpe" />
+    <value Id="RangOpePoidMetrique" Position="323" Size="3" Description="suivi laminage consigne XP9 (poids metrique) - rang opération consigne" />
+    <value Id="CodeOpePoidMetrique" Position="326" Size="3" Description="suivi laminage consigne XP9 (poids metrique) - code opération" />
+    <value Id="LibelleConsignePoidMetrique" Position="329" Size="18" Description="suivi laminage consigne XP9 (poids metrique) - libellé consigne" />
+    <value Id="CodeConsignePoidMetrique" Position="347" Size="12" Description="suivi laminage consigne XP9 (poids metrique) - consigne" />
+    <value Id="RangOpeRefroidissoir" Position="359" Size="3" Description="consigne XA1-XA2-FC1 (refroidissoir) - rang opération consigne" />
+    <value Id="CodeOpeRefroidissoir" Position="362" Size="3" Description="consigne XA1-XA2-FC1 (refroidissoir) - code opération" />
+    <value Id="LibelleConsigneRefroidissoir" Position="365" Size="18" Description="consigne XA1-XA2-FC1 (refroidissoir) - libellé consigne" />
+    <value Id="CodeConsigneRefroidissoir" Position="383" Size="12" Description="consigne XA1-XA2-FC1 (refroidissoir) - consigne" />
+    <value Id="ReserveRefroidissoir" Position="395" Size="9" Description="consigne XA1-XA2-FC1 (refroidissoir) - reserve" />
+    <value Id="MatriculeClient" Position="404" Size="5" Description="consigne XA1-XA2-FC1 (refroidissoir) - matricule client destinataire" />
+    <value Id="RefroidissementBloom" Position="409" Size="8" Description="consigne XA1-XA2-FC1 (refroidissoir) - consigne de refroidissement bloom" />
+    <value Id="NombreLingotsFour1" Position="417" Size="2" Description="consigne XA1-XA2-FC1 (refroidissoir) - nombre de lingots four 1" />
+    <value Id="NombreLingotsFour2" Position="419" Size="2" Description="consigne XA1-XA2-FC1 (refroidissoir) - nombre de lingots four 2" />
+    <value Id="ReserveRefroidissoir2" Position="421" Size="1" Description="consigne XA1-XA2-FC1 (refroidissoir) - reserve" />
+    <value Id="OFOrigin" Position="422" Size="7" Description="consigne XA1-XA2-FC1 (refroidissoir) - Numéro d'OF origine" />
+    <value Id="OFOriginInterne" Position="429" Size="1" Description="consigne XA1-XA2-FC1 (refroidissoir) - Numéro d'OF origine interne" />
+    <value Id="OFDestination" Position="430" Size="7" Description="consigne XA1-XA2-FC1 (refroidissoir) - Numéro d'OF de destination" />
+    <value Id="OFDestinationInterne" Position="437" Size="1" Description="consigne XA1-XA2-FC1 (refroidissoir) - Numéro d'OF de destination interne" />
+    <value Id="NuanceMarquage" Position="438" Size="6" Description="consigne XA1-XA2-FC1 (refroidissoir) - nuance marquage" />
+    <value Id="GazScarfing" Position="444" Size="3" Description="consigne XA1-XA2-FC1 (refroidissoir) - gaz scarfing" />
+    <value Id="OxygeneSuperieur" Position="447" Size="3" Description="consigne XA1-XA2-FC1 (refroidissoir) - oxygène supérieur" />
+    <value Id="OxygeneInferieur" Position="450" Size="3" Description="consigne XA1-XA2-FC1 (refroidissoir) - oxygène inférieur" />
+    <value Id="OxygeneLatent" Position="453" Size="3" Description="consigne XA1-XA2-FC1 (refroidissoir) - oxygène latent" />
+    <value Id="VitesseV1" Position="456" Size="2" Description="consigne XA1-XA2-FC1 (refroidissoir) - vitesse V1" />
+    <value Id="VitesseV2" Position="458" Size="2" Description="consigne XA1-XA2-FC1 (refroidissoir) - vitesse V2" />
+    <value Id="VitesseV3" Position="460" Size="2" Description="consigne XA1-XA2-FC1 (refroidissoir) - vitesse V3" />
+    <value Id="LongueurScarfingPied" Position="462" Size="2" Description="consigne XA1-XA2-FC1 (refroidissoir) - longueur scarfing pied" />
+    <value Id="LongueurScarfingTete" Position="464" Size="2" Description="consigne XA1-XA2-FC1 (refroidissoir) - longueur scarfing tête" />
+    <value Id="MiseAuMille" Position="466" Size="4" Description="consigne XA1-XA2-FC1 (refroidissoir) - mise aux milles" />
+    <value Id="ReserveRefroidissoir3" Position="470" Size="4" Description="consigne XA1-XA2-FC1 (refroidissoir) - reserve" />
+    <value Id="RangOpeSVT" Position="474" Size="3" Description="suivi laminage consigne SVT - rang opération consigne" />
+    <value Id="CodeOpeSVT" Position="477" Size="3" Description="suivi laminage consigne SVT - code opération" />
+    <value Id="LibelleConsigneSVT" Position="480" Size="18" Description="suivi laminage consigne SVT - libellé consigne" />
+    <value Id="CodeConsigneSVT" Position="498" Size="12" Description="suivi laminage consigne SVT - consigne" />
+    <value Id="ReserveSVT" Position="510" Size="16" Description="suivi laminage consigne SVT - reserve" />
+  </message>
+ <footer>
+   <value Id="File" Position="0" Size="3" Description="File code" />
+   <value Id="Date" Position="3" Size="3" Description="Number of the day in the year" />
+   <value Id="NumeroFichier" Position="6" Size="3" Description="Transmission number"/>
+   <value Id="Segment" Position="9" Size="3" Description="Segment" />
+   <value Id="Records" Position="12" Size="5" Description="Nombre d'enregistrement" />
+   <value Id="Filler" Position="17" Size="63" Description="Réserve" />
+</footer> 
+</commande>

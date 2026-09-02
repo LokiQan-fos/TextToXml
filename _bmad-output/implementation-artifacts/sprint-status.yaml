@@ -1,0 +1,67 @@
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created, ready for development
+#   - in-progress: Developer actively working on implementation
+#   - review: Implementation complete, ready for review
+#   - done: Story completed
+
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+
+# Action Item Status:
+#   - open: Committed during a retrospective, not yet addressed
+#   - in-progress: Actively being worked on
+#   - done: Completed
+
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when its first story starts (via build's sprint sync)
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates the next story after the previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+# - Retrospective appends its action items to action_items; the status view surfaces open ones
+generated: 09-02-2026 16:00
+last_updated: 09-02-2026 17:35
+project: TextToXml
+project_key: NOKEY
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+development_status:
+  epic-1: in-progress
+  1-1-mise-en-place-de-la-solution-et-du-socle-de-tests: done
+  1-2-chargement-validation-du-descripteur: backlog
+  1-3-décodage-windows-1252-strict-découpage-en-lignes: backlog
+  1-4-affectation-des-blocs-contrôle-du-nombre-de-lignes-contrôle: backlog
+  1-5-contrôle-de-longueur-des-lignes-format-fixed: backlog
+  1-6-extraction-typage-sérialisation-du-xml-normalisé: backlog
+  1-7-contrat-conversionresult-pureté-thread-safety: backlog
+  1-8-généricité-isolation-de-format-types-étendus-decimal-datetim: backlog
+  epic-1-retrospective: optional
+
+  epic-2: backlog
+  2-1-entités-ef-database-first-harnais-de-test-docker: backlog
+  2-2-descripteur-p60-xml-enrichi-embarqué-en-ressource: backlog
+  2-3-p60-xsd-statique-génération-du-dto-kape22file-validation-ava: backlog
+  2-4-désérialisation-mapping-dto-kape22file-entité-l_d_kape22: backlog
+  2-5-contrôle-de-compatibilité-descripteur-table-au-démarrage: backlog
+  2-6-champs-dérivés-combinés: backlog
+  2-7-contrôles-de-cohérence-warnings-non-bloquants: backlog
+  2-8-persistance-transactionnelle-garde-fou-anti-doublon: backlog
+  epic-2-retrospective: optional
+
+  epic-3: backlog
+  3-1-scrutation-du-dossier-de-réception-cycle-de-vie-du-fichier: backlog
+  3-2-orchestration-par-fichier: backlog
+  3-3-double-journalisation-mqttnetservices-logs-l_d_log_commande: backlog
+  3-4-intégration-launcher-arrêt-propre: backlog
+  3-5-robustesse-de-la-boucle-worker: backlog
+  3-6-validation-de-bout-en-bout-harnais-de-couverture-sm-1-2-3: backlog
+  epic-3-retrospective: optional

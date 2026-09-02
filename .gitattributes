@@ -1,0 +1,6 @@
+# Normalize line endings for source by default.
+* text=auto
+
+# SAP samples and test fixtures are byte-sensitive (Windows-1252, CR LF, high bytes). Never normalize them.
+P60/** -text
+tests/TextToXml.Tests/fixtures/** -text

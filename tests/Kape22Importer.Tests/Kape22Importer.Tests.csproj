@@ -1,0 +1,27 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Kape22Importer\Kape22Importer.csproj" />
+  </ItemGroup>
+
+  <!-- Share the trait vocabulary with the TextToXml.Tests project instead of duplicating it. -->
+  <ItemGroup>
+    <Compile Include="..\TextToXml.Tests\TestCategory.cs" Link="TestCategory.cs" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Pure library. No disk, no network, no state, no EF, no runtime NuGet packages (NFR-4, CC-6, AC-FR16-4).
+    Windows-1252 is provided by System.Text.CodePagesEncodingProvider. On net10.0 the SDK supplies the
+    System.Text.Encoding.CodePages assembly implicitly, so no explicit PackageReference is needed (NU1510).
+    That package name is kept on the SolutionStructureTests allowlist as the single sanctioned exception,
+    in case a trimmed or self-contained publish later needs it pinned.
+  -->
+
+</Project>

@@ -1,0 +1,86 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<commande type="BIL" format="Semicolon">
+  <message type="BIL" index="0">
+
+    <value Id="OF" Position="1"                      Size="7" Description="OF" datatype="int" convert="{0:0000000}"/>
+    <value Id="Rang" Position="2"                    Size="3" Description="Rand de passage au laminoir" datatype="int" convert="{0:000}"/>
+    <value Id="Poste" Position="3"                   Size="1" Description="Lettre du poste de travail m:Matin, S:Soir et N pour nuit" datatype="string"/>
+    <value Id="Client" Position="4"                  Size="13" Description="Nom du client"/>
+    <value Id="Nuance" Position="5"                  Size="7" Description="Nuance" datatype="string"/>
+    <value Id="Coulee" Position="6"                  Size="6" Description="Coulee" datatype="int" convert="{0:000000}"/>
+    <value Id="Montage" Position="7"                 Size="3" Description="Numéro de montage" datatype="int" convert="{0:000}"/>
+    <value Id="Profil" Position="8"                  Size="1" Description="Profil laminé" datatype="string"/>
+    <value Id="Section" Position="9"                 Size="5" Description="999v9 en 10ieme mm" datatype="decimal" convert="{0:000.0}" decimalSeparator="."/>
+    <value Id="TolerancePlus" Position="10"           Size="3" Description="Tolérance plus section " datatype="decimal" convert="{0:0.0}" decimalSeparator="."/>
+    <value Id="ToleranceMoins" Position="11"          Size="3" Description="Tolérance moin section " datatype="decimal" convert="{0:0.0}" decimalSeparator="."/>
+    <value Id="PDF" Position="12"                     Size="5" Description="Prise de fer" datatype="decimal" convert="{0:000.0}"  decimalSeparator="."/>
+    <value Id="Four1" Position="13"                   Size="2" Description="Four 1" datatype="int" convert="{0:00}"/>
+    <value Id="Four2" Position="14"                   Size="2" Description="Four 2" datatype="int" convert="{0:00}"/>
+    <value Id="NombreMisesPrevue" Position="15"       Size="2" Description="Nombre de mises laminées" datatype="int" convert="{0:00}"/>
+    <value Id="DateEnvoi" Position="16"                     Size="14" Description="File code" datatype="datetime" convert="{0:dd/MM/yy HH:mm}" />
+    <value Id="Programme" Position="17"                Size="3" Description="" datatype="int" convert="{0:000}"/>
+    <value Id="NbPasse" Position="18"                  Size="2" Description="Segment" datatype="int" convert="{0,2}"/>
+
+    <value Id="Passe1" Position="19" Size="2" Description="Numéro de passe" datatype="int" convert="{0,2}"/>
+    <value Id="CannelurePasse1" Position="20" Size="2" Description="Cannelure passe" datatype="string"/>
+    <value Id="ElevationPasse1" Position="21" Size="4" Description="Elévation pour la passe " datatype="int" convert="{0,4}"/>
+
+    <value Id="Passe2" Position="22" Size="2" Description="Numéro de passe" datatype="int" convert="{0,2}"/>
+    <value Id="CannelurePasse2" Position="23" Size="2" Description="Cannelure passe" datatype="string"/>
+    <value Id="ElevationPasse2" Position="24" Size="4" Description="Elévation pour la passe " datatype="int" convert="{0,4}"/>
+
+    <value Id="Passe3" Position="25" Size="2" Description="Numéro de passe" datatype="int" convert="{0,2}"/>
+    <value Id="CannelurePasse3" Position="26" Size="2" Description="Cannelure passe" datatype="string"/>
+    <value Id="ElevationPasse3" Position="27" Size="4" Description="Elévation pour la passe " datatype="int" cconvert="{0,4}"/>
+
+    <value Id="Passe4" Position="28" Size="2" Description="Numéro de passe" datatype="int" convert="{0,2}"/>
+    <value Id="CannelurePasse4" Position="29" Size="2" Description="Cannelure passe" datatype="string"/>
+    <value Id="ElevationPasse4" Position="30" Size="4" Description="Elévation pour la passe " datatype="int" convert="{0,4}"/>
+
+    <value Id="Passe5" Position="31" Size="2" Description="Numéro de passe" datatype="int" convert="{0,2}"/>
+    <value Id="CannelurePasse5" Position="32" Size="2" Description="Cannelure passe" datatype="string"/>
+    <value Id="ElevationPasse5" Position="33" Size="4" Description="Elévation pour la passe " datatype="int" cconvert="{0,4}"/>
+
+    <value Id="Passe6" Position="34" Size="2" Description="Numéro de passe" datatype="int" convert="{0,2}"/>
+    <value Id="CannelurePasse6" Position="35" Size="2" Description="Cannelure passe" datatype="string"/>
+    <value Id="ElevationPasse6" Position="36" Size="4" Description="Elévation pour la passe " datatype="int" convert="{0,4}"/>
+
+    <value Id="Passe7" Position="37" Size="2" Description="Numéro de passe" datatype="int" convert="{0,2}"/>
+    <value Id="CannelurePasse7" Position="38" Size="2" Description="Cannelure passe" datatype="string"/>
+    <value Id="ElevationPasse7" Position="39" Size="4" Description="Elévation pour la passe " datatype="int" convert="{0,4}"/>
+
+    <value Id="Passe8" Position="40" Size="2" Description="Numéro de passe" datatype="int" convert="{0,2}"/>
+    <value Id="CannelurePasse8" Position="41" Size="2" Description="Cannelure passe" datatype="string"/>
+    <value Id="ElevationPasse8" Position="42" Size="4" Description="Elévation pour la passe " datatype="int" convert="{0,4}"/>
+
+    <value Id="Passe9" Position="43" Size="2" Description="Numéro de passe" datatype="int" convert="{0,2}"/>
+    <value Id="CannelurePasse9" Position="44" Size="2" Description="Cannelure passe" datatype="string"/>
+    <value Id="ElevationPasse9" Position="45" Size="4" Description="Elévation pour la passe " datatype="int" convert="{0,4}"/>
+
+    <value Id="Passe10" Position="46" Size="2" Description="Numéro de passe" datatype="int" convert="{0,2}"/>
+    <value Id="CannelurePasse10" Position="47" Size="2" Description="Cannelure passe" datatype="string"/>
+    <value Id="ElevationPasse10" Position="48" Size="4" Description="Elévation pour la passe " datatype="int" convert="{0,4}"/>
+
+    <value Id="Passe11" Position="49" Size="2" Description="Numéro de passe" datatype="int" convert="{0,2}"/>
+    <value Id="CannelurePasse11" Position="50" Size="2" Description="Cannelure passe" datatype="string"/>
+    <value Id="ElevationPasse11" Position="51" Size="4" Description="Elévation pour la passe " datatype="int" convert="{0,4}"/>
+
+    <value Id="Passe12" Position="52" Size="2" Description="Numéro de passe" datatype="int" convert="{0,2}"/>
+    <value Id="CannelurePasse12" Position="53" Size="2" Description="Cannelure passe" datatype="string"/>
+    <value Id="ElevationPasse12" Position="54" Size="4" Description="Elévation pour la passe " datatype="int" convert="{0,4}"/>
+
+    <value Id="Passe13" Position="55" Size="2" Description="Numéro de passe" datatype="int" convert="{0,2}"/>
+    <value Id="CannelurePasse13" Position="56" Size="2" Description="Cannelure passe" datatype="string"/>
+    <value Id="ElevationPasse13" Position="57" Size="4" Description="Elévation pour la passe " datatype="int" convert="{0,4}" decimalSeparator="."/>
+
+    <value Id="Passe14" Position="58" Size="2" Description="Numéro de passe" datatype="int" convert="{0,2}"/>
+    <value Id="CannelurePasse14" Position="59" Size="2" Description="Cannelure passe" datatype="string"/>
+    <value Id="ElevationPasse14" Position="60" Size="4" Description="Elévation pour la passe " datatype="int" convert="{0,4}"/>
+
+    <value Id="Passe15" Position="61" Size="2" Description="Numéro de passe" datatype="int" convert="{0,2}"/>
+    <value Id="CannelurePasse15" Position="62" Size="2" Description="Cannelure passe" datatype="string"/>
+    <value Id="ElevationPasse15" Position="63" Size="4" Description="Elévation pour la passe " datatype="int" convert="{0,4}"/>
+
+    <value Id="FinDeLigne" Position="64" Size="1" Description="Fin de ligne" datatype="string"/>
+  </message>
+</commande>
