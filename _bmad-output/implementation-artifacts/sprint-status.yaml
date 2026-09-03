@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 16:00
-last_updated: 09-03-2026 00:00
+last_updated: 09-03-2026
 project: TextToXml
 project_key: NOKEY
 tracking_system: file-system
@@ -39,7 +39,7 @@ development_status:
   1-1-mise-en-place-de-la-solution-et-du-socle-de-tests: done
   1-2-chargement-validation-du-descripteur: done
   1-3-décodage-windows-1252-strict-découpage-en-lignes: done
-  1-4-affectation-des-blocs-contrôle-du-nombre-de-lignes-contrôle: backlog
+  1-4-affectation-des-blocs-contrôle-du-nombre-de-lignes-contrôle: done
   1-5-contrôle-de-longueur-des-lignes-format-fixed: backlog
   1-6-extraction-typage-sérialisation-du-xml-normalisé: backlog
   1-7-contrat-conversionresult-pureté-thread-safety: backlog

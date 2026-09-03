@@ -8,8 +8,8 @@ using System.Xml.Linq;
 namespace TextToXml;
 
 // Reads the Descripteur directly, without a meta-schema (D10), and returns the first layout problem
-// found, or null when the Descripteur is well-formed and valid. Every problem is reported the same
-// way: a single LayoutInvalid error carried by the whole Fichier (FR-1).
+// found, or the parsed root when the Descripteur is well-formed and valid. Every problem is reported
+// the same way: a single LayoutInvalid error carried by the whole Fichier (FR-1).
 internal static class DescriptorValidator
 {
     private static readonly HashSet<string> KnownDatatypes =
@@ -18,7 +18,9 @@ internal static class DescriptorValidator
     // The three Bloc sections, in the order the skeleton [header] + message(s) + [footer] imposes.
     private static readonly string[] SectionNames = ["header", "message", "footer"];
 
-    public static ConversionError? Validate(string descriptor)
+    // Parses the Descripteur once and hands the parsed root back to the caller so later pipeline
+    // stages do not reparse it.
+    public static DescriptorValidationResult Validate(string descriptor)
     {
         XDocument document;
         try
@@ -27,11 +29,22 @@ internal static class DescriptorValidator
         }
         catch (XmlException exception)
         {
-            return LayoutInvalid($"Le descripteur XML n'est pas bien formé : {exception.Message}");
+            return new DescriptorValidationResult
+            {
+                Error = LayoutInvalid($"Le descripteur XML n'est pas bien formé : {exception.Message}"),
+            };
         }
 
         XElement root = document.Root!;
+        ConversionError? error = ValidateRoot(root);
 
+        return error is not null
+            ? new DescriptorValidationResult { Error = error }
+            : new DescriptorValidationResult { Root = root };
+    }
+
+    private static ConversionError? ValidateRoot(XElement root)
+    {
         // The Descriptor root is <commande> in no namespace; the element names below are matched verbatim.
         if (root.Name != "commande")
         {
@@ -52,6 +65,17 @@ internal static class DescriptorValidator
         if (root.Element("message") is null)
         {
             return LayoutInvalid("Le descripteur ne contient pas de section <message> obligatoire.");
+        }
+
+        // The expectedMessageCount attribute is optional; when present it pins the exact number of
+        // message Lignes and must be a positive integer.
+        string? expectedMessageCount = (string?)root.Attribute("expectedMessageCount");
+        if (expectedMessageCount is not null
+            && (!int.TryParse(expectedMessageCount, NumberStyles.None, CultureInfo.InvariantCulture, out int messageCount)
+                || messageCount < 1))
+        {
+            return LayoutInvalid(
+                $"L'attribut expectedMessageCount « {expectedMessageCount} » doit être un entier positif.");
         }
 
         foreach (string sectionName in SectionNames)
@@ -149,4 +173,14 @@ internal static class DescriptorValidator
             Message = message,
         };
     }
+}
+
+// Outcome of DescriptorValidator.Validate. On success Error is null and Root holds the parsed
+// Descripteur root; on failure Error carries the single LayoutInvalid error and Root is null.
+// Properties are declared in alphabetical order (CC-4).
+internal sealed record DescriptorValidationResult
+{
+    public ConversionError? Error { get; init; }
+
+    public XElement? Root { get; init; }
 }
