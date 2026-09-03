@@ -1,0 +1,3 @@
+W001 Left widget 0042
+W002 Big unit    0007
+W003 Spare part  1000

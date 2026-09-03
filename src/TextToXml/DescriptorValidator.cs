@@ -163,9 +163,47 @@ internal static class DescriptorValidator
             {
                 return LayoutInvalid($"Le Champ « {id} » a un datatype non reconnu : « {datatype} ».");
             }
+
+            // A datetime Champ must say how to read its Valeur brute; without a "{0:<mask>}" convert
+            // attribute the parse would be ambiguous and clock-dependent, so this is a layout error
+            // rather than a later InvalidDate on otherwise-valid input (CTR-2).
+            if (datatype == "datetime" && ExtractConvertMask((string?)value.Attribute("convert")) is null)
+            {
+                return LayoutInvalid(
+                    $"Le Champ « {id} » de type datetime doit porter un attribut convert de la forme « {{0:<format>}} ».");
+            }
+
+            // A decimal Champ's decimalSeparator, when given, is a single character rewritten to the
+            // invariant point before parsing (CTR-1).
+            string? decimalSeparator = (string?)value.Attribute("decimalSeparator");
+            if (datatype == "decimal" && decimalSeparator is not null && decimalSeparator.Length != 1)
+            {
+                return LayoutInvalid(
+                    $"Le Champ « {id} » a un attribut decimalSeparator qui doit être un caractère unique.");
+            }
         }
 
         return null;
+    }
+
+    // The convert attribute is expected to be a "{0:<mask>}" composite format string. Returns the mask
+    // between the first colon and the last closing brace, or null when the attribute is absent or does
+    // not have that shape.
+    internal static string? ExtractConvertMask(string? convert)
+    {
+        if (string.IsNullOrEmpty(convert))
+        {
+            return null;
+        }
+
+        int colon = convert.IndexOf(':');
+        int close = convert.LastIndexOf('}');
+        if (colon < 0 || close <= colon + 1)
+        {
+            return null;
+        }
+
+        return convert.Substring(colon + 1, close - colon - 1);
     }
 
     private static bool IsNonNegativeInteger(XAttribute? attribute)

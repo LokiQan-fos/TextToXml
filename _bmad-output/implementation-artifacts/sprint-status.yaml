@@ -43,7 +43,7 @@ development_status:
   1-5-contrôle-de-longueur-des-lignes-format-fixed: done
   1-6-extraction-typage-sérialisation-du-xml-normalisé: done
   1-7-contrat-conversionresult-pureté-thread-safety: done
-  1-8-généricité-isolation-de-format-types-étendus-decimal-datetim: backlog
+  1-8-généricité-isolation-de-format-types-étendus-decimal-datetim: done
   epic-1-retrospective: optional
 
   epic-2: backlog

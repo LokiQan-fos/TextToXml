@@ -56,9 +56,8 @@ internal static class NormalizedXmlBuilder
             {
                 string id = (string)champ.Attribute("Id")!;
                 string rawValue = ExtractRawValue(lines[i], champ);
-                string? datatype = (string?)champ.Attribute("datatype");
 
-                ConversionError? error = Normalize(datatype, rawValue, blocks[i], i + 1, id, out string canonicalValue);
+                ConversionError? error = Normalize(champ, rawValue, blocks[i], i + 1, id, out string canonicalValue);
                 if (error is not null)
                 {
                     // Every typing Error is collected: the whole Fichier is scanned so the caller sees
@@ -101,18 +100,31 @@ internal static class NormalizedXmlBuilder
     }
 
     private static ConversionError? Normalize(
-        string? datatype,
+        XElement champ,
         string rawValue,
         Block bloc,
         int lineNumber,
         string fieldId,
         out string canonicalValue)
     {
-        // The int datatype is the only one that both constrains and rewrites the value in Step 1;
-        // decimal, datetime and convert are added in Story 1.8. Every other Champ is a string.
+        // The datatype dictates the canonical form written to the normalized XML. The int, decimal and
+        // datetime datatypes all constrain and rewrite the Valeur brute in Step 1; every other Champ is
+        // a string.
+        string? datatype = (string?)champ.Attribute("datatype");
+
         if (datatype == "int")
         {
             return NormalizeInteger(rawValue, bloc, lineNumber, fieldId, out canonicalValue);
+        }
+
+        if (datatype == "decimal")
+        {
+            return NormalizeDecimal(champ, rawValue, bloc, lineNumber, fieldId, out canonicalValue);
+        }
+
+        if (datatype == "datetime")
+        {
+            return NormalizeDateTime(champ, rawValue, bloc, lineNumber, fieldId, out canonicalValue);
         }
 
         // A string Champ keeps its internal spaces and only the fixed-width space padding is trimmed
@@ -159,6 +171,186 @@ internal static class NormalizedXmlBuilder
         // value normalizes to "0" (AC-FR5-4).
         canonicalValue = parsed.ToString(CultureInfo.InvariantCulture);
         return null;
+    }
+
+    private static ConversionError? NormalizeDecimal(
+        XElement champ,
+        string rawValue,
+        Block bloc,
+        int lineNumber,
+        string fieldId,
+        out string canonicalValue)
+    {
+        string trimmed = rawValue.Trim(' ');
+
+        // A blank decimal Champ yields an empty element, like a blank int; the obligation is judged in
+        // Step 2 against the target column.
+        if (trimmed.Length == 0)
+        {
+            canonicalValue = string.Empty;
+            return null;
+        }
+
+        // The Descripteur names the decimal separator used in the Valeur brute; the descriptor validator
+        // has checked it is a single character. It defaults to the point and is the only non-digit the
+        // value may carry besides a leading sign (CTR-1). The convert attribute is not used for decimal
+        // in v1.
+        string? separator = (string?)champ.Attribute("decimalSeparator");
+        char effectiveSeparator = string.IsNullOrEmpty(separator) ? '.' : separator[0];
+
+        // A leading sign is allowed for decimal (unlike int); a group separator, an inner space, the
+        // wrong separator character or any other stray character makes the value invalid rather than
+        // letting it parse to a plausible wrong number.
+        if (!IsPlainDecimal(trimmed, effectiveSeparator))
+        {
+            canonicalValue = string.Empty;
+            return InvalidDecimal(bloc, lineNumber, fieldId, trimmed, rawValue);
+        }
+
+        string invariant = effectiveSeparator == '.' ? trimmed : trimmed.Replace(effectiveSeparator, '.');
+        if (!decimal.TryParse(
+            invariant,
+            NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint,
+            CultureInfo.InvariantCulture,
+            out decimal parsed))
+        {
+            canonicalValue = string.Empty;
+            return InvalidDecimal(bloc, lineNumber, fieldId, trimmed, rawValue);
+        }
+
+        // The canonical form drops trailing zeros the way the int form drops leading zeros, so "12,50"
+        // and "12,5" yield the same normalized value (CTR-1). The run of '#' covers the decimal's full
+        // precision and the pattern never falls back to exponential notation.
+        canonicalValue = parsed.ToString("0.#############################", CultureInfo.InvariantCulture);
+        return null;
+    }
+
+    // Accepts an optional leading sign, decimal digits and at most one occurrence of the declared
+    // separator; at least one digit must be present.
+    private static bool IsPlainDecimal(string value, char separator)
+    {
+        int start = value.Length > 0 && value[0] is '+' or '-' ? 1 : 0;
+        bool separatorSeen = false;
+        bool digitSeen = false;
+
+        for (int i = start; i < value.Length; i++)
+        {
+            char c = value[i];
+            if (c == separator)
+            {
+                if (separatorSeen)
+                {
+                    return false;
+                }
+
+                separatorSeen = true;
+            }
+            else if (char.IsAsciiDigit(c))
+            {
+                digitSeen = true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        return digitSeen;
+    }
+
+    private static ConversionError InvalidDecimal(Block bloc, int lineNumber, string fieldId, string trimmed, string rawValue)
+    {
+        return new ConversionError
+        {
+            Block = bloc,
+            Code = ErrorCode.InvalidDecimal,
+            FieldId = fieldId,
+            LineNumber = lineNumber,
+            Message = $"La valeur « {trimmed} » du Champ « {fieldId} » n'est pas un nombre décimal valide.",
+            RawValue = rawValue,
+        };
+    }
+
+    private static ConversionError? NormalizeDateTime(
+        XElement champ,
+        string rawValue,
+        Block bloc,
+        int lineNumber,
+        string fieldId,
+        out string canonicalValue)
+    {
+        string trimmed = rawValue.Trim(' ');
+
+        // A blank datetime Champ yields an empty element, like a blank int or decimal.
+        if (trimmed.Length == 0)
+        {
+            canonicalValue = string.Empty;
+            return null;
+        }
+
+        // The convert attribute is a "{0:<mask>}" composite format string whose mask lays out the Valeur
+        // brute; the descriptor validator has already guaranteed a datetime Champ carries a usable one.
+        // The mask drives parsing only - the output is always ISO-8601 (CTR-2). ParseExact with
+        // InvariantCulture resolves a two-digit year ("yy") through the Gregorian TwoDigitYearMax pivot
+        // (currently 2049), so a format needing an unambiguous year must use a four-digit "yyyy" mask.
+        string mask = DescriptorValidator.ExtractConvertMask((string?)champ.Attribute("convert"))!;
+
+        if (!DateTime.TryParseExact(trimmed, mask, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime value))
+        {
+            canonicalValue = string.Empty;
+            return new ConversionError
+            {
+                Block = bloc,
+                Code = ErrorCode.InvalidDate,
+                FieldId = fieldId,
+                LineNumber = lineNumber,
+                Message = $"La valeur « {trimmed} » du Champ « {fieldId} » n'est pas une date valide.",
+                RawValue = rawValue,
+            };
+        }
+
+        // The normalized XML carries an ISO-8601 value: a date alone when the convert mask has no time
+        // token, a date and time otherwise, so an XmlSerializer reads it straight into a DateTime
+        // without a custom converter (CTR-2, CTR-3).
+        canonicalValue = MaskHasTimeComponent(mask)
+            ? value.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture)
+            : value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        return null;
+    }
+
+    private static bool MaskHasTimeComponent(string mask)
+    {
+        // In a .NET custom date/time format string the time-bearing specifiers are h, H, m, s, f, F, t,
+        // z and K; d, M, y and g are date-only. A lowercase m is minutes, an uppercase M is the month.
+        // A character inside a quoted literal ('...' or "...") and an escaped character (\c) are skipped
+        // so a literal letter is never read as a specifier.
+        for (int i = 0; i < mask.Length; i++)
+        {
+            char specifier = mask[i];
+            if (specifier == '\\')
+            {
+                i++;
+                continue;
+            }
+
+            if (specifier is '\'' or '"')
+            {
+                i = mask.IndexOf(specifier, i + 1);
+                if (i < 0)
+                {
+                    return false;
+                }
+
+                continue;
+            }
+
+            if (specifier is 'h' or 'H' or 'm' or 's' or 'f' or 'F' or 't' or 'z' or 'K')
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static string Serialize(XElement file)

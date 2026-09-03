@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Synthetic non-P60 Descripteur for the genericity tests (Story 1.8, AR-11, AC-FR1-9, AC-FR5-13).
+  Every layout choice here is deliberately unlike P60: no header, no footer, no Segment control, and
+  Ids, Positions and Sizes that never appear in the KAPE22 layout.
+-->
+<commande type="WIDGET" format="Fixed">
+  <message type="WIDGET" index="0">
+    <value Id="Ref" Position="0" Size="5" datatype="string" />
+    <value Id="Label" Position="5" Size="12" datatype="string" />
+    <value Id="Quantity" Position="17" Size="4" datatype="int" />
+  </message>
+</commande>

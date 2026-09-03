@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Synthetic Descripteur with mixed datatypes for the typed round-trip test (Story 1.8, CTR-3).
+  A valid Fichier through this Descripteur must produce a normalized XML that an XmlSerializer reads
+  straight into a record DTO, keeping int, decimal, DateTime and string values intact.
+-->
+<commande type="RT" format="Fixed">
+  <message type="RT" index="0">
+    <value Id="Code" Position="0" Size="4" datatype="string" />
+    <value Id="Count" Position="4" Size="5" datatype="int" />
+    <value Id="Price" Position="9" Size="7" datatype="decimal" decimalSeparator="." />
+    <value Id="MadeOn" Position="16" Size="6" datatype="datetime" convert="{0:ddMMyy}" />
+  </message>
+</commande>

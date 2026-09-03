@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Synthetic Descripteur exercising the extended datatypes decimal and datetime (Story 1.8, CTR-1, CTR-2).
+  Amount carries an explicit decimalSeparator; the datetime Champs carry a convert mask used only for
+  parsing.
+-->
+<commande type="TYPED" format="Fixed">
+  <message type="TYPED" index="0">
+    <value Id="Amount" Position="0" Size="8" datatype="decimal" decimalSeparator="," />
+    <value Id="RecordedOn" Position="8" Size="6" datatype="datetime" convert="{0:ddMMyy}" />
+    <value Id="SentAt" Position="14" Size="10" datatype="datetime" convert="{0:ddMMyyHHmm}" />
+  </message>
+</commande>
