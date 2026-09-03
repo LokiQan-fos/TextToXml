@@ -14,6 +14,10 @@ internal static class InputReader
     private const string UndecodableMessage =
         "Le Fichier contient un octet qui ne peut pas être décodé en Windows-1252.";
 
+    // Wording for a C0 control byte that decodes cleanly but cannot appear in an XML document.
+    private const string ControlCharacterMessage =
+        "Le Fichier contient un caractère de contrôle interdit dans un document XML.";
+
     private static readonly Encoding Windows1252;
 
     static InputReader()
@@ -37,12 +41,19 @@ internal static class InputReader
 
         // The .NET Windows-1252 decoder silently maps the five undefined byte positions to their
         // C1 control characters instead of failing, so the strict rejection required by D19 is
-        // enforced here explicitly.
+        // enforced here explicitly. A C0 control byte decodes cleanly but is not a legal XML 1.0
+        // character, so it is rejected here rather than throwing later while the normalized XML is
+        // written. Tab, line feed and carriage return are the only control characters XML 1.0 allows.
         foreach (byte value in input)
         {
             if (value is 0x81 or 0x8D or 0x8F or 0x90 or 0x9D)
             {
                 return Failure(ErrorCode.UndecodableInput, UndecodableMessage);
+            }
+
+            if (value < 0x20 && value is not 0x09 and not 0x0A and not 0x0D)
+            {
+                return Failure(ErrorCode.UndecodableInput, ControlCharacterMessage);
             }
         }
 

@@ -132,6 +132,18 @@ internal static class DescriptorValidator
                 return LayoutInvalid($"Un Champ du Bloc {sectionName} à la Position {position} n'a pas d'attribut Id.");
             }
 
+            // The Id becomes an element name in the normalized XML, so it must be a legal XML name; a
+            // digit-leading, spaced or colon-bearing Id would otherwise throw while the XML is built.
+            try
+            {
+                XmlConvert.VerifyNCName(id);
+            }
+            catch (XmlException)
+            {
+                return LayoutInvalid(
+                    $"Le Champ « {id} » du Bloc {sectionName} n'est pas un nom d'élément XML valide.");
+            }
+
             // Two Champs sharing an Id inside the same Bloc make the layout ambiguous.
             if (!seenIds.Add(id))
             {

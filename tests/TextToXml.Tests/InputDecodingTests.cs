@@ -135,6 +135,38 @@ public class InputDecodingTests
         Assert.Equal(ErrorCode.UndecodableInput, error.Code);
     }
 
+    // A C0 control byte decodes cleanly in Windows-1252 but is not a legal XML 1.0 character, so it is
+    // rejected at decode time as UndecodableInput rather than throwing later while the XML is written.
+    [Theory]
+    [InlineData((byte)0x00)]
+    [InlineData((byte)0x07)]
+    [InlineData((byte)0x0B)]
+    [InlineData((byte)0x0C)]
+    [InlineData((byte)0x1F)]
+    [Trait("AC", "FR2-4")]
+    public void Read_C0ControlByte_YieldsUndecodableInputError_AcFr2_4(byte control)
+    {
+        byte[] input = [0x41, control, 0x42];
+
+        InputReadResult? result = null;
+        Exception? exception = Record.Exception(() => result = InputReader.Read(input));
+
+        Assert.Null(exception);
+        AssertSingleFileError(result!, ErrorCode.UndecodableInput);
+    }
+
+    // Tab, line feed and carriage return are the only control characters XML 1.0 allows, so they must
+    // pass the decode stage untouched.
+    [Fact]
+    [Trait("AC", "FR2-4")]
+    public void Read_TabLineFeedAndCarriageReturn_AreNotRejected_AcFr2_4()
+    {
+        InputReadResult result = InputReader.Read(Windows1252("A\tB\r\nC\tD"));
+
+        Assert.Null(result.Error);
+        Assert.Equal(new[] { "A\tB", "C\tD" }, result.Lines);
+    }
+
     [Fact]
     [Trait("AC", "FR2-5")]
     public void Read_FichierWithoutTrailingLf_KeepsTheLastLigne_AcFr2_5()

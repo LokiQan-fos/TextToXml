@@ -109,6 +109,28 @@ public class DescriptorValidationTests
         Assert.Contains("OF", error.Message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("1Diametre")]
+    [InlineData("Diametre produit")]
+    [InlineData("ns:Diametre")]
+    [Trait("AC", "FR1-4")]
+    public void Convert_ChampIdNotAValidXmlName_YieldsLayoutInvalidCitingTheId_AcFr1_4(string id)
+    {
+        // The Id becomes an element name in the normalized XML, so an illegal name must be caught here
+        // rather than throwing while the XML is built.
+        string descriptor = $"""
+            <?xml version="1.0" encoding="utf-8"?>
+            <commande type="KAPE22" format="Fixed">
+              <message type="KAPE22" index="0">
+                <value Id="{id}" Position="0" Size="4" datatype="string" />
+              </message>
+            </commande>
+            """;
+
+        ConversionError error = AssertSingleLayoutInvalid(Convert(descriptor));
+        Assert.Contains(id, error.Message, StringComparison.Ordinal);
+    }
+
     public static TheoryData<string, string> InvalidPositionOrSizeCases()
     {
         return new TheoryData<string, string>

@@ -42,8 +42,15 @@ public static class Converter
             return new ConversionResult { Errors = lineErrors, Warnings = blocks.Warnings };
         }
 
-        // Later stories continue the pipeline: extract and type the Champs, then emit the normalized
-        // XML. Segment Warnings are carried through unchanged.
-        return new ConversionResult { Warnings = blocks.Warnings };
+        // Extract and type every Champ, then emit the normalized XML, but only when no typing Error is
+        // found (FR-5). Segment Warnings are carried through unchanged.
+        NormalizedXmlResult normalized =
+            NormalizedXmlBuilder.Build(blocks.Lines, blocks.Blocks, descriptorValidation.Root!);
+        if (normalized.Errors.Count > 0)
+        {
+            return new ConversionResult { Errors = normalized.Errors, Warnings = blocks.Warnings };
+        }
+
+        return new ConversionResult { Warnings = blocks.Warnings, Xml = normalized.Xml };
     }
 }
