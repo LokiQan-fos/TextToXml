@@ -42,7 +42,7 @@ development_status:
   1-4-affectation-des-blocs-contrôle-du-nombre-de-lignes-contrôle: done
   1-5-contrôle-de-longueur-des-lignes-format-fixed: done
   1-6-extraction-typage-sérialisation-du-xml-normalisé: done
-  1-7-contrat-conversionresult-pureté-thread-safety: backlog
+  1-7-contrat-conversionresult-pureté-thread-safety: done
   1-8-généricité-isolation-de-format-types-étendus-decimal-datetim: backlog
   epic-1-retrospective: optional
 
