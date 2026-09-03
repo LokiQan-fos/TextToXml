@@ -33,8 +33,17 @@ public static class Converter
             return new ConversionResult { Errors = [blocks.Error] };
         }
 
-        // Later stories continue the pipeline: check Ligne lengths, extract and type the Champs,
-        // then emit the normalized XML. Segment Warnings are carried through unchanged.
+        // Check that each Ligne covers the starting Position of every one of its Champs (FR-4).
+        IReadOnlyList<ConversionError> lineErrors =
+            LineLengthChecker.Check(blocks.Lines, blocks.Blocks, descriptorValidation.Root!);
+        if (lineErrors.Count > 0)
+        {
+            // A LineTooShort is blocking, but the non-blocking Segment Warnings are still reported.
+            return new ConversionResult { Errors = lineErrors, Warnings = blocks.Warnings };
+        }
+
+        // Later stories continue the pipeline: extract and type the Champs, then emit the normalized
+        // XML. Segment Warnings are carried through unchanged.
         return new ConversionResult { Warnings = blocks.Warnings };
     }
 }

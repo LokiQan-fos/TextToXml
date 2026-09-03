@@ -75,7 +75,7 @@ internal static class BlockAssigner
         Block[] blocks = AssignRoles(content.Count, hasHeader, hasFooter);
         IReadOnlyList<ConversionError> warnings = CheckSegments(content, blocks, descriptorRoot);
 
-        return new BlockAssignmentResult { Blocks = blocks, Warnings = warnings };
+        return new BlockAssignmentResult { Blocks = blocks, Lines = content, Warnings = warnings };
     }
 
     private static Block[] AssignRoles(int count, bool hasHeader, bool hasFooter)
@@ -195,8 +195,9 @@ internal static class BlockAssigner
     }
 }
 
-// Outcome of BlockAssigner.Assign. On success Error is null and Blocks holds one entry per non-empty
-// Ligne, in Ligne order; on failure Error carries the single WrongBlockCount error and Blocks is empty.
+// Outcome of BlockAssigner.Assign. On success Error is null, Blocks holds one entry per non-empty
+// Ligne, in Ligne order, and Lines holds those same Lignes after trailing empty Lignes were dropped;
+// on failure Error carries the single WrongBlockCount error and Blocks and Lines are empty.
 // Warnings holds the SegmentMismatch entries and never blocks the conversion.
 // Properties are declared in alphabetical order (CC-4).
 internal sealed record BlockAssignmentResult
@@ -204,6 +205,8 @@ internal sealed record BlockAssignmentResult
     public IReadOnlyList<Block> Blocks { get; init; } = [];
 
     public ConversionError? Error { get; init; }
+
+    public IReadOnlyList<string> Lines { get; init; } = [];
 
     public IReadOnlyList<ConversionError> Warnings { get; init; } = [];
 }
