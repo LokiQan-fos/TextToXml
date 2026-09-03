@@ -17,8 +17,15 @@ public static class Converter
             return new ConversionResult { Errors = [layoutError] };
         }
 
-        // Later stories continue the pipeline: decode Windows-1252, split into Lignes,
-        // assign Blocs, extract and type the Champs, then emit the normalized XML.
+        // Decode the Windows-1252 bytes with a strict decoder and split the Fichier into Lignes (FR-2).
+        InputReadResult read = InputReader.Read(input);
+        if (read.Error is not null)
+        {
+            return new ConversionResult { Errors = [read.Error] };
+        }
+
+        // Later stories continue the pipeline: assign Blocs, extract and type the Champs,
+        // then emit the normalized XML.
         return new ConversionResult();
     }
 }

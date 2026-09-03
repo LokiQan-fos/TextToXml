@@ -8,4 +8,9 @@
     in case a trimmed or self-contained publish later needs it pinned.
   -->
 
+  <!-- The internal pipeline stages (DescriptorValidator, InputReader...) are exercised directly by the unit tests. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="TextToXml.Tests" />
+  </ItemGroup>
+
 </Project>
