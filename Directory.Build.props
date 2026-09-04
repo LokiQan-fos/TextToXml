@@ -8,4 +8,10 @@
     <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>
 
+  <!-- Make the .editorconfig code-style rules build errors under -warnaserror, so CI enforces
+       the mechanical half of CC-2/CC-3/CC-4 instead of relying on review alone. -->
+  <PropertyGroup>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+
 </Project>

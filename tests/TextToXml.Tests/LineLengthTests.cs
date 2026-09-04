@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Xml.Linq;
+using static TextToXml.Tests.TestSupport;
 
 namespace TextToXml.Tests;
 
@@ -98,11 +99,6 @@ public class LineLengthTests
           </footer>
         </commande>
         """;
-
-    private static XElement Root(string descriptor) => XDocument.Parse(descriptor).Root!;
-
-    // Encodes ASCII-only test text to Windows-1252 bytes; a plain byte cast is enough for these callers.
-    private static byte[] Windows1252(string text) => text.Select(c => (byte)c).ToArray();
 
     // Pads a prefix with 'X' up to the requested Ligne length; the Segment markers stay where declared.
     private static string Line(string prefix, int length) => prefix.PadRight(length, 'X');

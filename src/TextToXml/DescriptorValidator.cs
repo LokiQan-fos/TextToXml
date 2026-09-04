@@ -16,7 +16,8 @@ internal static class DescriptorValidator
         new(StringComparer.Ordinal) { "string", "int", "decimal", "datetime" };
 
     // The three Bloc sections, in the order the skeleton [header] + message(s) + [footer] imposes.
-    private static readonly string[] SectionNames = ["header", "message", "footer"];
+    private static readonly string[] SectionNames =
+        [DescriptorSections.Header, DescriptorSections.Message, DescriptorSections.Footer];
 
     // Parses the Descripteur once and hands the parsed root back to the caller so later pipeline
     // stages do not reparse it.

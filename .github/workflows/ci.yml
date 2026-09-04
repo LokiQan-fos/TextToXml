@@ -1,0 +1,42 @@
+# Build gate for the TextToXml solution.
+# Runs the SolutionStructureTests build gate and the Category=Unit suite on every push and PR.
+# The Category=Integration suite (AR-12, Docker SQL Server) is added by Epic 2 Story 2.1.
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore TextToXml.sln
+
+      # -warnaserror plus EnforceCodeStyleInBuild turns the .editorconfig code-style rules
+      # into build failures, so the mechanical half of CC-2/CC-3/CC-4 is enforced here.
+      - name: Build
+        run: dotnet build TextToXml.sln --no-restore --configuration Release -warnaserror
+
+      - name: Test (Category=Unit)
+        run: >
+          dotnet test TextToXml.sln --no-build --configuration Release
+          --filter Category=Unit
+          --logger "trx;LogFileName=unit.trx"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: "**/*.trx"
+          if-no-files-found: ignore

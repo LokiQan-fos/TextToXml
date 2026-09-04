@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using static TextToXml.Tests.TestSupport;
 
 namespace TextToXml.Tests;
 
@@ -198,8 +199,4 @@ public class InputDecodingTests
         Assert.Equal(withoutTrailingLf.Lines, withTrailingLf.Lines);
         Assert.Equal(2, withTrailingLf.Lines.Count);
     }
-
-    // Encodes test text to Windows-1252 bytes. Only characters in the ASCII range are used by the
-    // callers, so a plain byte cast is enough and needs no encoding provider on the test side.
-    private static byte[] Windows1252(string text) => text.Select(c => (byte)c).ToArray();
 }

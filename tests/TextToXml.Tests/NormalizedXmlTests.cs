@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Xml.Linq;
 using System.Xml.Serialization;
+using static TextToXml.Tests.TestSupport;
 
 namespace TextToXml.Tests;
 
@@ -150,29 +151,6 @@ public class NormalizedXmlTests
           </message>
         </commande>
         """;
-
-    private static XElement Root(string descriptor) => XDocument.Parse(descriptor).Root!;
-
-    // Parses the produced normalized XML and returns its <file> root.
-    private static XElement FileRoot(string xml) => XDocument.Parse(xml).Root!;
-
-    // Encodes ASCII-only test text to Windows-1252 bytes; a plain byte cast is enough for these callers.
-    private static byte[] Windows1252(string text) => text.Select(c => (byte)c).ToArray();
-
-    // Places each fragment on a blank Ligne of the given length, space-padded like a fixed-width record.
-    private static string Row(int length, params (int Position, string Text)[] fields)
-    {
-        char[] buffer = new string(' ', length).ToCharArray();
-        foreach ((int position, string text) in fields)
-        {
-            for (int i = 0; i < text.Length && position + i < length; i++)
-            {
-                buffer[position + i] = text[i];
-            }
-        }
-
-        return new string(buffer);
-    }
 
     // The Ids of the <value> Champs declared in a section, in declaration order.
     private static string[] DeclaredIds(string descriptor, string section) =>

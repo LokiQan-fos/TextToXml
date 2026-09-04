@@ -15,15 +15,6 @@ namespace TextToXml;
 // Champ Id carrying its canonical value. Pure, no I/O, no mutable static state (CC-6).
 internal static class NormalizedXmlBuilder
 {
-    // The Bloc a Ligne was assigned to selects both the Descripteur section that declares its Champs
-    // and the element name used for it in the normalized XML.
-    private static readonly Dictionary<Block, string> SectionByBlock = new()
-    {
-        [Block.Detail] = "message",
-        [Block.Footer] = "footer",
-        [Block.Header] = "header",
-    };
-
     // Lines and blocks are aligned one-to-one, in Ligne order, as produced by BlockAssigner. The
     // Descripteur has already been validated, so Position and Size are non-negative integers and every
     // Champ has an Id that is a legal XML element name.
@@ -37,7 +28,8 @@ internal static class NormalizedXmlBuilder
 
         for (int i = 0; i < lines.Count; i++)
         {
-            if (!SectionByBlock.TryGetValue(blocks[i], out string? sectionName))
+            string? sectionName = DescriptorSections.For(blocks[i]);
+            if (sectionName is null)
             {
                 continue;
             }

@@ -11,15 +11,6 @@ namespace TextToXml;
 // non-blocking Segment control (FR-3). Pure, no I/O, no mutable static state (CC-6).
 internal static class BlockAssigner
 {
-    // The three sections that can carry a Segment marker, each paired with the Bloc its Lignes are
-    // assigned to and its root marker attribute. Members are ordered alphabetically (CC-4).
-    private static readonly (Block Bloc, string MarkerAttribute, string Section)[] SegmentControlSections =
-    [
-        (Block.Header, "headerMarker", "header"),
-        (Block.Detail, "messageMarker", "message"),
-        (Block.Footer, "footerMarker", "footer"),
-    ];
-
     // Trailing empty or whitespace-only Lignes are dropped before the count; an empty Ligne in the
     // middle still counts. The first Ligne is the Header when a <header> section is declared, the last
     // is the Footer when a <footer> section is declared, and every Ligne in between is a Detail. When
@@ -112,7 +103,7 @@ internal static class BlockAssigner
             return warnings;
         }
 
-        foreach ((Block bloc, string markerAttribute, string section) in SegmentControlSections)
+        foreach ((Block bloc, string markerAttribute, string section) in DescriptorSections.All)
         {
             XElement? sectionElement = root.Element(section);
             string? marker = (string?)root.Attribute(markerAttribute);

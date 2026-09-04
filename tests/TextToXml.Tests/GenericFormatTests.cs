@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Xml.Linq;
+using static TextToXml.Tests.TestSupport;
 
 namespace TextToXml.Tests;
 
@@ -20,14 +21,6 @@ public class GenericFormatTests
     // the like) are deliberately excluded - they collide with legitimate data.
     private static readonly string[] P60SpecificTokens =
         ["P60", "KAPE22", "EOF", "Segment", "DiametreProduit", "Coulee", "Records"];
-
-    private static string ReadDescriptor(string name) =>
-        File.ReadAllText(Path.Combine(RepoLayout.FixturesDirectory, "generic", name));
-
-    private static byte[] ReadInput(string name) =>
-        File.ReadAllBytes(Path.Combine(RepoLayout.FixturesDirectory, "generic", name));
-
-    private static XElement FileRoot(string xml) => XDocument.Parse(xml).Root!;
 
     // AC-FR1-9: a synthetic Descripteur with different Ids, Positions, Sizes and no header/footer is
     // converted with no change to TextToXml; the XML is coherent with that Descripteur.

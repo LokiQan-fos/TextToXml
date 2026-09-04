@@ -1,0 +1,60 @@
+# EditorConfig for the TextToXml solution.
+# Encodes the mechanical half of the PRD 4.5 coding standards (CC-2, CC-3, CC-4).
+# The language and shape of comments (CC-2/CC-3) and alphabetical property order (CC-4)
+# are not expressible here and stay enforced by the adversarial code review.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{json,yml,yaml}]
+indent_size = 2
+
+[*.{csproj,props,targets}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+# Test fixtures are byte-sensitive (Windows-1252, CR LF, high bytes). Never touch them.
+[tests/TextToXml.Tests/fixtures/**]
+charset = unset
+end_of_line = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+
+[P60/**]
+charset = unset
+end_of_line = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+
+[*.cs]
+# Usings sit outside the namespace, System first, then alphabetical. This matches the
+# established house style; ImplicitUsings stays on but the explicit directives are kept.
+csharp_using_directive_placement = outside_namespace:warning
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+
+# File-scoped namespaces and Allman braces, as written across the codebase.
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_new_line_before_open_brace = all
+
+# One statement and one declaration per line.
+csharp_preserve_single_line_statements = false
+
+# Modern C# the codebase already relies on.
+csharp_style_prefer_primary_constructors = false:suggestion
+dotnet_style_collection_initializer = true:suggestion
+csharp_style_implicit_object_creation_when_type_is_apparent = true:suggestion
+dotnet_style_namespace_match_folder = false
+
+# Unused usings: surfaced, not enforced. The codebase deliberately keeps explicit
+# System directives despite ImplicitUsings; revisit this house-style point before raising it.
+dotnet_diagnostic.IDE0005.severity = suggestion

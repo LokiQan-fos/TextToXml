@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Xml.Linq;
 using System.Xml.Serialization;
+using static TextToXml.Tests.TestSupport;
 
 namespace TextToXml.Tests;
 
@@ -20,12 +21,6 @@ namespace TextToXml.Tests;
 [Trait("Category", TestCategory.Unit)]
 public class ExtendedTypesTests
 {
-    private static string ReadDescriptor(string name) =>
-        File.ReadAllText(Path.Combine(RepoLayout.FixturesDirectory, "generic", name));
-
-    private static byte[] ReadInput(string name) =>
-        File.ReadAllBytes(Path.Combine(RepoLayout.FixturesDirectory, "generic", name));
-
     // Message-only Descripteur with a single decimal Champ, used for the separator, sign and
     // trailing-zero edge cases that do not need a full fixture file.
     private const string DecimalOnly = """
@@ -48,9 +43,6 @@ public class ExtendedTypesTests
         """;
 
     private static XElement Message(string xml) => XDocument.Parse(xml).Root!.Element("message")!;
-
-    // Encodes ASCII-only test text to bytes; the Windows-1252 decoder reads these back unchanged.
-    private static byte[] Ascii(string text) => text.Select(c => (byte)c).ToArray();
 
     // CTR-1: a valid decimal Valeur brute is normalized to its canonical form; the decimalSeparator of
     // the Descripteur ("," here) is honored and the XML carries the invariant "." form.

@@ -14,14 +14,6 @@ namespace TextToXml;
 // the surplus is ignored (D5). Pure, no I/O, no mutable static state (CC-6).
 internal static class LineLengthChecker
 {
-    // The Bloc a Ligne was assigned to selects the Descripteur section whose Champs constrain it.
-    private static readonly Dictionary<Block, string> SectionByBlock = new()
-    {
-        [Block.Detail] = "message",
-        [Block.Footer] = "footer",
-        [Block.Header] = "header",
-    };
-
     // Lines and blocks are aligned one-to-one, in Ligne order, as produced by BlockAssigner. The
     // returned list carries at most one LineTooShort per Ligne, in Ligne order.
     public static IReadOnlyList<ConversionError> Check(
@@ -45,7 +37,8 @@ internal static class LineLengthChecker
 
     private static ConversionError? CheckLine(string line, Block bloc, int lineNumber, XElement root)
     {
-        if (!SectionByBlock.TryGetValue(bloc, out string? sectionName))
+        string? sectionName = DescriptorSections.For(bloc);
+        if (sectionName is null)
         {
             return null;
         }
