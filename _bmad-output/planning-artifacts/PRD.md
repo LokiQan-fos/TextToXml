@@ -645,8 +645,8 @@ Pas de déduplication fonctionnelle (§0bis D7). **Garde‑fou** (§0bis D22) : 
 l'`INSERT`, le worker vérifie qu'aucune ligne `L_D_LOG_COMMANDE` finissant par
 ` — OK` n'existe déjà pour ce `NumeroFichier` + `OF`.
 
-**Consequences (testables)** *(intégration EF — LocalDB / conteneur SQL, schéma
-miroir `L_D_KAPE22` + `L_D_LOG_COMMANDE`)* :
+**Consequences (testables)** *(intégration EF — instance SQL Server de test,
+schéma miroir `L_D_KAPE22` + `L_D_LOG_COMMANDE`)* :
 - `AC-FR11-1` : `MapResult.Success == true` → **1** ligne `L_D_KAPE22`,
   `ImportResult.InsertedId` = l'`Id` identity généré.
 - `AC-FR11-2` : `MapResult.Success == false` → **0** ligne `L_D_KAPE22`,

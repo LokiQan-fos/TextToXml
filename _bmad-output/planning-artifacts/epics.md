@@ -14,8 +14,9 @@ inputDocuments:
 ## Overview
 
 Ce document décompose le PRD `TextToXml` en 3 épics et 22 stories implémentables.
-Tous les tests d'intégration base de données sont **dockerisés** (Testcontainers /
-`docker-compose` de test, schéma minimal) — voir **AR-12**.
+Tous les tests d'intégration base de données tournent contre une **instance SQL
+Server locale** (Developer Edition) avec un **schéma minimal versionné**
+(`scripts/schema/`, généré depuis la base réelle) — voir **AR-12**.
 Aucune architecture ni UX design séparés (v1 = bibliothèque .NET pure +
 microservice worker, sans UI). Les décisions d'architecture sont portées par le
 PRD lui‑même (§0, §0bis D1–D26, §4). Cible technique : **.NET 10.0**, **EF Core
@@ -112,26 +113,47 @@ Architecture séparé, pas de starter template**.
   la lib enregistre elle‑même `CodePagesEncodingProvider` (D2, D19, FR-2).
 - **AR-11** — Jeu de fixtures : les 10 fichiers `P60/` + variantes fautives
   dérivées + **1 descripteur synthétique non‑P60** `fixtures/generic/` (Annexe A.4).
-- **AR-12** — **Tous** les tests d'intégration qui touchent SQL Server (EF Core,
-  scripts SQL, transactions, garde‑fou anti‑doublon, E2E) s'exécutent et sont
-  orchestrés via **conteneurs Docker** : **Testcontainers for .NET**
-  (`Testcontainers.MsSql`) de préférence, ou un `docker-compose` de test. La base
-  de test **n'est pas** la base complète : un script d'init crée **uniquement les
-  tables nécessaires aux tests** (`L_D_KAPE22`, `L_D_LOG_COMMANDE`, et pour les
-  logs `MQTTnetServices.dbo.Logs` / `dbo.WorkerSettings`). Les tests unitaires
+- **AR-12** — **Tests d'intégration base de données : instance SQL Server locale
+  + schéma versionné.** Tous les tests qui touchent SQL Server (EF Core, scripts
+  SQL, transactions, garde‑fou anti‑doublon, E2E) s'exécutent contre une
+  **instance SQL Server** (édition **Developer**, gratuite dev/test), base(s) de
+  test **`AscoLSI_Test`** + **`MQTTnetServices_Test`** (ou schémas équivalents sur
+  la même instance). **Jamais la base de production.** Les tests unitaires
   (`TextToXml`, `Kape22Mapper` hors persistance) et les tests `IFileSource`
-  mémoire **ne** requièrent **pas** Docker.
-  - **Un seul conteneur** est démarré pour **tout l'assembly d'intégration**
-    (fixture xUnit niveau assembly) ; l'isolation entre tests se fait par **reset
-    des données** (`Respawn` ou `TRUNCATE`), pas par un nouveau conteneur —
-    limite le coût (image ~1,5 Go, démarrage 10‑30 s).
-  - Jamais de dépendance à un SQL local (LocalDB, instance de poste).
-  - **Prérequis runner CI (documenté `README`) :** le runner de build doit savoir
-    exécuter des **conteneurs Linux** (image `mcr.microsoft.com/mssql/server`,
-    édition Developer, gratuite pour dev/test). Sur l'infra Windows Server 2019
-    du portail : WSL2 / Hyper‑V requis. À défaut, la catégorie `Integration` ne
-    tourne qu'en local — **voir Risque R-1**.
-  - Image épinglée par tag exact (pas `latest`).
+  mémoire **ne** requièrent **pas** SQL Server.
+  - **Schéma** — scripts SQL **idempotents versionnés** dans `scripts/schema/`
+    (`01-ascolsi-tables.sql`, `02-mqtt-logs.sql`…) créant **uniquement** les
+    tables nécessaires aux tests : `L_D_KAPE22`, `L_D_LOG_COMMANDE`,
+    `MQTTnetServices.dbo.Logs`, `dbo.WorkerSettings` — **rien d'autre** de la base
+    réelle.
+  - **Provenance (R-3)** — ces scripts sont **générés depuis la base réelle
+    `AFV004-LSI`** (`sqlcmd` sur `sys.columns` / `GENERATE SCRIPTS`), en‑tête
+    portant **serveur, base et date d'extraction**. Jamais rédigés de mémoire.
+    Un test « modèle `AscoLsiDbContext` ⟺ `scripts/schema/` » verrouille la
+    dérive.
+  - **Isolation entre tests — deux régimes selon ce qui est testé :**
+    - **`TransactionScope` + rollback** (défaut) pour les tests qui lisent/écrivent
+      sans dépendre du commit : rapide, aucun nettoyage. En async ⇒
+      `TransactionScopeAsyncFlowOption.Enabled` **obligatoire**.
+    - **Commit réel + reset de données** (`Respawn` ou `TRUNCATE` ciblé) pour les
+      tests qui **dépendent d'un état persisté entre deux actions** ou qui
+      **testent les frontières de transaction** — un `TransactionScope` ambiant
+      les fausserait : garde‑fou anti‑doublon (`AC-FR11-6/11-7`, D22 — la 2ᵉ
+      tentative doit voir la ligne `… — OK` **commitée** par la 1ʳᵉ), rollback
+      sur échec (`AC-FR11-3/11-5`), E2E 10 fichiers (Story 3.6).
+  - **Configuration** — chaîne(s) de connexion de test dans `appsettings.Test.json`
+    (ou User Secrets / variables d'environnement en CI), pointant vers l'instance
+    de test. **Jamais en dur.** Aucun secret au dépôt.
+  - **Catégorisation** — ces tests portent `[Trait("Category","Integration")]`.
+    `dotnet test --filter Category=Unit` ne les exécute pas ; `Category=Integration`
+    requiert **une instance SQL Server joignable**. À défaut, ils sont **ignorés
+    avec un message clair** (pas en échec) — détection par tentative de connexion
+    brève dans la fixture niveau assembly.
+  - **CI** — le workflow exécute `Category=Unit` sur chaque push (inchangé).
+    `Category=Integration` tourne quand un runner fournit SQL Server : conteneur
+    Linux `mcr.microsoft.com/mssql/server` **si** le runner est Linux, **ou**
+    instance SQL Server native sur runner Windows. Les mêmes `scripts/schema/`
+    servent dans les deux cas. **Aucune dépendance Docker en développement.**
 
 ### UX Design Requirements
 
@@ -159,7 +181,7 @@ microservices à UI et ne s'appliquent à aucune story v1.
     propre : les **tests‑barrière‑à‑la‑compilation** (`AC-FR7-3`, `AC-FR16-1..4`,
     `AC-FR9-6` — tests d'architecture / de complétude par réflexion) dont la forme
     d'échec est un **build qui casse**, et l'infrastructure de test elle‑même
-    (harnais Docker Story 2.1). Ces cas restent test‑first au sens : le test /
+    (harnais de base de test Story 2.1). Ces cas restent test‑first au sens : le test /
     l'assertion existe et échoue **avant** que le code de prod le satisfasse.
 - **CC-2 — Commentaires : langue & syntaxe.** Tous les commentaires (C#, XML, SQL,
   YAML, `.csproj`, scripts) sont en **anglais**. Chaque phrase de commentaire
@@ -220,22 +242,23 @@ microservices à UI et ne s'appliquent à aucune story v1.
 | NFR-5 | 2.1 (`DbContext`/connexions), 2.8 (`AC-FR11-8`), garde `CC-7` Épics 2‑3 | test « connexions lues de `IConfiguration` », revue secrets |
 | NFR-6 | 3.3 (double log), 3.6 (traçabilité) | E2E : nom fichier → `InsertedId` / `Errors` via `Logs` + `L_D_LOG_COMMANDE` + `*.errors.json` |
 | NFR-7 | 3.1 (`AC-FR12-6`), 3.5 (`AC-FR15-4`) | test reprise sans action en base |
-| NFR-8 | 1.1, 2.1 | inspection des versions de packages (dont `Testcontainers.MsSql`) |
+| NFR-8 | 1.1, 2.1 | inspection des versions de packages (`Microsoft.EntityFrameworkCore` 10.0.x, `Serilog.Sinks.MSSqlServer`) |
 | NFR-9 | 3.4 (`AC-FR14-6`) | test arrêt propre < 5 s, jamais de demi‑insertion |
 
-**AR-12 (tests d'intégration dockerisés)** — harnais central : **Story 2.1**
-(`Testcontainers.MsSql` + script d'init tables minimales + fallback
-`docker-compose`) ; réutilisé par **2.8** (persistance transactionnelle),
-**3.3** (écritures de logs), **3.5** (`AC-FR15-3/4`), **3.6** (E2E 10 fichiers).
-Tests unitaires (`TextToXml`, `Kape22Mapper` hors persistance) sans Docker.
+**AR-12 (tests d'intégration base de données locale)** — harnais central :
+**Story 2.1** (fixture assembly SQL Server + `scripts/schema/` idempotents généré
+depuis `AFV004-LSI` + double régime d'isolation `TransactionScope` / reset) ;
+réutilisé par **2.8** (persistance transactionnelle), **3.3** (écritures de
+logs), **3.5** (`AC-FR15-3/4`), **3.6** (E2E 10 fichiers). Tests unitaires
+(`TextToXml`, `Kape22Mapper` hors persistance) sans SQL Server.
 
 ### Risques & points à trancher en début d'épic
 
 | # | Risque / point | Impact | Action | Statut |
 |---|---|---|---|---|
-| R-1 | Runner CI (Windows Server 2019) : capacité conteneurs Linux (`mssql/server`) | catégorie `Integration` non exécutée en CI | **Tranché (utilisateur) :** l'environnement cible gère les conteneurs ; à défaut les tests s'appuient sur Testcontainers / instance locale selon les besoins. Story 2.1 : garde le skip propre si pas de démon Docker. | ✅ résolu |
+| R-1 | Exécution des tests `Integration` sur cible Windows Server 2019 sans conteneurs Linux (pas de WSL2/Hyper-V) | catégorie `Integration` non exécutable | **Tranché (utilisateur, 2026-09-04) :** abandon de Docker/Testcontainers. Tests contre une **instance SQL Server locale** (Developer Edition) + `scripts/schema/` versionné ; skip propre si aucune instance joignable (détection connexion). CI : conteneur Linux `mssql/server` sur runner Linux, ou SQL natif sur runner Windows. Voir `sprint-change-proposal-2026-09-04.md`. | ✅ résolu |
 | R-2 | `PortalSharedLibrary` : mode de référencement (D20) | bloque le build de la solution (Story 1.1) | **Tranché (utilisateur) :** `ProjectReference` pointant vers l'emplacement de `PortalSharedLibrary` dans l'arborescence (chemin standard de la solution / dépôt `PortalFosMarcegaglia`). Story 1.1 : documenter le chemin exact dans le `README`. | ✅ résolu |
-| R-3 | `test-schema.sql` rédigé à la main → dérive vs `L_D_KAPE22` réelle | tests d'intégration verts contre un faux schéma (contre‑métrique SM‑3) | **Confirmé (utilisateur) :** base `AFV004-LSI` accessible sur le serveur cible pour lire les 92 colonnes. Story 2.1 : script généré depuis `AFV004-LSI` (provenance datée), + test « modèle EF ⟺ `test-schema.sql` ». | ✅ accès confirmé |
+| R-3 | `scripts/schema/*.sql` dérive vs schéma réel de `AscoLSI` | tests d'intégration verts contre un faux schéma (contre‑métrique SM‑3) | **Résolu (2026-09-04) :** `scripts/schema/01-ascolsi-tables.sql` + `02-mqtt-tables.sql` **générés depuis `AFV004-LSI`** (SQL Server 2012, `AscoLSI` + `MQTTnetServices` **même instance**), en‑tête de provenance daté, **validés** (exécution idempotente en base jetable). Story 2.1 : câbler la chaîne de test (User Secrets / `appsettings.Test.json` gitignoré) + test « `AscoLsiDbContext` ⟺ `scripts/schema/` ». **NB : les longueurs texte de PRD Annexe C sont en octets (×2) — les scripts portent les vraies (`OF nchar(12)`, `Client nvarchar(13)`…).** | ✅ résolu |
 | R-4 | Ordre des enfants du XML normalisé vs `<xs:sequence>` de `P60.xsd` | validation `AC-FR5-14` / `AC-FR7-1` casse si divergence | Décision : XML émis dans l'**ordre du Descripteur**, `P60.xsd` en `<xs:sequence>` **même ordre** (Stories 1.6 & 2.3). | ✅ résolu |
 | R-5 | `xsd.exe` génère `Kape22File` dans l'ordre du schéma, pas alphabétique — conflit `CC-4` | friction inutile / post‑traitement fragile | `CC-4` **ne s'applique pas** aux fichiers générés ; membres ajoutés à la main → classe partielle triée (Story 2.3). | ✅ résolu |
 | R-6 | Source de `max_length` pour `AC-FR8-2` non spécifiée | dépendance schéma au runtime, ou constantes qui dérivent | Story 2.5 : constantes issues d'Annexe C dans la config d'entité, pas de requête `sys.columns` live. | ✅ résolu |
@@ -249,7 +272,7 @@ Tests unitaires (`TextToXml`, `Kape22Mapper` hors persistance) sans Docker.
 | Besoin | Story |
 |---|---|
 | Solution `TextToXml.sln`, projets, xUnit, `PortalSharedLibrary`, arbo fixtures + 10 fichiers valides, séparation catégories `Unit` / `Integration` | 1.1 |
-| `AscoLsiDbContext` database‑first (`L_D_KAPE22`, `L_D_LOG_COMMANDE`) + **harnais de test Docker** (Testcontainers `MsSql` + script d'init tables minimales, AR-12) | 2.1 |
+| `AscoLsiDbContext` database‑first (`L_D_KAPE22`, `L_D_LOG_COMMANDE`) + **harnais de test SQL Server local** (`scripts/schema/` générés depuis `AFV004-LSI` + double régime d'isolation, AR-12) | 2.1 |
 | `P60.xml` enrichi (`datatype`, `expectedMessageCount`) + ressource embarquée | 2.2 |
 | `P60.xsd` + génération DTO `Kape22File` + validation avant désérialisation | 2.3 |
 
@@ -332,7 +355,8 @@ So that toute story suivante démarre sur un socle compilable et testable en TDD
   pour toutes les stories suivantes
 **And** les tests sont séparés en deux catégories via `[Trait("Category","Unit")]`
   et `[Trait("Category","Integration")]` ; `dotnet test --filter Category=Unit`
-  tourne **sans Docker**, `Category=Integration` requiert un démon Docker (AR-12)
+  tourne **sans base de données**, `Category=Integration` requiert une instance
+  SQL Server joignable (AR-12)
 
 **Note (risque à lever tôt) :** `PortalSharedLibrary` est référencé par D20 sans
 préciser NuGet interne vs `ProjectReference` externe (dépôt
@@ -667,12 +691,12 @@ So that ajouter un format = 0 ligne de code dans `TextToXml`.
 Étape 2 pour P60 : du XML normalisé à la ligne insérée dans `AscoLSI`, **tout ou
 rien**, avec contrôle de compatibilité au démarrage et garde‑fou anti‑doublon.
 
-### Story 2.1 : Entités EF (database‑first) & harnais de test Docker
+### Story 2.1 : Entités EF (database‑first) & harnais de test SQL Server local
 
 As a `Kape22Importer`,
 I want un `AscoLsiDbContext` figeant les tables cibles d'après Annexe C (sans
-migration) **et** un harnais de tests d'intégration dockerisé (Testcontainers
-SQL Server, schéma minimal),
+migration) **et** un harnais de tests d'intégration contre une instance SQL
+Server locale (schéma minimal versionné, généré depuis la base réelle),
 So that le descripteur, le mapping et la persistance disposent d'entités fidèles
 au schéma réel et d'une base de test jetable dès la première story de l'épic.
 
@@ -702,34 +726,34 @@ au schéma réel et d'une base de test jetable dès la première story de l'épi
 
 **Given** le harnais de test d'intégration (AR-12)
 **When** la fixture xUnit **niveau assembly** démarre
-**Then** elle lance **un** conteneur **SQL Server** via `Testcontainers.MsSql`
-  (image épinglée par tag exact) pour tout l'assembly d'intégration, applique
-  `test-schema.sql` (idempotent) créant **uniquement** `AscoLSI.dbo.L_D_KAPE22`,
-  `AscoLSI.dbo.L_D_LOG_COMMANDE`, `MQTTnetServices.dbo.Logs`,
-  `MQTTnetServices.dbo.WorkerSettings` — et **rien d'autre** de la base réelle
-**And** `test-schema.sql` est **scripté depuis la base réelle `AFV004-LSI`**
-  (`GENERATE SCRIPTS` / `sys.columns`), avec en en‑tête sa **provenance et sa
-  date** ; il n'est **jamais** rédigé de mémoire (R-3)
-**And** l'isolation entre tests se fait par **reset des données** (`Respawn` /
-  `TRUNCATE`), pas par un nouveau conteneur ; le conteneur est **détruit** en fin
-  d'assembly
-**And** la chaîne de connexion du conteneur est fournie au `DbContext` par la
-  fixture (jamais en dur, jamais un SQL local)
-**And** un fallback `docker-compose` de test équivalent est fourni et documenté
-  pour l'exécution locale et la CI
+**Then** elle se connecte à l'instance SQL Server de test (chaîne d'
+  `appsettings.Test.json` / variable d'environnement) et applique les scripts
+  **idempotents** de `scripts/schema/` créant **uniquement** `L_D_KAPE22`,
+  `L_D_LOG_COMMANDE`, `MQTTnetServices.dbo.Logs`, `MQTTnetServices.dbo.WorkerSettings`
+  — et **rien d'autre** de la base réelle
+**And** les scripts de `scripts/schema/` sont **générés depuis la base réelle
+  `AFV004-LSI`** (`sqlcmd` / `sys.columns`), avec en en‑tête **serveur, base et
+  date d'extraction** ; ils ne sont **jamais** rédigés de mémoire (R-3)
+**And** l'isolation par défaut se fait par **`TransactionScope` + rollback**
+  (async ⇒ `TransactionScopeAsyncFlowOption.Enabled`) ; les tests qui dépendent
+  d'un état commité entre deux actions, ou qui testent les frontières de
+  transaction, utilisent **commit réel + reset de données** (`Respawn` / `TRUNCATE`)
+**And** la chaîne de connexion est fournie au `DbContext` par la fixture (jamais
+  en dur ; base de **test** dédiée, jamais la production)
 **And** ces tests portent `[Trait("Category","Integration")]` ; ils sont
-  **ignorés avec un message clair** (pas en échec) si aucun démon Docker n'est
-  disponible
+  **ignorés avec un message clair** (pas en échec) si aucune instance SQL Server
+  n'est joignable (tentative de connexion brève dans la fixture)
 
 **Tests xUnit (TDD — écrits en premier, CC-1) :** test « ensemble des colonnes
 NOT NULL == Annexe C.1 » ; test de forme d'entité (types CLR) ; test « pas de
 migration / `Id` identity » ; test « connexions lues de `IConfiguration` » ;
-**test « modèle `AscoLsiDbContext` ⟺ colonnes/types de `test-schema.sql` »** (R-3) ;
-**test d'intégration fumée** : la fixture Docker démarre, `test-schema.sql` passe,
-un `INSERT`/`SELECT` round‑trip sur `L_D_KAPE22` réussit dans le conteneur.
+**test « modèle `AscoLsiDbContext` ⟺ colonnes/types de `scripts/schema/` »** (R-3) ;
+**test d'intégration fumée** : la fixture se connecte, `scripts/schema/` s'applique
+sans erreur, un `INSERT`/`SELECT` round‑trip sur `L_D_KAPE22` réussit — sous
+`TransactionScope` (rollback), la base reste vide après le test.
 
 **Critères transverses :** CC-1, CC-2, CC-3, **CC-4 (propriétés d'entité par
-ordre alphabétique)**, CC-5, CC-7. **AR-12** : harnais de test dockerisé.
+ordre alphabétique)**, CC-5, CC-7. **AR-12** : harnais de test SQL Server local.
 
 ---
 
@@ -884,7 +908,7 @@ un rejet par fichier.
 **And** `max_length` provient de **constantes issues d'Annexe C** portées par la
   configuration d'entité EF (`HasMaxLength`), **pas** d'une requête `sys.columns`
   au runtime — aucune dépendance au schéma live au démarrage (R-6) ; un test
-  vérifie que ces constantes == `test-schema.sql`
+  vérifie que ces constantes == `scripts/schema/`
 **And** toute colonne **NOT NULL** (Annexe C) a une source (Champ mappé ou règle
   dérivée FR‑9) — sinon exception de démarrage (AC-FR8-3)
 **And** descripteur & table compatibles (cas nominal KAPE22) → le worker démarre (AC-FR8-4)
@@ -988,9 +1012,11 @@ demi‑écriture.
 
 **Acceptance Criteria:**
 
-*(Tests d'intégration EF — via le **harnais Docker de la Story 2.1**
-(`Testcontainers.MsSql`, tables minimales `L_D_KAPE22` + `L_D_LOG_COMMANDE`),
-`[Trait("Category","Integration")]`. Aucun SQL local. AR-12.)*
+*(Tests d'intégration EF — via le **harnais de la Story 2.1** (instance SQL
+Server de test, tables minimales `L_D_KAPE22` + `L_D_LOG_COMMANDE`),
+`[Trait("Category","Integration")]`. `AC-FR11-3`/`AC-FR11-5` (frontières de
+transaction) et `AC-FR11-6`/`AC-FR11-7` (garde‑fou anti‑doublon) tournent en
+**commit réel + reset de données**, pas sous `TransactionScope` ambiant. AR-12.)*
 
 **Given** `MapResult.Success == true`
 **When** la persistance s'exécute
@@ -1020,10 +1046,10 @@ demi‑écriture.
   dur**, compte `sa` existant (AC-FR11-8, D21, CC-7)
 
 **Tests xUnit (TDD — écrits en premier, CC-1) :** `AC-FR11-1` … `AC-FR11-8`
-(catégorie `Integration`, harnais Docker Story 2.1).
+(catégorie `Integration`, harnais SQL Server local Story 2.1).
 
 **Critères transverses :** CC-1, CC-2, CC-3, CC-4, CC-5, CC-7. **AR-12** : tests
-d'intégration dockerisés.
+d'intégration sur SQL Server local.
 
 ---
 
@@ -1166,10 +1192,10 @@ So that tout traitement — succès comme rejet — laisse une trace lisible.
 **Tests xUnit (TDD — écrits en premier, CC-1) :** `AC-FR14-1`, `AC-FR14-2`,
 `AC-FR14-3`, `AC-FR14-4`, `AC-FR14-7`, `AC-FR14-8` — les cas écrivant en base
 (`L_D_LOG_COMMANDE`, `Logs`) sont en catégorie `Integration` sur le harnais
-Docker de la Story 2.1 (AR-12).
+SQL Server local de la Story 2.1 (AR-12).
 
 **Critères transverses :** CC-1, CC-2, CC-3, CC-4, CC-5, CC-7. **AR-12** : tests
-d'intégration dockerisés.
+d'intégration sur SQL Server local.
 
 ---
 
@@ -1231,7 +1257,9 @@ So that le service tourne sans surveillance permanente.
 
 **Tests xUnit (TDD — écrits en premier, CC-1) :** `AC-FR15-1` … `AC-FR15-4`.
 `AC-FR15-3` (base injoignable) et `AC-FR15-4` (recycle) s'appuient sur le harnais
-Docker de la Story 2.1 — conteneur arrêté / redémarré en cours de test (AR-12).
+SQL Server local de la Story 2.1 — la panne est simulée par une chaîne de
+connexion pointant un hôte/port mort (ou un toggle de la fixture), pas par
+l'arrêt d'un conteneur (AR-12).
 
 **Critères transverses :** CC-1, CC-2, CC-3, CC-4, CC-5, CC-7.
 
@@ -1255,9 +1283,10 @@ So that la v1 est acceptable pour la mise en production.
   traçabilité `AC → test(s)` sans lacune (SM‑1)
 
 **Given** les 10 fichiers `P60/P60_847_682_001..010`
-**When** le test d'intégration de bout en bout s'exécute sur le **harnais Docker**
-  de la Story 2.1 (`Testcontainers.MsSql`, tables minimales ; ou `docker-compose`
-  de test) — `[Trait("Category","Integration")]`, aucun SQL local (AR-12)
+**When** le test d'intégration de bout en bout s'exécute sur le **harnais SQL
+  Server local** de la Story 2.1 (instance de test, tables minimales de
+  `scripts/schema/`) — `[Trait("Category","Integration")]`, en **commit réel +
+  reset de données** (AR-12)
 **Then** `Kape22Importer` insère **10 lignes** `L_D_KAPE22` cohérentes avec les
   données visibles (`OF`, `Coulee`, `Client`, `Nuance`) + 10 lignes
   `L_D_LOG_COMMANDE` ` — OK` (SM‑2)
@@ -1282,8 +1311,9 @@ So that la v1 est acceptable pour la mise en production.
 
 **Tests xUnit (TDD — écrits en premier, CC-1) :** test agrégateur de traçabilité
 (SM‑1, catégorie `Unit`) ; E2E 10 fichiers (SM‑2, catégorie `Integration`,
-harnais Docker Story 2.1) ; test `*.errors.json` lisible (SM‑3) ; tests de perf
-(NFR‑1/2 — la mesure < 200 ms exclut le temps de démarrage du conteneur).
+harnais SQL Server local Story 2.1) ; test `*.errors.json` lisible (SM‑3) ;
+tests de perf (NFR‑1/2 — la mesure < 200 ms exclut le temps de connexion /
+d'application du schéma).
 
 **Critères transverses :** CC-1, CC-2, CC-3, CC-4, CC-5, CC-7. **AR-12** : E2E
-dockerisé.
+sur SQL Server local.
