@@ -985,24 +985,31 @@ Champs identifiants (extrait ; liste complète = section `<message>` de `P60.xml
 | Element | 12 | 1 | string | *(ignoré)* | — |
 | KAP | 13 | 2 | string | *(ignoré)* | — |
 | Reserve | 15 | 6 | string | *(ignoré)* | — |
-| Type | 21 | 1 | string | `Type` | nchar(2) NOT NULL |
-| OF | 22 | 7 | string | `OF` | nchar(24) NOT NULL |
+| Type | 21 | 1 | string | `Type` | nchar(1) NOT NULL |
+| OF | 22 | 7 | string | `OF` | nchar(12) NOT NULL |
 | Indice | 29 | 1 | int | `Indice` | int NOT NULL |
-| Client | 30 | 13 | string | `Client` | nvarchar(26) NOT NULL |
-| Nuance | 43 | 7 | string | `Nuance` | nvarchar(14) NOT NULL |
-| Coulee | 50 | 6 | string | `Coulee` | nvarchar(12) NOT NULL |
-| ProfilProduit | 56 | 3 | string | `ProfilProduit` | nchar(6) NULL |
+| Client | 30 | 13 | string | `Client` | nvarchar(13) NOT NULL |
+| Nuance | 43 | 7 | string | `Nuance` | nvarchar(7) NOT NULL |
+| Coulee | 50 | 6 | string | `Coulee` | nvarchar(6) NOT NULL |
+| ProfilProduit | 56 | 3 | string | `ProfilProduit` | nchar(3) NULL |
 | DiametreProduit | 59 | 4 | int | `DiametreProduit` | int NULL |
 | … *(colonne `int` L_D_KAPE22)* | … | … | int | *(homonyme)* | int NULL |
 | … *(colonne `nchar`/`nvarchar`)* | … | … | string | *(homonyme)* | (n)var/char NULL |
 | DateEnfournementFour1_Date / _Heure | 162 / 166 | 4 / 4 | string | **ignoré (§0bis D14)** — colonne `DateEnfournementFour1` laissée NULL | — |
 | DateEnfournementFour2_Date / _Heure | 172 / 176 | 4 / 4 | string | **ignoré (§0bis D14)** — colonne `DateEnfournementFour2` laissée NULL | — |
-| OFOriginInterne | 429 | 1 | string | `OForiginInterne` *(casse)* | nchar(24) NULL |
+| OFOriginInterne | 429 | 1 | string | `OForiginInterne` *(casse)* | nchar(12) NULL |
 | ReserveSVT | 510 | 16 | string | *(ignoré)* | — |
 | *(526..636)* | — | — | — | **ignoré (§0bis D5)** | — |
 
 P60 n'a **aucun** Champ `datetime` ni `decimal` : `int` (~30 Champs, `int.Parse`
 après `Trim`, pas de `convert`) et `string` (le reste). Aucun `convert` requis.
+
+> **Longueurs de colonnes (corrigé 2026‑09‑04).** Les longueurs `nchar`/`nvarchar`
+> ci‑dessus sont en **caractères**, telles que lues dans `AFV004-LSI`
+> (`INFORMATION_SCHEMA.COLUMNS`, cf. `scripts/schema/`). Une version antérieure de
+> cette annexe et de C.1/C.2 donnait le **double** (nombre d'octets `nchar`/`nvarchar`).
+> Le `Size` de chaque `<value>` de `P60.xml` correspond exactement à la longueur
+> réelle de la colonne homonyme (aucun débordement).
 
 ### A.3 Bloc Pied (`Segment` = `999`) — longueur min 17
 
@@ -1072,9 +1079,11 @@ Au **démarrage du worker** (FR‑8), incompatibilité de type ou `Size > max_le
 ### C.1 `AscoLSI.dbo.L_D_KAPE22` (cible)
 
 PK `Id` `int` identity. ~17 648 lignes. Colonnes **NOT NULL** (hors `Id`) :
-`NumeroFichier` (nvarchar max), `OF` (nchar 24), `Indice` (int), `Type` (nchar 2),
-`Coulee` (nvarchar 12), `Nuance` (nvarchar 14), `Client` (nvarchar 26),
+`NumeroFichier` (nvarchar max), `OF` (nchar 12), `Indice` (int), `Type` (nchar 1),
+`Coulee` (nvarchar 6), `Nuance` (nvarchar 7), `Client` (nvarchar 13),
 `DateReception` (datetime). Toutes les autres colonnes sont **nullable**.
+Longueurs `nchar`/`nvarchar` en **caractères** (source `AFV004-LSI`,
+`scripts/schema/01-ascolsi-tables.sql`).
 
 `datatype` du template dérivé du type de colonne (§0bis D6) : **`int`** pour les
 ~30 colonnes numériques SAP (`Indice`, `DiametreProduit`, toutes les `Tolerance*`,
@@ -1093,10 +1102,10 @@ d'unicité métier ⇒ pas de dédup (§0bis D7). Les 92 colonnes sont figées d
 | Colonne | Type | Null | Écrit par `Kape22Importer` |
 |---|---|---|---|
 | `Id` | int identity | non | — |
-| `Commande` | nvarchar(100) | non | `"P60"` |
+| `Commande` | nvarchar(50) | non | `"P60"` |
 | `Message` | nvarchar(max) | non | `"<NumeroFichier> — OK"` / `"<NumeroFichier> — REJETÉ : <résumé erreurs de mapping>"` |
-| `OF` | nvarchar(24) | non | `OF` **brut** du bloc message (§0bis D8) — ligne écrite **seulement si lisible** (§0bis D15) |
-| `User` | nvarchar(100) | non | `Import:InitiatingServer` (config, §0bis D8) |
+| `OF` | nvarchar(12) | non | `OF` **brut** du bloc message (§0bis D8) — ligne écrite **seulement si lisible** (§0bis D15) |
+| `User` | nvarchar(50) | non | `Import:InitiatingServer` (config, §0bis D8) |
 | `Date` | datetime | non | horodatage de traitement (heure de Paris) |
 | `NumLingot` | int | non | `0` (§0bis D25) |
 | `Trace` | bit | oui | `1` (§0bis D25) |
@@ -1106,8 +1115,9 @@ d'unicité métier ⇒ pas de dédup (§0bis D7). Les 92 colonnes sont figées d
 `Logs` : `Id` (identity), `Message`, `MessageTemplate`, `Level`, `TimeStamp`,
 `Exception`, `Properties` — sink `Serilog.Sinks.MSSqlServer`, message
 `[Kape22Importer][<Event>] : <texte>` (même style que les workers `ImportFiles` /
-`ConvertAndSave` existants). `WorkerSettings` : `WorkerName` (nvarchar 200),
-`IsActive` (bit) — le worker s'y enregistre pour le Launcher.
+`ConvertAndSave` existants) ; toutes les colonnes texte sont `nvarchar(max)`,
+`TimeStamp` nullable. `WorkerSettings` : `WorkerName` (nvarchar 100, **PK**),
+`IsActive` (bit) — pas de colonne `Id` — le worker s'y enregistre pour le Launcher.
 
 ## Annexe D — Catalogue des `ErrorCode`
 

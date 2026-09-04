@@ -441,14 +441,13 @@ quel**, le titre affiché sera corrigé, pas la clé.)
 - **Cible CI `Integration`** : runner Linux (conteneur `mssql/server`) vs runner
   Windows (SQL natif). Décision d'infra, sans impact sur le code des tests
   (mêmes `scripts/schema/`).
-- **Bug spec — PRD Annexe C.1 / C.2 : longueurs `nchar`/`nvarchar` doublées.**
-  Le schéma réel donne `OF nchar(12)`, `Coulee nvarchar(6)`, `Type nchar(1)`,
-  `Nuance nvarchar(7)`, `Client nvarchar(13)`, `Commande nvarchar(50)`,
-  `User nvarchar(50)`, `WorkerName nvarchar(100)` — l'Annexe C liste le double
-  (24, 12, 2, 14, 26, 100, 100, 200), c.-à-d. le **nombre d'octets**, pas de
-  caractères. Les `Size` du descripteur `P60.xml` (Client=13, Nuance=7, Coulee=6,
-  Type=1) **confirment** les valeurs réelles. `scripts/schema/` porte les
-  vraies ; **Story 2.5** doit prendre les `max_length` de `scripts/schema/`, pas
-  d'Annexe C. À corriger dans l'Annexe C (PM) — impacte aussi la lecture de la
-  liste des ~30 colonnes `int` pour la Story 2.2 (les types `int` eux sont
-  corrects, seules les longueurs texte sont fausses).
+- ~~**Bug spec — PRD Annexe C.1 / C.2 : longueurs `nchar`/`nvarchar` doublées**~~
+  **Corrigé (2026-09-04).** L'Annexe C listait le nombre d'**octets** (24, 12, 2,
+  14, 26, 100, 100, 200) au lieu de caractères. Réel : `OF nchar(12)`,
+  `Coulee nvarchar(6)`, `Type nchar(1)`, `Nuance nvarchar(7)`,
+  `Client nvarchar(13)`, `Commande/User nvarchar(50)`, `WorkerName nvarchar(100)`.
+  Vérifié : le `Size` de **chaque** `<value>` string de `P60.xml` est **égal** à
+  la longueur réelle de la colonne homonyme (aucun débordement, 0/57).
+  `PRD.md` Annexe A.2 + C.1 + C.2 + C.3 corrigées, note explicative ajoutée.
+  Les types `int` de l'Annexe C sont corrects (seules les longueurs texte
+  l'étaient). **Story 2.5** : `HasMaxLength` depuis `scripts/schema/`.
