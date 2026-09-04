@@ -1,5 +1,16 @@
 # Deferred Work
 
+## Deferred from: code review of story 2.4 (2026-09-04)
+
+- **`P60Deserializer.Deserialize` throws `ArgumentNullException` on a `null` `normalizedXml`** —
+  `Validate` wraps `XmlReader.Create(new StringReader(normalizedXml), ...)` in a `try/catch
+  (XmlException)` only; `new StringReader(null)` throws before that catch runs, so a `null` input
+  crashes instead of coming back as a `PersistenceError`. Pre-existing from Story 2.3, surfaced while
+  reviewing `Kape22Mapper.Map` (Story 2.4), which simply forwards whatever `Deserialize` returns and
+  inherits the same gap. Not currently reachable — every caller passes `Converter.Convert`'s own
+  non-null `Xml` output — but worth a null-guard in `P60Deserializer.Validate` in a Story 2.3/2.4
+  hardening pass.
+
 ## Deferred from: code review of story 2.2 (2026-09-04)
 
 - **`DateEnfournementFour1/2` (`DateTime?` columns) are modelled as split `_Date` / `_Heure` `string`
