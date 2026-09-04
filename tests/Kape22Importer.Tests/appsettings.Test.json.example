@@ -1,0 +1,7 @@
+{
+  "_comment": "Copy this file to appsettings.Test.json (gitignored) and point it at a local SQL Server test instance. Never the production database. The Integration test category skips cleanly when this is absent.",
+  "ConnectionStrings": {
+    "AscoLSI": "Server=localhost;Database=AscoLSI_Test;Trusted_Connection=True;TrustServerCertificate=True;",
+    "MQTTnetServices": "Server=localhost;Database=MQTTnetServices_Test;Trusted_Connection=True;TrustServerCertificate=True;"
+  }
+}

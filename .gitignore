@@ -483,3 +483,6 @@ $RECYCLE.BIN/
 
 # Claude Code local settings (machine-specific, may contain secrets).
 .claude/settings.local.json
+
+# Local SQL Server test connection strings (AR-12). Never commit the real file.
+/tests/Kape22Importer.Tests/appsettings.Test.json

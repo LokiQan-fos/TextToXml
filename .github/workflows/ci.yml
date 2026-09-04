@@ -1,6 +1,7 @@
 # Build gate for the TextToXml solution.
 # Runs the SolutionStructureTests build gate and the Category=Unit suite on every push and PR.
-# The Category=Integration suite (AR-12, Docker SQL Server) is added by Epic 2 Story 2.1.
+# The Category=Integration suite (AR-12) needs a reachable SQL Server test instance; the runner that
+# provides one is still an open infra decision, so only Category=Unit runs here for now.
 name: CI
 
 on:

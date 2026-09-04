@@ -1,5 +1,46 @@
 # Deferred Work
 
+## Deferred from: code review of story 2.1 (2026-09-04)
+
+- **No CI job runs `Category=Integration`** — `ci.yml` now states outright that the runner providing a
+  SQL Server test instance "is still an open infra decision". The AR-12 harness, the `scripts/schema`
+  application and the EF round-trip therefore have no automated gate; only the `Category=Unit`
+  model/parity tests run in CI. Decided during the review to accept this as a known deferral (D). Fold
+  the runner choice (Linux service container vs Windows-native SQL) into the Epic 2 CI story; ties to
+  risk R-1. When the job lands, also address the two items below.
+- **The test schema is never reset between runs** — `scripts/schema/*.sql` guard every table with
+  `IF OBJECT_ID(...) IS NULL` and `SqlServerIntegrationFixture` never drops. After any edit to
+  `scripts/schema/`, an existing `AscoLSI_Test` / `MQTTnetServices_Test` keeps the stale tables and the
+  integration tests pass against an outdated schema — exactly the R-3 failure mode, on the layer the
+  file-vs-model parity test does not cover. Add a fixture drop/recreate of the four harness tables (or
+  a documented reset step) when the integration CI job is built.
+- **`MQTTnetServices.dbo.Logs` / `WorkerSettings` have no EF entity and no `SchemaModelParityTests`
+  coverage** — R-3 drift protection currently exists only for `L_D_KAPE22` and `L_D_LOG_COMMANDE`.
+  Extend parity (or add a lightweight column check) when Story 3.3 introduces the Serilog / launcher
+  persistence.
+- **Schema extraction is not reproducible** — the `.sql` headers describe the `sqlcmd` /
+  `INFORMATION_SCHEMA.COLUMNS` + `sys.identity_columns` method but no extraction script or query is
+  committed, so R-3's "regenerate from the same source if the production schema changes" cannot be
+  followed mechanically. Commit the extraction query (or a small script) alongside `scripts/schema/`.
+- **MQTTnetServices connection string is not wired into production configuration** — Story 2.1 AC
+  bundles `AscoLSI` **and** `MQTTnetServices` as "read from `IConfiguration`", but only `AscoLSI` has a
+  production reader (`AddAscoLsiPersistence`) and a unit test. Decided during the review to defer the
+  MQTT wiring to Epic 3, where its entities land; the misleading `AscoLsiConnectionConfigTests` comment
+  was corrected in this pass.
+- **Second test-isolation regime (commit + reset via Respawn / TRUNCATE) is not built** — only
+  `TransactionScope` + rollback exists. `SqlServerIntegrationFixture` documents that commit + reset is
+  "the caller's job" but provides no helper. Decided during the review to defer until Story 2.8 (the
+  anti-duplicate guard, D22) — the first test that needs committed state.
+- **Importer host does not compose persistence** — `Program.cs` never calls `AddAscoLsiPersistence`
+  and `appsettings.json` carries no `ConnectionStrings:AscoLSI` placeholder. The extension exists and
+  is unit-tested in isolation. Decided during the review to defer host wiring to the story that first
+  consumes the `DbContext` (2.4 / 2.8); revisit `AddDbContext` vs `AddDbContextFactory` there, since
+  the only current consumer (`Worker`) is a singleton.
+- **`SqlServerIntegrationFixture` GO-batch splitter has no unit test** — the `BatchSeparator` regex is
+  private and only exercised by the integration path (which itself has no CI gate). Extract the
+  splitter into a small internal helper and add a `Category=Unit` test over the real `scripts/schema/`
+  files so the parsing half is guarded without a database.
+
 ## Resolved: Epic 1 retrospective hygiene pass (2026-09-04)
 
 Closed by the "story 0" hygiene pass (retro action `epic-1-retro-item-1`), commit pending:

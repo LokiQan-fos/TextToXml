@@ -34,16 +34,21 @@ Voir `_bmad-output/planning-artifacts/PRD.md` et `epics.md` pour le détail fonc
   revanche `dotnet build TextToXml.sln` échoue tant que le dépôt voisin est
   absent, car la solution liste `PortalSharedLibrary` (dossier `external/`).
 
-- **Docker** (démon Linux, image `mcr.microsoft.com/mssql/server` épinglée) pour
-  la catégorie de tests `Integration` — harnais construit en Story 2.1 (AR-12).
-  Les tests `Unit` n'en ont pas besoin.
+- Une **instance SQL Server** joignable (édition Developer, gratuite) pour la
+  catégorie de tests `Integration` (AR-12). Renseigner les chaînes de connexion
+  dans `tests/Kape22Importer.Tests/appsettings.Test.json` (gitignoré ; modèle :
+  `appsettings.Test.json.example`) ou la variable d'environnement
+  `KAPE22_TEST_ConnectionStrings__AscoLSI`. **Jamais la base de production.** Le
+  harnais crée uniquement les tables de `scripts/schema/`. Sans instance
+  configurée, ces tests sont **ignorés** (pas en échec) ; les tests `Unit` n'en
+  ont pas besoin.
 
 ## Build & tests
 
 ```sh
 dotnet build TextToXml.sln
-dotnet test  TextToXml.sln --filter Category=Unit          # aucun Docker requis
-dotnet test  TextToXml.sln --filter Category=Integration   # démon Docker requis
+dotnet test  TextToXml.sln --filter Category=Unit          # aucune base requise
+dotnet test  TextToXml.sln --filter Category=Integration   # instance SQL Server de test requise
 dotnet test  TextToXml.sln                                  # tout
 ```
 

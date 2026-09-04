@@ -19,9 +19,10 @@ public class SolutionStructureTests
     private static readonly HashSet<string> AllowedRuntimePackages =
         new(StringComparer.OrdinalIgnoreCase) { "System.Text.Encoding.CodePages" };
 
-    // The only PackageReference Kape22Importer may declare beyond the shared framework (AR-1, AC-FR16-1).
+    // The PackageReferences Kape22Importer may declare beyond the shared framework (AR-1, AC-FR16-1).
+    // EF Core SqlServer joined the list in Story 2.1 as a sanctioned dependency (PRD NFR-8, AR-8).
     private static readonly HashSet<string> AllowedImporterPackages =
-        new(StringComparer.OrdinalIgnoreCase) { "Microsoft.Extensions.Hosting" };
+        new(StringComparer.OrdinalIgnoreCase) { "Microsoft.EntityFrameworkCore.SqlServer", "Microsoft.Extensions.Hosting" };
 
     [Fact]
     public void TextToXml_UsesTheClassLibrarySdk()

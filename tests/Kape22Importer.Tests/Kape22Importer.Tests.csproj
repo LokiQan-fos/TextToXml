@@ -6,9 +6,19 @@
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector" />
+    <!-- The AR-12 fixture opens SqlConnection / SqlCommand directly to apply scripts/schema/. -->
+    <PackageReference Include="Microsoft.Data.SqlClient" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
+    <!-- Runtime skip for the AR-12 integration tests when no SQL Server test instance is reachable. -->
+    <PackageReference Include="Xunit.SkippableFact" />
+  </ItemGroup>
+
+  <!-- Local SQL Server test connection strings (AR-12). Real file is gitignored; the .example is the template. -->
+  <ItemGroup>
+    <None Include="appsettings.Test.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('appsettings.Test.json')" />
   </ItemGroup>
 
   <ItemGroup>
@@ -19,9 +29,10 @@
     <ProjectReference Include="..\..\src\Kape22Importer\Kape22Importer.csproj" />
   </ItemGroup>
 
-  <!-- Share the trait vocabulary with the TextToXml.Tests project instead of duplicating it. -->
+  <!-- Share the trait vocabulary and the repo-path helper with the TextToXml.Tests project instead of duplicating them. -->
   <ItemGroup>
     <Compile Include="..\TextToXml.Tests\TestCategory.cs" Link="TestCategory.cs" />
+    <Compile Include="..\TextToXml.Tests\RepoLayout.cs" Link="RepoLayout.cs" />
   </ItemGroup>
 
 </Project>

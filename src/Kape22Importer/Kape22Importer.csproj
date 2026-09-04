@@ -5,6 +5,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- EF Core is a sanctioned runtime dependency of the importer (PRD NFR-8, AR-8). -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
   </ItemGroup>
 
