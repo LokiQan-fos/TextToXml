@@ -27,6 +27,18 @@ and `AcTraitCoverageTests` — the AC→`[Trait]` aggregator gate (Story 3.6 pul
 fails if a test named after an `AC` / `CTR` / `NFR` lacks the matching `[Trait]`. Closes the story 1.1
 notes on absent `.editorconfig` and absent CI.
 
+Landed (retro action `epic-1-retro-item-3`, PRD reconciliation): `PRD.md` §3 glossary and the FR-1
+descriptor grammar now list `decimalSeparator` and `convert` on `<value>`; the `decimal` / `datetime`
+canonical forms and the "datetime requires a `convert` mask" rule are captured as §0bis **D28** plus
+`AC-FR1-14` / `AC-FR5-15`. Closes the review 1.8 note on the glossary.
+
+Decided (retro action `epic-1-retro-item-3`): the blank-typed-Champ question from the review 1.6 note
+is resolved as §0bis **D27** — `P60.xsd` types `int` / `decimal` / `datetime` Champs strongly
+(`minOccurs="0"`), so Étape 1 must **omit** the element for a blank typed Champ instead of emitting
+`<Id></Id>`; the DTO gets `int?` / `decimal?` / `DateTime?`. `string` Champs keep the empty element.
+This revises `AC-FR5-4` / `AC-FR5-6` and needs a `NormalizedXmlBuilder` change + test updates before
+Story 2.3 — tracked as retro action `epic-1-retro-item-7`.
+
 Landed (retro action `epic-1-retro-item-4`): `AC-FR6-5` — `DescriptorValidator.Validate` no longer
 concatenates the English `XmlException.Message` for a not-well-formed Descripteur; it emits
 `"Le descripteur XML n'est pas bien formé (ligne N, position M)."`, keeping only the language-neutral

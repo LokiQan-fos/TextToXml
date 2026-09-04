@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 16:00
-last_updated: 09-04-2026 10:21
+last_updated: 09-04-2026 10:31
 project: TextToXml
 project_key: NOKEY
 tracking_system: file-system
@@ -88,7 +88,7 @@ action_items:
       glossaire PRD 3 et a la grammaire FR-1; trancher nullabilite int/decimal vs
       element vide (AC-FR5-4) dans P60.xsd story 2.3 avant que 2.4 consomme le DTO"
     owner: "PM + Lead Architecte"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-09-03.md"
   - id: "epic-1-retro-item-4-rendre-ac-fr6-5-reellement-vert-rendu-fr"
     epic: 1
@@ -111,4 +111,13 @@ action_items:
       stories 1.x sont done)"
     owner: "Scrum Master"
     status: done
+    ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-09-03.md"
+  - id: "epic-1-retro-item-7-normalizedxmlbuilder-champ-type-vide-omet-element"
+    epic: 1
+    action: "NormalizedXmlBuilder: un Champ type (int/decimal/datetime) a valeur vide
+      OMET son element au lieu d emettre <Id></Id> (PRD D27, decide a la retro Epic
+      1). Mettre a jour les tests AC-FR5-4 / AC-FR5-6. A livrer AVANT la Story 2.3
+      (P60.xsd type fort minOccurs=0)."
+    owner: "Dev"
+    status: open
     ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-09-03.md"

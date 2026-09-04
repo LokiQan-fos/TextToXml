@@ -529,10 +529,18 @@ convertisseur custom.
 **When** `Convert` normalise
 **Then** `string` `"APERAM ALLOYS"` + padding → `<Client>APERAM ALLOYS</Client>`
   (`TrimEnd`, espaces internes conservés) (AC-FR5-3) ; `int` `"0005900"` →
-  `5900`, `"0000000"` → `0`, `""` → élément vide (AC-FR5-4) ; `int` `"11A0"` ou
+  `5900`, `"0000000"` → `0`, **`""` → élément omis** (Champ typé vide, PRD §0bis
+  D27 — révision décidée à la rétro Épic 1) (AC-FR5-4) ; `int` `"11A0"` ou
   `"-12"` → `Error {Code:InvalidInteger, FieldId, RawValue}` (non signé) (AC-FR5-5, D17) ;
-  `string` vide/espaces → élément **vide** (AC-FR5-6) ; Champ sans `datatype` →
-  `string`/`TrimEnd` (AC-FR5-7)
+  `string` (ou sans `datatype`) vide/espaces → élément **vide** `<Id></Id>` (AC-FR5-6) ;
+  Champ sans `datatype` → `string`/`TrimEnd` (AC-FR5-7)
+
+> **Révision post‑rétro (D27, 2026‑09‑04) :** `AC-FR5-4` / `AC-FR5-6` ont changé —
+> un Champ **typé** (`int`/`decimal`/`datetime`) à valeur vide **omet** son élément
+> (au lieu de `<Id></Id>`), pour que `P60.xsd` puisse le typer fort en
+> `minOccurs="0"` et que `Kape22File` reçoive `int?`/`decimal?`/`DateTime?`. Modif
+> `NormalizedXmlBuilder` + tests à faire **avant la Story 2.3** (action rétro
+> `epic-1-retro-item-7`).
 
 **Given** le XML normalisé produit
 **When** je l'inspecte / le recharge
@@ -783,6 +791,11 @@ So that toute dérive entre descripteur, XML et DTO est attrapée tôt.
 **When** je le compare au Descripteur `P60.xml`
 **Then** chaque `<value Id>` non ignoré a un `<xs:element name="Id">` du bon type
   (`xs:int` / `xs:string`), présence header/footer alignée (AC-FR1-13)
+**And** les éléments des Champs **typés** (`xs:int`, plus tard `xs:decimal` /
+  `xs:dateTime`) sont `minOccurs="0"` — un Champ typé vide est omis du XML
+  normalisé (PRD §0bis **D27**) ; le DTO `Kape22File` reçoit `int?` / `decimal?` /
+  `DateTime?`. *(Prérequis : la modif `NormalizedXmlBuilder` de l'action rétro
+  `epic-1-retro-item-7` doit être livrée avant cette story.)*
 
 **Given** `P60.xsd`
 **When** je le structure
@@ -804,7 +817,8 @@ So that toute dérive entre descripteur, XML et DTO est attrapée tôt.
   conforme → `{Block:File, Code:PersistenceError}` citant l'erreur de schéma
   (filet — ne doit pas arriver si Étape 1 a réussi) (AC-FR7-1, AC-FR5-14)
 **And** un XML conforme se **désérialise** en `Kape22File` (`XmlSerializer`) sans
-  perte : round‑trip `int`/`string` conservé (**AC-FR5-12b**)
+  perte : round‑trip `int?`/`string` conservé, un Champ typé omis → propriété
+  `null` (**AC-FR5-12b**, D27)
 
 **Tests xUnit (TDD — écrits en premier, CC-1) :** `AC-FR1-13`, `AC-FR5-14`,
 `AC-FR7-1`, `AC-FR5-12b`, + test « ordre `<xs:sequence>` de `P60.xsd` == ordre

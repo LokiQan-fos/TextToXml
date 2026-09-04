@@ -28,7 +28,7 @@ décrit **deux livrables v1** :
 Le vocabulaire est fixé au §3. Les exigences fonctionnelles (FR) sont numérotées
 globalement `FR-1..FR-N`. Chaque FR porte une liste **« Conséquences
 (testables) »** dont **chaque puce est un cas de test xUnit** (`AC-FRx-y`). Les
-décisions arrêtées sont au **§0bis** (D1–D26, avec leur source). **Aucune
+décisions arrêtées sont au **§0bis** (D1–D28, avec leur source). **Aucune
 question ouverte, aucune hypothèse.** Le PRD est prêt pour le découpage en
 epics & stories (§9).
 
@@ -118,6 +118,8 @@ part ailleurs.*
 | D24 | Formats `P62` / `SerrageBil` / `SortieStock` : **hors périmètre**, fournis à titre d'exemple. v1 = **P60 uniquement**. `format="Semicolon"` → `LayoutInvalid`. | utilisateur (Q19) |
 | D25 | `L_D_LOG_COMMANDE` : `NumLingot = 0`, `Trace = 1` pour toutes les lignes P60. | utilisateur |
 | D26 | PRD validé, **déplacé dans `_bmad-output/planning-artifacts/PRD.md`** (convention BMAD, §9). | utilisateur |
+| D27 | **Champ typé à valeur vide dans le XML normalisé.** Un Champ `datatype` `int` / `decimal` / `datetime` dont la Valeur brute est vide/espaces **n'émet pas d'élément** (élément **omis**). `P60.xsd` type ces Champs **fort** (`xs:int` / `xs:decimal` / `xs:dateTime`) en `minOccurs="0"` (`nillable="true"` admis) ; le DTO `Kape22File` reçoit `int?` / `decimal?` / `DateTime?`. Un Champ `string` (ou sans `datatype`) vide émet toujours son élément vide `<Id></Id>` (chaîne vide = `xs:string` valide). L'obligation NOT NULL reste jugée en Étape 2 (D17). **Révise `AC-FR5-4` / `AC-FR5-6`** ; impose une modif `NormalizedXmlBuilder` (Épic 1) avant la Story 2.3. | utilisateur (rétro Épic 1, 2026‑09‑04) |
+| D28 | **Types étendus `TextToXml` (généricité, hors P60).** `datatype="decimal"` : analyse pilotée par `decimalSeparator` seul (caractère unique, défaut `.`) ; `convert` ignoré pour `decimal` en v1 ; forme canonique `xs:decimal`, zéros de fin retirés. `datatype="datetime"` : `convert="{0:<masque>}"` **obligatoire** (`DescriptorValidator` rejette un `datetime` sans masque → `LayoutInvalid`), sert **uniquement** à l'analyse (`ParseExact`, `InvariantCulture`) ; le XML normalisé porte **toujours** de l'**ISO‑8601** (`yyyy-MM-dd` / `yyyy-MM-ddTHH:mm:ss`). Le format d'affichage français est une préoccupation d'Étape 2, jamais `TextToXml`. Contrats `CTR-1` / `CTR-2` / `CTR-3` (Story 1.8). | utilisateur (contrat Story 1.8, 2026‑09‑03) |
 
 ## 1. Vision
 
@@ -218,16 +220,23 @@ Termes à utiliser **à l'identique** dans les FR, UJ, tests et code.
 - **Descripteur** — Le fichier `P60.xml` (`Templates/`), embarqué comme ressource
   dans le microservice. Racine `<commande type format>` ; sections `<header>`
   (opt.), `<message>` (req.), `<footer>` (opt.), chacune contenant des
-  `<value Id Position Size datatype [convert] Description>`. Attributs optionnels
+  `<value Id Position Size datatype [convert] [decimalSeparator] [Description]>`.
+  Attributs optionnels
   de la racine : `expectedMessageCount` (P60 = `1`), `segmentField` /
   `headerMarker` / `messageMarker` / `footerMarker` (contrôle `Segment`) —
   absents ⇒ contrôle désactivé. **Pas de méta‑schéma** : `TextToXml` lit ce
   format directement (attributs compris = ceux listés ici) ; seule évolution v1 =
   **ajouter les `datatype`** à `P60.xml` (§0bis D6).
 - **Champ** — Élément `<value>` : `Id` (nom), `Position` (offset 0‑based), `Size`
-  (longueur), `datatype` (`string` par défaut | `int` — P60 n'utilise que ces
-  deux ; la lib gère aussi `decimal` / `datetime` + `convert` pour d'autres
-  formats). En `format="Fixed"` : `Position` = offset
+  (longueur), `datatype` (`string` par défaut | `int` | `decimal` | `datetime` —
+  P60 n'utilise que `string` / `int`, la lib gère les quatre pour d'autres
+  formats). Attributs de typage optionnels : `convert` — chaîne de format
+  composite `"{0:<masque>}"` : **obligatoire** pour un Champ `datatype="datetime"`
+  (le masque décrit la Valeur brute ; sans lui l'analyse serait ambiguë et
+  dépendante de l'horloge → `LayoutInvalid`), ignoré pour `decimal` en v1 ;
+  `decimalSeparator` — caractère unique séparant partie entière et décimale dans
+  la Valeur brute d'un Champ `datatype="decimal"` (défaut `.`). En `format="Fixed"` :
+  `Position` = offset
   0‑based, `Size` = longueur. Deux Champs peuvent se **chevaucher** — des
   tranches indépendantes (ex. `Segment` et `NumeroFichier` du message, tous deux
   `Position=9`) ; `TextToXml` l'accepte sans erreur (§0bis D23).
@@ -247,7 +256,12 @@ Termes à utiliser **à l'identique** dans les FR, UJ, tests et code.
 - **Valeur normalisée** — Valeur brute nettoyée & mise en **forme canonique**
   selon `datatype` : `string` → `TrimEnd` (espaces internes conservés) ;
   `int` → `Trim` + zéros de tête retirés, **non signé** (`-` ⇒ `InvalidInteger`,
-  §0bis D17) ; (`decimal` / `datetime` : autres formats). Valeur non conforme ⇒
+  §0bis D17) ; `decimal` → `Trim`, séparateur `decimalSeparator` ramené au point
+  invariant, signe de tête admis, zéros de fin retirés (`"12,50"` et `"12,5"` ⇒
+  même valeur), forme `xs:decimal` ; `datetime` → analysé avec le masque
+  `convert` (`ParseExact`, `InvariantCulture`), **toujours** ré‑émis en
+  **ISO‑8601** (`yyyy-MM-dd` sans jeton d'heure, `yyyy-MM-ddTHH:mm:ss` sinon —
+  §0bis D28). Valeur non conforme ⇒
   `InvalidInteger` / `InvalidDecimal` / `InvalidDate` (Étape 1, `Error`). La
   forme canonique est écrite dans le **XML normalisé** pour que `XmlSerializer`
   la relise sans convertisseur custom.
@@ -329,7 +343,7 @@ admise).
 `TextToXml` lit le Descripteur `P60.xml` directement (racine `<commande type
 format [expectedMessageCount] [segmentField] [*Marker]>`, sections `<header>`
 opt. / `<message>` req. / `<footer>` opt., `<value Id Position Size datatype
-[convert]>`). Pas de méta‑schéma (§0bis D10).
+[convert] [decimalSeparator] [Description]>`). Pas de méta‑schéma (§0bis D10).
 
 **Consequences (testables) :**
 - `AC-FR1-1` : Descripteur non bien formé (XML cassé) → `Success=false`, 1
@@ -340,6 +354,10 @@ opt. / `<message>` req. / `<footer>` opt., `<value Id Position Size datatype
   entier → `LayoutInvalid` citant l'`Id`.
 - `AC-FR1-5` : `datatype` non reconnu (≠ `string|int|decimal|datetime`) →
   `LayoutInvalid`.
+- `AC-FR1-14` : `datatype="datetime"` **sans** attribut `convert` de la forme
+  `"{0:<masque>}"` → `LayoutInvalid` (pas d'analyse par défaut : elle serait
+  ambiguë et dépendante de l'horloge, §0bis D28). `decimalSeparator` de plus d'un
+  caractère sur un Champ `decimal` → `LayoutInvalid`.
 - `AC-FR1-6` : Descripteur valide sans `<header>` ni `<footer>` → accepté ;
   toutes les Lignes sont des Détails.
 - `AC-FR1-7` : deux Champs aux tranches qui se chevauchent (ex. `Segment` et
@@ -445,12 +463,22 @@ document est **désérialisable** par `XmlSerializer` sans convertisseur custom.
 - `AC-FR5-3` : Champ `string` `"APERAM ALLOYS"` + padding → `<Client>APERAM
   ALLOYS</Client>` (`TrimEnd`, espaces internes conservés).
 - `AC-FR5-4` : `datatype="int"` `"0005900"` → `<DiametreProduit>5900</…>` ;
-  `"0000000"` → `<…>0</…>` ; `""` → `<…></…>` (vide).
+  `"0000000"` → `<…>0</…>` ; **vide/espaces → l'élément est omis** — un Champ typé
+  (`int` / `decimal` / `datetime`) à valeur vide n'émet pas d'élément (une valeur
+  vide n'est pas un `xs:int` / `xs:decimal` / `xs:dateTime` valide ; `P60.xsd`
+  type ces éléments `minOccurs="0"`, le DTO reçoit `int?` / `decimal?` /
+  `DateTime?`). L'obligation NOT NULL reste jugée en Étape 2 (§0bis D17, D27).
 - `AC-FR5-5` : `datatype="int"` `"11A0"` ou `"-12"` → `Error` `{Block, Line,
   FieldId, Code:InvalidInteger, RawValue}` (§0bis D17 — non signé).
-- `AC-FR5-6` : Champ `string` vide/espaces → élément **vide** (l'obligation est
-  jugée en Étape 2 contre les colonnes NOT NULL).
+- `AC-FR5-6` : Champ `string` (ou sans `datatype`) vide/espaces → élément **vide**
+  `<Id></Id>` (une chaîne vide est un `xs:string` valide ; l'obligation NOT NULL
+  est jugée en Étape 2). Les Champs **typés** vides, eux, sont **omis** (`AC-FR5-4`).
 - `AC-FR5-7` : Champ sans `datatype` → `string` (`TrimEnd`).
+- `AC-FR5-15` : `datatype="decimal"` valide → valeur canonique `xs:decimal` dans
+  le XML (séparateur `decimalSeparator` ramené au point, zéros de fin retirés) ;
+  `datatype="datetime"` valide → valeur **ISO‑8601** (masque `convert` pour
+  l'analyse seulement). Valeur non conforme → `Error` `{Code:InvalidDecimal}` /
+  `{Code:InvalidDate}`, `0` XML produit. *(Contrats `CTR-1` / `CTR-2`, §0bis D28.)*
 - `AC-FR5-8` : `&`, `<`, `>` échappés ; rechargeable via `XDocument.Parse`.
 - `AC-FR5-9` : deux Champs qui se chevauchent (`Segment` / `NumeroFichier` @9) →
   les deux éléments émis avec leur valeur (mêmes 3 caractères).
@@ -899,7 +927,7 @@ L'agent de développement doit impérativement appliquer les règles de formatag
 
 ## 8. Questions ouvertes
 
-**Aucune.** Toutes les décisions sont figées au §0bis (D1–D26).
+**Aucune.** Toutes les décisions sont figées au §0bis (D1–D28).
 
 *Traçabilité des 21 questions posées en revue → décisions :* Q1→D14, Q2→D10
 (pas de méta‑schéma), Q3→D10, Q4→D4, Q5→D4, Q6→D8, Q7→D8, Q8→D15, Q9→D25,
