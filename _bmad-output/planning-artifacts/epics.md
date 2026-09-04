@@ -539,8 +539,7 @@ convertisseur custom.
 > un Champ **typé** (`int`/`decimal`/`datetime`) à valeur vide **omet** son élément
 > (au lieu de `<Id></Id>`), pour que `P60.xsd` puisse le typer fort en
 > `minOccurs="0"` et que `Kape22File` reçoive `int?`/`decimal?`/`DateTime?`. Modif
-> `NormalizedXmlBuilder` + tests à faire **avant la Story 2.3** (action rétro
-> `epic-1-retro-item-7`).
+> `NormalizedXmlBuilder` + tests **livrés** (action rétro `epic-1-retro-item-7`).
 
 **Given** le XML normalisé produit
 **When** je l'inspecte / le recharge
@@ -793,9 +792,9 @@ So that toute dérive entre descripteur, XML et DTO est attrapée tôt.
   (`xs:int` / `xs:string`), présence header/footer alignée (AC-FR1-13)
 **And** les éléments des Champs **typés** (`xs:int`, plus tard `xs:decimal` /
   `xs:dateTime`) sont `minOccurs="0"` — un Champ typé vide est omis du XML
-  normalisé (PRD §0bis **D27**) ; le DTO `Kape22File` reçoit `int?` / `decimal?` /
-  `DateTime?`. *(Prérequis : la modif `NormalizedXmlBuilder` de l'action rétro
-  `epic-1-retro-item-7` doit être livrée avant cette story.)*
+  normalisé (PRD §0bis **D27**, livré côté `TextToXml` par l'action rétro
+  `epic-1-retro-item-7`) ; le DTO `Kape22File` reçoit `int?` / `decimal?` /
+  `DateTime?`.
 
 **Given** `P60.xsd`
 **When** je le structure

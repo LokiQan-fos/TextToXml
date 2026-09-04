@@ -1,7 +1,7 @@
 ---
 title: TextToXml
 created: 2026-09-02
-updated: 2026-09-02
+updated: 2026-09-04
 status: validé — prêt pour epics & stories
 ---
 

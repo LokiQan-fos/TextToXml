@@ -34,10 +34,15 @@ canonical forms and the "datetime requires a `convert` mask" rule are captured a
 
 Decided (retro action `epic-1-retro-item-3`): the blank-typed-Champ question from the review 1.6 note
 is resolved as §0bis **D27** — `P60.xsd` types `int` / `decimal` / `datetime` Champs strongly
-(`minOccurs="0"`), so Étape 1 must **omit** the element for a blank typed Champ instead of emitting
+(`minOccurs="0"`), so Étape 1 **omits** the element for a blank typed Champ instead of emitting
 `<Id></Id>`; the DTO gets `int?` / `decimal?` / `DateTime?`. `string` Champs keep the empty element.
-This revises `AC-FR5-4` / `AC-FR5-6` and needs a `NormalizedXmlBuilder` change + test updates before
-Story 2.3 — tracked as retro action `epic-1-retro-item-7`.
+
+Landed (retro action `epic-1-retro-item-7`): `NormalizedXmlBuilder.Normalize` now returns a nullable
+canonical value — `null` for a blank `int` / `decimal` / `datetime` Champ — and `Build` skips the
+element when it is null. `AC-FR5-4` / `AC-FR5-6` tests updated (`Convert_IntChampBlank_OmitsElement`,
+`Convert_TrailingIntChampAbsent_OmitsElement`, `Convert_Decimal/DatetimeChampBlank_OmitsElement`).
+Closes the review 1.6 note "Blank int Champ emits `<Id></Id>` which will not deserialize into a
+non-nullable `int` DTO member".
 
 Landed (retro action `epic-1-retro-item-4`): `AC-FR6-5` — `DescriptorValidator.Validate` no longer
 concatenates the English `XmlException.Message` for a not-well-formed Descripteur; it emits
