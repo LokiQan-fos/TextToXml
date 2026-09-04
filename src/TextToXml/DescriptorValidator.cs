@@ -30,9 +30,15 @@ internal static class DescriptorValidator
         }
         catch (XmlException exception)
         {
+            // The framework XmlException.Message is English; keep only its language-neutral location
+            // so the Message stays entirely French (AC-FR6-5).
+            string location = exception.LineNumber > 0
+                ? $" (ligne {exception.LineNumber}, position {exception.LinePosition})"
+                : string.Empty;
+
             return new DescriptorValidationResult
             {
-                Error = LayoutInvalid($"Le descripteur XML n'est pas bien formé : {exception.Message}"),
+                Error = LayoutInvalid($"Le descripteur XML n'est pas bien formé{location}."),
             };
         }
 

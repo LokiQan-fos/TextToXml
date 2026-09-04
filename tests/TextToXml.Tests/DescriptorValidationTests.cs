@@ -72,7 +72,12 @@ public class DescriptorValidationTests
     {
         string broken = "<commande type=\"KAPE22\" format=\"Fixed\"><message><value Id=\"A\" Position=\"0\" Size=\"1\" ></commande>";
 
-        AssertSingleLayoutInvalid(Convert(broken));
+        ConversionError error = AssertSingleLayoutInvalid(Convert(broken));
+
+        // The Message stays entirely French: no framework XmlException text leaks through (AC-FR6-5).
+        Assert.Contains("bien formé", error.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("occurred", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("expected", error.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

@@ -433,6 +433,10 @@ public class ConversionResultContractTests
     private static readonly string[] FrenchMarkers =
         ["«", " le ", " la ", " ne ", " pas ", " de ", " un ", " est ", " dans "];
 
+    // Tokens from framework XmlException / exception text; none appears in a hand-written French Message.
+    private static readonly string[] EnglishLeakTokens =
+        ["occurred", "unexpected", "the following", "not closed", "was expected", "is expected", "line "];
+
     // The frozen contract: Success is exactly "no Error", and the Xml is present exactly on success
     // (AC-FR6-1, AC-FR6-2).
     private static void AssertContractInvariants(ConversionResult result)
@@ -454,6 +458,13 @@ public class ConversionResultContractTests
         Assert.DoesNotContain(" at ", message, StringComparison.Ordinal);
         Assert.DoesNotContain('\n', message);
         Assert.DoesNotContain('\r', message);
+
+        // English words that only reach a Message when framework exception text is passed through
+        // verbatim; our own wording never uses them (heuristic, extend as new leaks are found).
+        foreach (string englishLeak in EnglishLeakTokens)
+        {
+            Assert.DoesNotContain(englishLeak, message, StringComparison.OrdinalIgnoreCase);
+        }
 
         Assert.True(
             FrenchMarkers.Any(marker => message.Contains(marker, StringComparison.Ordinal)),
