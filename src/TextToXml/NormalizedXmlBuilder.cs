@@ -49,12 +49,21 @@ internal static class NormalizedXmlBuilder
                 string id = (string)champ.Attribute("Id")!;
                 string rawValue = ExtractRawValue(lines[i], champ);
 
-                ConversionError? error = Normalize(champ, rawValue, blocks[i], i + 1, id, out string canonicalValue);
+                ConversionError? error = Normalize(champ, rawValue, blocks[i], i + 1, id, out string? canonicalValue);
                 if (error is not null)
                 {
                     // Every typing Error is collected: the whole Fichier is scanned so the caller sees
                     // all of them at once rather than fixing and rerunning one at a time.
                     errors.Add(error);
+                    continue;
+                }
+
+                // A typed Champ (int, decimal, datetime) with a blank Valeur brute normalizes to null:
+                // its element is omitted, since an empty value is not a valid xs:int / xs:decimal /
+                // xs:dateTime and P60.xsd types those elements minOccurs="0" (PRD D27). A string Champ
+                // never normalizes to null, so its empty element is still emitted (AC-FR5-6).
+                if (canonicalValue is null)
+                {
                     continue;
                 }
 
@@ -91,13 +100,15 @@ internal static class NormalizedXmlBuilder
         return line.Substring(position, available);
     }
 
+    // A null canonicalValue means "omit this element": a typed Champ whose Valeur brute is blank. An
+    // empty (but non-null) canonicalValue is a genuine empty string element.
     private static ConversionError? Normalize(
         XElement champ,
         string rawValue,
         Block bloc,
         int lineNumber,
         string fieldId,
-        out string canonicalValue)
+        out string? canonicalValue)
     {
         // The datatype dictates the canonical form written to the normalized XML. The int, decimal and
         // datetime datatypes all constrain and rewrite the Valeur brute in Step 1; every other Champ is
@@ -130,15 +141,15 @@ internal static class NormalizedXmlBuilder
         Block bloc,
         int lineNumber,
         string fieldId,
-        out string canonicalValue)
+        out string? canonicalValue)
     {
         string trimmed = rawValue.Trim(' ');
 
-        // A blank int Champ yields an empty element; the NOT NULL obligation is judged later in Step 2
-        // against the target column (AC-FR5-4, AC-FR5-6).
+        // A blank int Champ omits its element (an empty value is not a valid xs:int); the NOT NULL
+        // obligation is judged later in Step 2 against the target column (AC-FR5-4, PRD D27).
         if (trimmed.Length == 0)
         {
-            canonicalValue = string.Empty;
+            canonicalValue = null;
             return null;
         }
 
@@ -171,15 +182,15 @@ internal static class NormalizedXmlBuilder
         Block bloc,
         int lineNumber,
         string fieldId,
-        out string canonicalValue)
+        out string? canonicalValue)
     {
         string trimmed = rawValue.Trim(' ');
 
-        // A blank decimal Champ yields an empty element, like a blank int; the obligation is judged in
-        // Step 2 against the target column.
+        // A blank decimal Champ omits its element, like a blank int; the obligation is judged in
+        // Step 2 against the target column (PRD D27).
         if (trimmed.Length == 0)
         {
-            canonicalValue = string.Empty;
+            canonicalValue = null;
             return null;
         }
 
@@ -269,14 +280,14 @@ internal static class NormalizedXmlBuilder
         Block bloc,
         int lineNumber,
         string fieldId,
-        out string canonicalValue)
+        out string? canonicalValue)
     {
         string trimmed = rawValue.Trim(' ');
 
-        // A blank datetime Champ yields an empty element, like a blank int or decimal.
+        // A blank datetime Champ omits its element, like a blank int or decimal (PRD D27).
         if (trimmed.Length == 0)
         {
-            canonicalValue = string.Empty;
+            canonicalValue = null;
             return null;
         }
 

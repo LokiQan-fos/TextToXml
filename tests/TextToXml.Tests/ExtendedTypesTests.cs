@@ -95,6 +95,54 @@ public class ExtendedTypesTests
         Assert.Equal("-1.5", Message(result.Xml!).Element("Amount")!.Value);
     }
 
+    // CTR-1 / AC-FR5-4: a blank decimal Champ omits its element (an empty value is not a valid
+    // xs:decimal; the NOT NULL obligation is judged in Step 2). PRD D27.
+    [Fact]
+    [Trait("AC", "FR5-4")]
+    public void Convert_DecimalChampBlank_OmitsElement_AcFr5_4()
+    {
+        // Marker keeps the Ligne non-empty; Amount @1/10 reads blank.
+        string descriptor = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <commande type="DEC" format="Fixed">
+              <message type="DEC" index="0">
+                <value Id="Marker" Position="0" Size="1" datatype="string" />
+                <value Id="Amount" Position="1" Size="10" datatype="decimal" decimalSeparator="," />
+              </message>
+            </commande>
+            """;
+
+        ConversionResult result = Converter.Convert(Ascii("X          "), descriptor);
+
+        Assert.True(result.Success);
+        XElement message = Message(result.Xml!);
+        Assert.Equal("X", message.Element("Marker")!.Value);
+        Assert.Null(message.Element("Amount"));
+    }
+
+    // CTR-2 / AC-FR5-4: a blank datetime Champ omits its element. PRD D27.
+    [Fact]
+    [Trait("AC", "FR5-4")]
+    public void Convert_DatetimeChampBlank_OmitsElement_AcFr5_4()
+    {
+        string descriptor = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <commande type="DT" format="Fixed">
+              <message type="DT" index="0">
+                <value Id="Marker" Position="0" Size="1" datatype="string" />
+                <value Id="Stamp" Position="1" Size="6" datatype="datetime" convert="{0:ddMMyy}" />
+              </message>
+            </commande>
+            """;
+
+        ConversionResult result = Converter.Convert(Ascii("X      "), descriptor);
+
+        Assert.True(result.Success);
+        XElement message = Message(result.Xml!);
+        Assert.Equal("X", message.Element("Marker")!.Value);
+        Assert.Null(message.Element("Stamp"));
+    }
+
     // CTR-1: a value using a separator other than the one declared by the Descripteur ("," here) is
     // rejected as InvalidDecimal rather than parsed to a plausible wrong number.
     [Fact]

@@ -265,25 +265,27 @@ public class NormalizedXmlTests
         Assert.Equal("0", FileRoot(result.Xml!).Element("message")!.Element("Amount")!.Value);
     }
 
-    // AC-FR5-4: a blank int raw value yields an empty element (the NOT NULL obligation is judged in Step 2).
+    // AC-FR5-4: a blank int raw value omits the element (a typed Champ cannot carry an empty xs:int
+    // value; the NOT NULL obligation is judged in Step 2). PRD D27.
     [Fact]
     [Trait("AC", "FR5-4")]
-    public void Convert_IntChampBlank_YieldsEmptyElement_AcFr5_4()
+    public void Convert_IntChampBlank_OmitsElement_AcFr5_4()
     {
         string fichier = "X" + "       ";
 
         ConversionResult result = Converter.Convert(Windows1252(fichier), MessageOnlySingleInt);
 
         Assert.True(result.Success);
-        XElement amount = FileRoot(result.Xml!).Element("message")!.Element("Amount")!;
-        Assert.Equal(string.Empty, amount.Value);
+        XElement message = FileRoot(result.Xml!).Element("message")!;
+        Assert.Null(message.Element("Amount"));
+        Assert.Equal("X", message.Element("Marker")!.Value);
     }
 
     // AC-FR5-4: an int Champ that is the last declared Champ and is entirely absent at the end of the
-    // Ligne yields an empty element, not a LineTooShort.
+    // Ligne omits its element (not a LineTooShort, not an empty element). PRD D27.
     [Fact]
     [Trait("AC", "FR5-4")]
-    public void Convert_TrailingIntChampAbsent_YieldsEmptyElement_AcFr5_4()
+    public void Convert_TrailingIntChampAbsent_OmitsElement_AcFr5_4()
     {
         // Ligne of 3 characters: Alpha @0 is covered, the trailing Count @10 is missing.
         ConversionResult result = Converter.Convert(Windows1252("ABC"), MessageOnlyTrailingInt);
@@ -291,7 +293,7 @@ public class NormalizedXmlTests
         Assert.True(result.Success);
         XElement message = FileRoot(result.Xml!).Element("message")!;
         Assert.Equal("ABC", message.Element("Alpha")!.Value);
-        Assert.Equal(string.Empty, message.Element("Count")!.Value);
+        Assert.Null(message.Element("Count"));
     }
 
     // AC-FR5-4: a non-trailing Champ whose declared Size overruns a short Ligne is emitted with the
@@ -407,7 +409,8 @@ public class NormalizedXmlTests
         Assert.Equal(new[] { "Indice", "DiametreProduit" }, result.Errors.Select(e => e.FieldId).ToArray());
     }
 
-    // AC-FR5-6: a string Champ that is empty or all spaces yields an empty element.
+    // AC-FR5-6: a string Champ that is empty or all spaces still emits its element, empty (an empty
+    // string is a valid xs:string, unlike a typed Champ which is omitted - AC-FR5-4, PRD D27).
     [Fact]
     [Trait("AC", "FR5-6")]
     public void Convert_StringChampAllSpaces_YieldsEmptyElement_AcFr5_6()
@@ -419,6 +422,7 @@ public class NormalizedXmlTests
 
         Assert.True(result.Success);
         XElement message = FileRoot(result.Xml!).Element("message")!;
+        Assert.NotNull(message.Element("Alpha"));
         Assert.Equal(string.Empty, message.Element("Alpha")!.Value);
         Assert.Equal("XYZ", message.Element("Beta")!.Value);
     }
