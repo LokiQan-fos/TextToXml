@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 16:00
-last_updated: 09-04-2026 09:45
+last_updated: 09-04-2026 10:21
 project: TextToXml
 project_key: NOKEY
 tracking_system: file-system
@@ -80,7 +80,7 @@ action_items:
       en premiere PR Epic 2, avant harnais Docker story 2.1; cabler le test agregateur
       AC->trait comme gate"
     owner: "Lead Architecte"
-    status: in-progress
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-09-03.md"
   - id: "epic-1-retro-item-3-reconciliation-prd-ajouter-decimalsepara"
     epic: 1
@@ -96,14 +96,14 @@ action_items:
       bonne-formation XML dans DescriptorValidator.Validate (pas de texte XmlException
       anglais); renforcer AssertCleanFrenchMessage"
     owner: "Dev"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-09-03.md"
   - id: "epic-1-retro-item-5-convention-equipe-chaque-commit-chore-st"
     epic: 1
     action: "Convention equipe: chaque commit chore(story-x.y) liste par AC le test
       correspondant + mention test rouge avant code"
     owner: "Scrum Master"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-09-03.md"
   - id: "epic-1-retro-item-6-basculer-epic-1-de-in-progress-a-done-da"
     epic: 1

@@ -21,11 +21,17 @@ Closed by the "story 0" hygiene pass (retro action `epic-1-retro-item-1`), commi
 Still open from those same notes: unifying `Position` / `Size` offset access (three parsing styles
 across the pipeline) — deferred, no Epic 2 payoff yet.
 
-Also landed (retro action `epic-1-retro-item-2`, in-progress): repo `.editorconfig` +
-`.github/workflows/ci.yml` (`dotnet build -warnaserror` with `EnforceCodeStyleInBuild` + `dotnet test
---filter Category=Unit`). Remaining part of that action: wire the AC→`[Trait]` aggregator gate (needs
-the aggregator test written first — Story 3.6 pulled forward). Closes the story 1.1 notes on absent
-`.editorconfig` and absent CI.
+Landed (retro action `epic-1-retro-item-2`): repo `.editorconfig` + `.github/workflows/ci.yml`
+(`dotnet build -warnaserror` with `EnforceCodeStyleInBuild` + `dotnet test --filter Category=Unit`),
+and `AcTraitCoverageTests` — the AC→`[Trait]` aggregator gate (Story 3.6 pulled forward): the build
+fails if a test named after an `AC` / `CTR` / `NFR` lacks the matching `[Trait]`. Closes the story 1.1
+notes on absent `.editorconfig` and absent CI.
+
+Landed (retro action `epic-1-retro-item-4`): `AC-FR6-5` — `DescriptorValidator.Validate` no longer
+concatenates the English `XmlException.Message` for a not-well-formed Descripteur; it emits
+`"Le descripteur XML n'est pas bien formé (ligne N, position M)."`, keeping only the language-neutral
+location. `AssertCleanFrenchMessage` now also rejects English framework-text tokens. Closes the
+review 1.7 note.
 
 ## Deferred from: code review of story 1.8 (2026-09-03)
 

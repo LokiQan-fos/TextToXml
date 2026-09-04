@@ -55,6 +55,22 @@ Les versions de packages sont centralisées dans `Directory.Packages.props`
 d'acceptation qu'il couvre (`AC-FRx-y` / `CTR-x`) et le trait
 `[Trait("AC", "...")]`. Les tests de la Story 1.1 sont structurels (CC-1 sans
 objet) et sont classés `[Trait("Category", "Unit")]` / `"Integration"`.
+`AcTraitCoverageTests` échoue le build si un test nommé d'après un `AC` / `CTR` /
+`NFR` n'a pas le `[Trait]` correspondant.
+
+## Contribution
+
+- **CI** (`.github/workflows/ci.yml`) : sur chaque push / PR, `dotnet build
+  -warnaserror` (avec `EnforceCodeStyleInBuild`, donc les règles `.editorconfig`
+  sont bloquantes) puis `dotnet test --filter Category=Unit`.
+- **TDD strict (CC-1)** : les tests xUnit dérivés des `AC-FRx-y` / `CTR-x` sont
+  écrits **avant** le code de production, et vus rouges avant d'être verts.
+- **Message de commit** — un commit par story, `chore(story-x.y): <résumé>`. Le
+  merge écrasant l'historique (squash), le **corps du commit atteste le TDD** :
+  pour chaque `AC` de la story, le nom du test qui le couvre et la mention que le
+  test a été écrit (et vu rouge) avant le code. Les écarts de standard transverse
+  reportés vont dans `_bmad-output/implementation-artifacts/deferred-work.md` sous
+  un titre daté.
 
 ## Fixtures
 
