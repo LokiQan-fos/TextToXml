@@ -1,5 +1,32 @@
 # Deferred Work
 
+## Resolved: Epic 1 retrospective hygiene pass (2026-09-04)
+
+Closed by the "story 0" hygiene pass (retro action `epic-1-retro-item-1`), commit pending:
+
+- **Test-fixture helpers duplicated** (`Windows1252` ×5, `Row` ×2, `ReadDescriptor` / `ReadInput` /
+  `FileRoot` / `Root` / `Ascii` across 4+ files) — folded into
+  `tests/TextToXml.Tests/TestSupport.cs`, imported per file with `using static`. The
+  `Windows1252` helper now uses the real `Encoding.GetEncoding(1252)` (provider registered in a
+  static ctor) instead of the ASCII byte cast, so the name is honest. Notes from reviews 1.4, 1.6,
+  1.7, 1.8.
+- **Bloc→section-name mapping duplicated three times** (`BlockAssigner.SegmentControlSections`,
+  `LineLengthChecker.SectionByBlock`, `NormalizedXmlBuilder.SectionByBlock`) — replaced by a single
+  `src/TextToXml/DescriptorSections.cs` (`For(Block)` + `All` + name constants), also used by
+  `DescriptorValidator.SectionNames`. Note from review 1.6.
+- **Misleading comment in `BlockAssigner`** (`"Members are ordered alphabetically (CC-4)"` above a
+  structurally-ordered array) — the array moved to `DescriptorSections.All`, comment rewritten. Note
+  from review 1.5.
+
+Still open from those same notes: unifying `Position` / `Size` offset access (three parsing styles
+across the pipeline) — deferred, no Epic 2 payoff yet.
+
+Also landed (retro action `epic-1-retro-item-2`, in-progress): repo `.editorconfig` +
+`.github/workflows/ci.yml` (`dotnet build -warnaserror` with `EnforceCodeStyleInBuild` + `dotnet test
+--filter Category=Unit`). Remaining part of that action: wire the AC→`[Trait]` aggregator gate (needs
+the aggregator test written first — Story 3.6 pulled forward). Closes the story 1.1 notes on absent
+`.editorconfig` and absent CI.
+
 ## Deferred from: code review of story 1.8 (2026-09-03)
 
 - **`datetime` canonical output truncates sub-second precision and has no timezone strategy** — `NormalizedXmlBuilder.NormalizeDateTime` always emits `yyyy-MM-dd[THH:mm:ss]`; a `convert` mask carrying `f`/`F` (fractional seconds) or `z`/`K` (offset) would silently lose that component or risk a local-timezone shift. No descriptor in the repo uses such a mask (`P62.xml` masks are `ddMMyy` / `dd/MM/yy HH:mm` style). Revisit when a format needs sub-second or offset-bearing timestamps.

@@ -29,13 +29,13 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 16:00
-last_updated: 09-03-2026
+last_updated: 09-04-2026 09:45
 project: TextToXml
 project_key: NOKEY
 tracking_system: file-system
 story_location: _bmad-output/implementation-artifacts
 development_status:
-  epic-1: in-progress
+  epic-1: done
   1-1-mise-en-place-de-la-solution-et-du-socle-de-tests: done
   1-2-chargement-validation-du-descripteur: done
   1-3-décodage-windows-1252-strict-découpage-en-lignes: done
@@ -44,7 +44,7 @@ development_status:
   1-6-extraction-typage-sérialisation-du-xml-normalisé: done
   1-7-contrat-conversionresult-pureté-thread-safety: done
   1-8-généricité-isolation-de-format-types-étendus-decimal-datetim: done
-  epic-1-retrospective: optional
+  epic-1-retrospective: done
 
   epic-2: backlog
   2-1-entités-ef-database-first-harnais-de-test-docker: backlog
@@ -65,3 +65,50 @@ development_status:
   3-5-robustesse-de-la-boucle-worker: backlog
   3-6-validation-de-bout-en-bout-harnais-de-couverture-sm-1-2-3: backlog
   epic-3-retrospective: optional
+action_items:
+  - id: "epic-1-retro-item-1-passe-hygiene-story-0-epic-2-testsupport"
+    epic: 1
+    action: "Passe hygiene story-0 Epic 2: TestSupport partage (Windows1252 corrige
+      CP1252, Row, helpers fixture sur RepoLayout), accesseur DescriptorSections unique
+      remplacant les 3 copies, commentaire BlockAssigner.cs:15 corrige"
+    owner: "Dev"
+    status: done
+    ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-09-03.md"
+  - id: "epic-1-retro-item-2-editorconfig-ci-minimal-dotnet-build-dot"
+    epic: 1
+    action: ".editorconfig + CI minimal (dotnet build + dotnet test --filter Category=Unit)
+      en premiere PR Epic 2, avant harnais Docker story 2.1; cabler le test agregateur
+      AC->trait comme gate"
+    owner: "Lead Architecte"
+    status: in-progress
+    ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-09-03.md"
+  - id: "epic-1-retro-item-3-reconciliation-prd-ajouter-decimalsepara"
+    epic: 1
+    action: "Reconciliation PRD: ajouter decimalSeparator et convert sur <value> au
+      glossaire PRD 3 et a la grammaire FR-1; trancher nullabilite int/decimal vs
+      element vide (AC-FR5-4) dans P60.xsd story 2.3 avant que 2.4 consomme le DTO"
+    owner: "PM + Lead Architecte"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-09-03.md"
+  - id: "epic-1-retro-item-4-rendre-ac-fr6-5-reellement-vert-rendu-fr"
+    epic: 1
+    action: "Rendre AC-FR6-5 reellement vert: rendu francais propre pour echec de
+      bonne-formation XML dans DescriptorValidator.Validate (pas de texte XmlException
+      anglais); renforcer AssertCleanFrenchMessage"
+    owner: "Dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-09-03.md"
+  - id: "epic-1-retro-item-5-convention-equipe-chaque-commit-chore-st"
+    epic: 1
+    action: "Convention equipe: chaque commit chore(story-x.y) liste par AC le test
+      correspondant + mention test rouge avant code"
+    owner: "Scrum Master"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-09-03.md"
+  - id: "epic-1-retro-item-6-basculer-epic-1-de-in-progress-a-done-da"
+    epic: 1
+    action: "Basculer epic-1 de in-progress a done dans sprint-status.yaml (les 8
+      stories 1.x sont done)"
+    owner: "Scrum Master"
+    status: done
+    ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-09-03.md"
