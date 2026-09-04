@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 16:00
-last_updated: 09-04-2026 14:29
+last_updated: 09-04-2026 17:30
 project: TextToXml
 project_key: NOKEY
 tracking_system: file-system
@@ -49,7 +49,7 @@ development_status:
   epic-2: in-progress
   2-1-entités-ef-database-first-harnais-de-test-docker: done
   2-2-descripteur-p60-xml-enrichi-embarqué-en-ressource: done
-  2-3-p60-xsd-statique-génération-du-dto-kape22file-validation-ava: backlog
+  2-3-p60-xsd-statique-génération-du-dto-kape22file-validation-ava: done
   2-4-désérialisation-mapping-dto-kape22file-entité-l_d_kape22: backlog
   2-5-contrôle-de-compatibilité-descripteur-table-au-démarrage: backlog
   2-6-champs-dérivés-combinés: backlog

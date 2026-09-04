@@ -13,6 +13,8 @@
   <ItemGroup>
     <!-- The P60 Descripteur is embedded so it is read from the assembly at runtime, never from disk (AR-5). -->
     <EmbeddedResource Include="..\..\Templates\P60.xml" LogicalName="Kape22Importer.Templates.P60.xml" />
+    <!-- The static P60 schema is embedded too: Step 2 validates the normalized XML against it before deserialization (AR-3, AC-FR7-1). -->
+    <EmbeddedResource Include="..\..\Templates\P60.xsd" LogicalName="Kape22Importer.Templates.P60.xsd" />
   </ItemGroup>
 
   <ItemGroup>

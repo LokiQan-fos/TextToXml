@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Static schema for the P60 (KAPE22) normalized XML document produced by TextToXml (AR-3, D10).
+  Generated from Templates/P60.xml by scripts/gen.ps1 - do not edit by hand. One xs:element per
+  <value>, same order as the descriptor (xs:sequence, R-4), xs:int for datatype="int" and
+  xs:string otherwise (D6). A typed element is minOccurs="0" because Step 1 omits a blank typed
+  Champ (PRD D27); a string element is always emitted, even empty (AC-FR5-6). The Kape22File DTO
+  is generated from the same source and committed (AR-4). No target namespace: the normalized
+  XML is namespace-free.
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="unqualified">
+  <xs:element name="file">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="header" type="header" />
+        <xs:element name="message" type="message" />
+        <xs:element name="footer" type="footer" />
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:complexType name="header">
+    <xs:sequence>
+      <xs:element name="File" type="xs:string" />
+      <xs:element name="Date" type="xs:string" />
+      <xs:element name="NumeroFichier" type="xs:string" />
+      <xs:element name="Segment" type="xs:string" />
+      <xs:element name="Emet" type="xs:string" />
+      <xs:element name="Recepteur" type="xs:string" />
+      <xs:element name="Filler" type="xs:string" />
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="message">
+    <xs:sequence>
+      <xs:element name="File" type="xs:string" />
+      <xs:element name="Date" type="xs:string" />
+      <xs:element name="NumeroFichier" type="xs:string" />
+      <xs:element name="Segment" type="xs:string" />
+      <xs:element name="Element" type="xs:string" />
+      <xs:element name="KAP" type="xs:string" />
+      <xs:element name="Reserve" type="xs:string" />
+      <xs:element name="Type" type="xs:string" />
+      <xs:element name="OF" type="xs:string" />
+      <xs:element name="Indice" type="xs:int" minOccurs="0" />
+      <xs:element name="Client" type="xs:string" />
+      <xs:element name="Nuance" type="xs:string" />
+      <xs:element name="Coulee" type="xs:string" />
+      <xs:element name="ProfilProduit" type="xs:string" />
+      <xs:element name="DiametreProduit" type="xs:int" minOccurs="0" />
+      <xs:element name="ToleranceMaxSection" type="xs:int" minOccurs="0" />
+      <xs:element name="ToleranceMinSection" type="xs:int" minOccurs="0" />
+      <xs:element name="Epaisseur" type="xs:int" minOccurs="0" />
+      <xs:element name="ToleranceMaxEpaisseur" type="xs:int" minOccurs="0" />
+      <xs:element name="ToleranceMinEpaisseur" type="xs:int" minOccurs="0" />
+      <xs:element name="ClasseDeChute" type="xs:string" />
+      <xs:element name="LongueurCD" type="xs:int" minOccurs="0" />
+      <xs:element name="ToleranceMaxLongueur" type="xs:int" minOccurs="0" />
+      <xs:element name="ToleranceMinLongueur" type="xs:int" minOccurs="0" />
+      <xs:element name="MarqueCommerciale" type="xs:string" />
+      <xs:element name="NumeroMontage" type="xs:string" />
+      <xs:element name="CodeDemiProduit" type="xs:string" />
+      <xs:element name="PoidsDemiProduitUnitaire" type="xs:int" minOccurs="0" />
+      <xs:element name="NombreDemiProduit" type="xs:int" minOccurs="0" />
+      <xs:element name="AcompteSolde" type="xs:string" />
+      <xs:element name="PoidsPrevuDemiProduit" type="xs:int" minOccurs="0" />
+      <xs:element name="RangOpePits" type="xs:string" />
+      <xs:element name="CodeOpePits" type="xs:string" />
+      <xs:element name="LibelleConsignePits" type="xs:string" />
+      <xs:element name="CodeConsignePits" type="xs:string" />
+      <xs:element name="H2Coulee" type="xs:int" minOccurs="0" />
+      <xs:element name="NumeroFour1" type="xs:int" minOccurs="0" />
+      <xs:element name="DateEnfournementFour1_Date" type="xs:string" />
+      <xs:element name="DateEnfournementFour1_Heure" type="xs:string" />
+      <xs:element name="NumeroFour2" type="xs:int" minOccurs="0" />
+      <xs:element name="DateEnfournementFour2_Date" type="xs:string" />
+      <xs:element name="DateEnfournementFour2_Heure" type="xs:string" />
+      <xs:element name="RangOpeLingot" type="xs:string" />
+      <xs:element name="CodeOpeLingot" type="xs:string" />
+      <xs:element name="LibelleConsigneLingot" type="xs:string" />
+      <xs:element name="CodeConsigneLingot" type="xs:string" />
+      <xs:element name="ProfileLamine" type="xs:string" />
+      <xs:element name="SectionLaminage" type="xs:int" minOccurs="0" />
+      <xs:element name="ToleranceMaxSection1" type="xs:int" minOccurs="0" />
+      <xs:element name="ToleranceMinSection1" type="xs:int" minOccurs="0" />
+      <xs:element name="EpaisseurEnLaminage" type="xs:int" minOccurs="0" />
+      <xs:element name="ToleranceMaxEpaisseur1" type="xs:int" minOccurs="0" />
+      <xs:element name="ToleranceMinEpaisseur1" type="xs:int" minOccurs="0" />
+      <xs:element name="PriseDeFer" type="xs:int" minOccurs="0" />
+      <xs:element name="RangOpeChutage" type="xs:string" />
+      <xs:element name="CodeOpeChutage" type="xs:string" />
+      <xs:element name="LibelleConsigneChutage" type="xs:string" />
+      <xs:element name="CodeConsigneChutage" type="xs:string" />
+      <xs:element name="Destination" type="xs:string" />
+      <xs:element name="ChutageTete" type="xs:int" minOccurs="0" />
+      <xs:element name="ChutagePied" type="xs:int" minOccurs="0" />
+      <xs:element name="RangOpeDecoupe" type="xs:string" />
+      <xs:element name="CodeOpeDecoupe" type="xs:string" />
+      <xs:element name="LibelleConsigneDecoupe" type="xs:string" />
+      <xs:element name="CodeConsigneDecoupe" type="xs:string" />
+      <xs:element name="LongueurMoyenne" type="xs:int" minOccurs="0" />
+      <xs:element name="OutilDecoupe" type="xs:string" />
+      <xs:element name="RangOpePoidMetrique" type="xs:string" />
+      <xs:element name="CodeOpePoidMetrique" type="xs:string" />
+      <xs:element name="LibelleConsignePoidMetrique" type="xs:string" />
+      <xs:element name="CodeConsignePoidMetrique" type="xs:string" />
+      <xs:element name="RangOpeRefroidissoir" type="xs:string" />
+      <xs:element name="CodeOpeRefroidissoir" type="xs:string" />
+      <xs:element name="LibelleConsigneRefroidissoir" type="xs:string" />
+      <xs:element name="CodeConsigneRefroidissoir" type="xs:string" />
+      <xs:element name="ReserveRefroidissoir" type="xs:string" />
+      <xs:element name="MatriculeClient" type="xs:int" minOccurs="0" />
+      <xs:element name="RefroidissementBloom" type="xs:string" />
+      <xs:element name="NombreLingotsFour1" type="xs:int" minOccurs="0" />
+      <xs:element name="NombreLingotsFour2" type="xs:int" minOccurs="0" />
+      <xs:element name="ReserveRefroidissoir2" type="xs:string" />
+      <xs:element name="OFOrigin" type="xs:string" />
+      <xs:element name="OForiginInterne" type="xs:string" />
+      <xs:element name="OFDestination" type="xs:string" />
+      <xs:element name="OFDestinationInterne" type="xs:string" />
+      <xs:element name="NuanceMarquage" type="xs:string" />
+      <xs:element name="GazScarfing" type="xs:string" />
+      <xs:element name="OxygeneSuperieur" type="xs:string" />
+      <xs:element name="OxygeneInferieur" type="xs:string" />
+      <xs:element name="OxygeneLatent" type="xs:string" />
+      <xs:element name="VitesseV1" type="xs:string" />
+      <xs:element name="VitesseV2" type="xs:string" />
+      <xs:element name="VitesseV3" type="xs:string" />
+      <xs:element name="LongueurScarfingPied" type="xs:string" />
+      <xs:element name="LongueurScarfingTete" type="xs:string" />
+      <xs:element name="MiseAuMille" type="xs:string" />
+      <xs:element name="ReserveRefroidissoir3" type="xs:string" />
+      <xs:element name="RangOpeSVT" type="xs:string" />
+      <xs:element name="CodeOpeSVT" type="xs:string" />
+      <xs:element name="LibelleConsigneSVT" type="xs:string" />
+      <xs:element name="CodeConsigneSVT" type="xs:string" />
+      <xs:element name="ReserveSVT" type="xs:string" />
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="footer">
+    <xs:sequence>
+      <xs:element name="File" type="xs:string" />
+      <xs:element name="Date" type="xs:string" />
+      <xs:element name="NumeroFichier" type="xs:string" />
+      <xs:element name="Segment" type="xs:string" />
+      <xs:element name="Records" type="xs:string" />
+      <xs:element name="Filler" type="xs:string" />
+    </xs:sequence>
+  </xs:complexType>
+</xs:schema>

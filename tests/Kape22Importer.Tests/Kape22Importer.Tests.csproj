@@ -33,6 +33,7 @@
   <ItemGroup>
     <Compile Include="..\TextToXml.Tests\TestCategory.cs" Link="TestCategory.cs" />
     <Compile Include="..\TextToXml.Tests\RepoLayout.cs" Link="RepoLayout.cs" />
+    <Compile Include="..\TextToXml.Tests\AcTraitCoverage.cs" Link="AcTraitCoverage.cs" />
   </ItemGroup>
 
 </Project>
