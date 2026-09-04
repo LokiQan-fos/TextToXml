@@ -11,6 +11,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The P60 Descripteur is embedded so it is read from the assembly at runtime, never from disk (AR-5). -->
+    <EmbeddedResource Include="..\..\Templates\P60.xml" LogicalName="Kape22Importer.Templates.P60.xml" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\TextToXml\TextToXml.csproj" />
     <!--
       PortalSharedLibrary supplies the shared identity and logging used by every portal worker (PRD D20, R-2).

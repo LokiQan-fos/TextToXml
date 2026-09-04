@@ -1,5 +1,26 @@
 # Deferred Work
 
+## Deferred from: code review of story 2.2 (2026-09-04)
+
+- **`DateEnfournementFour1/2` (`DateTime?` columns) are modelled as split `_Date` / `_Heure` `string`
+  Champs** — the "derive `datatype` from the target column type" rule of Story 2.2 does not apply to
+  them, by design (D6: P60 has no `datetime` Champ), but nothing records how Story 2.6 (`champs
+  dérivés combinés`) recombines the two string slices into one `DateTime`, and no test covers the
+  `datetime` columns at all. The strengthened `P60Xml_IntDatatypeMatchesTheL_D_KAPE22IntColumns`
+  still only checks the `int` direction. Capture the recombination contract in Story 2.6 and add a
+  test that the two `_Date` / `_Heure` pairs are the only `<message>` Ids with no direct `L_D_KAPE22`
+  column.
+- **The `int`-column list is re-derived from the built EF model, not consumed from a Story 2.1 API** —
+  Story 2.1's epic AC promised "la liste des colonnes `int` … exposée pour la Story 2.2", but no such
+  member exists on `AscoLsiDbContext`; `P60DescriptorTests.Kape22IntColumns()` rebuilds a `DbContext`
+  and duplicates the model-only `DbContextOptions` helper already in `AscoLsiDbContextModelTests`.
+  Extract one shared model-only context helper for `Kape22Importer.Tests` (rule of three: this is the
+  second copy — extract on the third) or expose the int-column set from the persistence project.
+- **Pre-existing `Description` typos in `Templates/P60.xml` left in place** — `Emet` → "Rmetteur"
+  (Émetteur), "tolérence" ×4 (tolérance), despite every `<value>` line being rewritten in this story.
+  Also reconcile the header comment's "Positions 526 to 636" with `epics.md` AC-FR4-5 phrasing
+  ("637 > 526"); no test asserts the real Fichier's total record length (Story 2.5 territory).
+
 ## Deferred from: code review of story 2.1 (2026-09-04)
 
 - **No CI job runs `Category=Integration`** — `ci.yml` now states outright that the runner providing a
