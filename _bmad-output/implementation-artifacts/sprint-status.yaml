@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 16:00
-last_updated: 09-07-2026
+last_updated: 09-07-2026 16:00
 project: TextToXml
 project_key: NOKEY
 tracking_system: file-system
@@ -55,7 +55,7 @@ development_status:
   2-6-champs-dérivés-combinés: done
   2-7-contrôles-de-cohérence-warnings-non-bloquants: done
   2-8-persistance-transactionnelle-garde-fou-anti-doublon: done
-  epic-2-retrospective: optional
+  epic-2-retrospective: done
 
   epic-3: backlog
   3-1-scrutation-du-dossier-de-réception-cycle-de-vie-du-fichier: backlog
@@ -121,3 +121,50 @@ action_items:
     owner: "Dev"
     status: done
     ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-09-03.md"
+  - id: "epic-2-retro-item-8-passe-hygiene-story-0-epic-3-testsupport"
+    epic: 2
+    action: "Passe hygiene story-0 Epic 3: TestSupport partage Kape22Importer.Tests
+      (lecteur ressource embarquee, horloge/FixedTimeProvider, ConvertReferenceFichier);
+      scinder Kape22Mapper en CoherenceChecker (FR-10) + DerivedFields (FR-9) et trancher
+      static vs sealed class + Map d instance; un Lazy<TimeZoneInfo> partage Kape22Mapper/Kape22Persister;
+      conversion gardee au site SetValue de Map"
+    owner: "Dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-09-07.md"
+  - id: "epic-2-retro-item-9-gate-ci-de-la-categorie-integration-job"
+    epic: 2
+    action: "Gate CI de la categorie Integration: job build-test-integration (runner
+      Windows self-hosted + SQL Server Developer ou service container Linux mssql)
+      executant --filter Category=Integration contre scripts/schema/; drop/recreate
+      des 4 tables du harnais dans SqlServerIntegrationFixture; volet rapide = porter
+      branchement garde-fou + traduction DbException->PersistenceError sur provider
+      SQLite en Category=Unit"
+    owner: "Lead Architecte"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-09-07.md"
+  - id: "epic-2-retro-item-10-reconciliation-des-ac-reportes-dans-epic"
+    epic: 2
+    action: "Reconciliation des AC reportes dans epics.md avant stories 3.2/3.3: lister
+      AC-FR6-4 (liste fusionnee Errors+Warnings triee par LineNumber), volet journalisation
+      de AC-FR10-7/AC-FR11 (L_D_LOG_COMMANDE, MQTTnetServices.Logs), AC-FR12-3 (ImportResult.XmlArchivePath),
+      signal explicite de skip-doublon, chacun rattache a sa story Epic 3; trancher
+      AddDbContext vs AddDbContextFactory + duree de vie du persister"
+    owner: "SM + PM"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-09-07.md"
+  - id: "epic-2-retro-item-11-garde-sur-le-corps-de-commit-hook-pre-co"
+    epic: 2
+    action: "Garde sur le corps de commit: hook pre-commit refusant un chore(story-*)
+      sans lignes AC->test dans le corps (restaure l auditabilite cerementie CC-1,
+      cf regression stories 2.5/2.6); corriger les 3 coquilles Description de Templates/P60.xml
+      (Rmetteur->Emetteur, tolerence->tolerance)"
+    owner: "SM"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-09-07.md"
+  - id: "epic-2-retro-item-12-basculer-epic-2-de-in-progress-a-done-da"
+    epic: 2
+    action: "Basculer epic-2 de in-progress a done dans sprint-status.yaml (les 8
+      stories 2.x sont done)"
+    owner: "SM"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-09-07.md"
