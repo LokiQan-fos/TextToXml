@@ -1,5 +1,36 @@
 # Deferred Work
 
+## Deferred from: production data parity check (2026-09-07)
+
+`Kape22ProductionDataParityTests` (Category=Integration, opt-in behind
+`ConnectionStrings:AscoLSI_Production`) replays each of the 100 `P60/P60_847_682_0xx..1xx`
+sample Fichiers through `Converter` + `Kape22Mapper`, round-trips the mapped entity through the
+test database, and diffs it against the row the legacy import wrote in the **production**
+`L_D_KAPE22` (matched by OF + NumeroFichier — a clean 1:1). The legacy row is the reference:
+FR-7 requires the new insert to be identical. Four columns diverge because `Kape22Mapper` does
+not yet reproduce the legacy default-fill rules for abandoned Champs. Each Champ is **blank in
+every sample Fichier**, so only the "blank" branch of each rule is proven; the "populated"
+branch must be confirmed against the legacy import source before implementing.
+
+- **`OForiginInterne` — blank Champ must map to `NULL`, not `''`** — the `Kape22Mapper` reflective
+  copy takes the DTO `string` (default `string.Empty`) and writes `''`; legacy wrote `NULL`.
+  Likely a general rule "blank nullable string Champ -> `NULL`", but only `OForiginInterne` is
+  blank across the sample, so scope it against the legacy source (does it null every blank string
+  column, or just the OF* ones?).
+- **`AcompteSolde` — blank Champ must default to `'S'`** — legacy stored `'S'` (Solde) for all 100;
+  the new mapper writes `''`. Need the legacy rule for a *populated* Champ (copy as-is? map A/S?).
+- **`MatriculeClient` — blank typed Champ must map to `0`, not `NULL`** — Step 1 omits the blank
+  `int` element, the DTO is `null`, `Kape22Mapper` writes `NULL`; legacy wrote `0`. Confirm whether
+  legacy zero-fills every blank `int?` column or only specific ones (only `MatriculeClient` and
+  `ChutagePied` are blank in the sample).
+- **`ChutagePied` — same as `MatriculeClient`** (blank in 12/100, legacy `0`, new `NULL`).
+
+Permanent, not deferred: **`Client` mojibake**. One production row holds `SKF ⟂sterreic` — the
+`Ö` (Windows-1252 `0xD6`) was corrupted by a legacy encoding bug. The new pipeline decodes
+Windows-1252 correctly (`SKF Österreic`) and is intended to diverge. `KnownLegacyDivergences` in
+the test keeps `Client` listed forever; the four rows above come off the list as `Kape22Mapper`
+learns each rule.
+
 ## Resolved by: Story 2.8 (2026-09-07)
 
 - **`RequiredFieldCheck.Check` / `RequiredFieldMissing` had no production consumer of the rejection** —

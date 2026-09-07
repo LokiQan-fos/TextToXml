@@ -1,7 +1,9 @@
 {
   "_comment": "Copy this file to appsettings.Test.json (gitignored) and point it at a local SQL Server test instance. Never the production database. The Integration test category skips cleanly when this is absent.",
+  "_comment_production": "AscoLSI_Production points at the live exploitation database. Only Kape22ProductionDataParityTests reads it, and only with LINQ queries (never Add/SaveChanges) - all writes go to the test DB and roll back. Use a login limited to db_datareader and add ApplicationIntent=ReadOnly. Omit the key to skip that test.",
   "ConnectionStrings": {
     "AscoLSI": "Server=localhost;Database=AscoLSI_Test;Trusted_Connection=True;TrustServerCertificate=True;",
-    "MQTTnetServices": "Server=localhost;Database=MQTTnetServices_Test;Trusted_Connection=True;TrustServerCertificate=True;"
+    "MQTTnetServices": "Server=localhost;Database=MQTTnetServices_Test;Trusted_Connection=True;TrustServerCertificate=True;",
+    "AscoLSI_Production": "Server=AFV004-LSI;Database=AscoLSI;User ID=lsi_readonly;Password=...;TrustServerCertificate=True;ApplicationIntent=ReadOnly;"
   }
 }
