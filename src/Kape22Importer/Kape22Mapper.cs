@@ -30,8 +30,6 @@ public static class Kape22Mapper
         nameof(Kape22FileMessage.Segment),
         nameof(Kape22FileMessage.Element),
         nameof(Kape22FileMessage.KAP),
-        nameof(Kape22FileMessage.Reserve),
-        nameof(Kape22FileMessage.ReserveSVT),
         nameof(Kape22FileMessage.DateEnfournementFour1_Date),
         nameof(Kape22FileMessage.DateEnfournementFour1_Heure),
         nameof(Kape22FileMessage.DateEnfournementFour2_Date),

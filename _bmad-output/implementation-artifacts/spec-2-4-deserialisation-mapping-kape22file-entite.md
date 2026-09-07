@@ -59,6 +59,20 @@ baseline_commit: 'bb3f85f931310908025bc05ad5704dc92c0252c3'
 - Given `Kape22FileMessage`'s property set, when the completeness test runs, then every property is mapped or ignored, else the test fails (AC-FR7-3)
 - Given each Annexe B naming-exception entry, when the parameterized test runs, then both the source and target members exist by reflection (AC-FR7-6)
 
+### Review Findings
+
+- [x] [Review][Decision] AC-FR7-4's naming-exception test was vacuous — the generated DTO property `Kape22FileMessage.OForiginInterne` (`Kape22File.cs:298`) is spelled identically to the entity's `OForiginInterne` (`L_D_KAPE22.cs:130`), and case-insensitively identical to the `NamingExceptions` key `OFOriginInterne`, so `ResolveTargetName` returned the same value whether or not the exception entry existed. Resolved: strengthened the test instead of dropping the exception — added `ResolveTargetName_MappedSourceName_SubstitutesDictionaryTarget_AcFr7_4` and `ResolveTargetName_UnmappedSourceName_ReturnsInputUnchanged_AcFr7_4` [tests/Kape22Importer.Tests/Kape22MapperTests.cs] proving the dictionary-substitution mechanism directly (case-sensitive check), independent of the real DTO/entity casing coincidence.
+
+- [x] [Review][Patch] Removed redundant `Reserve`/`ReserveSVT` entries from `IgnoredProperties` [src/Kape22Importer/Kape22Mapper.cs] — both were already caught by `IsIgnored`'s `StartsWith("Reserve", OrdinalIgnoreCase)` fallback.
+
+- [x] [Review][Defer] `Map`'s reflection `SetValue` assumes DTO/entity types are already aligned ("checked at worker startup by FR-8"), but that startup check is Story 2.5 (currently `backlog`) — nothing guards a type mismatch today beyond AC-FR7-3's name-existence check. [src/Kape22Importer/Kape22Mapper.cs:71-75] — deferred, pre-existing cross-story dependency, owned by Story 2.5.
+
+- [x] [Review][Defer] No test exercises a nullable DTO field (e.g. a nullable int/decimal Detail Champ) actually blank in the source XML landing as `null` on the matching nullable entity column — only the non-nullable `Indice` blank-path is covered. [tests/Kape22Importer.Tests/Kape22MapperTests.cs:138] — deferred, real gap but not tied to a stated AC-FRx-y.
+
+- [x] [Review][Defer] Blank NOT-NULL string columns (`Client`, `Coulee`, `Nuance`, `OF`, `Type`) map through as empty string with no error and no test; the spec's "Never" clause names only `Indice` as exempt from `RequiredFieldMissing`-style validation. [src/Kape22Importer/Kape22Mapper.cs:52-79] — deferred, generalization to confirm explicitly when Story 2.6/FR-9 lands.
+
+- [x] [Review][Defer] Embedded-resource test helpers (`EmbeddedResource`, `EmbeddedP60Xml`, `ReadValidFixture`) are copy-pasted verbatim into a third test file (`Kape22MapperTests.cs`), repeating a pattern already present in `P60XsdTests.cs`/`P60DescriptorTests.cs`. [tests/Kape22Importer.Tests/Kape22MapperTests.cs:179-194] — deferred, pre-existing recurring pattern, consolidate into shared `TestSupport` in a future hardening pass.
+
 ## Spec Change Log
 
 ## Design Notes

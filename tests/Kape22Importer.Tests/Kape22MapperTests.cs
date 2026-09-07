@@ -78,6 +78,25 @@ public class Kape22MapperTests
         Assert.Equal(expected, result.Value!.OForiginInterne);
     }
 
+    // AC-FR7-4: proves ResolveTargetName actually substitutes the mapped name (case-sensitive check),
+    // independent of Kape22FileMessage/L_D_KAPE22's real property casing, which happens to already
+    // match case-insensitively and so cannot on its own prove the exception mechanism is exercised.
+    [Fact]
+    [Trait("AC", "FR7-4")]
+    public void ResolveTargetName_MappedSourceName_SubstitutesDictionaryTarget_AcFr7_4()
+    {
+        Assert.Equal("OForiginInterne", Kape22Mapper.ResolveTargetName("OFOriginInterne"));
+        Assert.NotEqual("OFOriginInterne", Kape22Mapper.ResolveTargetName("OFOriginInterne"), StringComparer.Ordinal);
+    }
+
+    // AC-FR7-4: an unmapped source name falls back to itself unchanged.
+    [Fact]
+    [Trait("AC", "FR7-4")]
+    public void ResolveTargetName_UnmappedSourceName_ReturnsInputUnchanged_AcFr7_4()
+    {
+        Assert.Equal("SomeUnmappedProperty", Kape22Mapper.ResolveTargetName("SomeUnmappedProperty"));
+    }
+
     // AC-FR7-5: Annexe B's ignored Detail properties are not copied anywhere, and Map raises no error.
     [Theory]
     [InlineData("Element")]

@@ -1,5 +1,26 @@
 # Deferred Work
 
+## Deferred from: code review of story-2.4 (2026-09-04)
+
+- **`Kape22Mapper.Map`'s reflection `SetValue` assumes DTO/entity types are already aligned** —
+  the code comment says "checked at worker startup by FR-8," but that startup compatibility check
+  is Story 2.5 (currently `backlog`). Nothing guards a type mismatch today beyond AC-FR7-3's
+  name-existence check. Pre-existing cross-story dependency, owned by Story 2.5.
+
+- **No test exercises a nullable DTO field actually blank landing as `null` on a nullable entity
+  column** — only the non-nullable `Indice` blank-path (`Kape22MapperTests.cs:138`) is covered.
+  Real coverage gap, not tied to a stated `AC-FRx-y`; worth a follow-up test.
+
+- **Blank NOT-NULL string columns (`Client`, `Coulee`, `Nuance`, `OF`, `Type`) map through as
+  empty string with no error and no test** — the spec's "Never" clause names only `Indice` as
+  exempt from `RequiredFieldMissing`-style validation. Confirm the generalization explicitly when
+  Story 2.6/FR-9 lands.
+
+- **Embedded-resource test helpers (`EmbeddedResource`, `EmbeddedP60Xml`, `ReadValidFixture`) are
+  copy-pasted into a third test file (`Kape22MapperTests.cs`)** — repeats a pattern already present
+  in `P60XsdTests.cs`/`P60DescriptorTests.cs`. Consolidate into a shared `TestSupport` helper in a
+  future hardening pass.
+
 ## Deferred from: code review of story 2.4 (2026-09-04)
 
 - **`P60Deserializer.Deserialize` throws `ArgumentNullException` on a `null` `normalizedXml`** —
