@@ -1,6 +1,57 @@
 # Deferred Work
 
-## Deferred from: Story 2.7 (2026-09-07)
+## Resolved by: Story 2.8 (2026-09-07)
+
+- **`RequiredFieldCheck.Check` / `RequiredFieldMissing` had no production consumer of the rejection** —
+  `Kape22Persister.Persist` now turns a failed `MapResult` into an `ImportResult` with no `L_D_KAPE22`
+  row and (when the OF is readable) one `L_D_LOG_COMMANDE` "REJETÉ" line.
+- **`MapResult.Warnings` not folded into a `ConversionResult`** (from Story 2.7) — still open; the
+  persister passes `mapResult.Warnings` straight onto `ImportResult.Warnings` on success without
+  merging Step 1 `SegmentMismatch` warnings or sorting by `LineNumber`. The Epic 3 orchestrator owns
+  that merge (it is the only place both lists exist).
+- **Commit + reset test-isolation regime** (deferred from Story 2.1 review) — `SqlServerIntegrationFixture.ResetData()`
+  (TRUNCATE of the two AscoLSI harness tables) now exists; `TransactionalPersistenceTests` runs every
+  case in that regime.
+
+## Deferred from: Story 2.8 (2026-09-07)
+
+- **Anti-duplicate guard reads outside the write transaction** — `Kape22Persister.OkLogRowExists` runs
+  its SELECT before the insert `SaveChanges`, not inside one ambient transaction. Fine for the
+  single-file-at-a-time worker; revisit if the orchestrator ever processes Fichiers concurrently.
+- **Duplicate-skip has no explicit signal on `ImportResult`** — it is identified structurally
+  (`Success == true && InsertedId == null && Errors.Count == 0`). The PRD "log Warning « déjà importé,
+  ignoré »" is left to Epic 3 worker logging (Story 3.3). If the orchestrator needs an unambiguous
+  flag, add one there or introduce an importer-side code (not in `TextToXml.ErrorCode`).
+- **`ImportResult.XmlArchivePath` is never set** by the persister — it is an Epic 3 orchestrator field
+  (written when the normalized XML is archived next to the Fichier, AC-FR12-3).
+- **`Kape22Persister.ParisTimeZone` is a `static` field initializer** — same `TypeInitializationException`
+  risk on a tz-data-less runtime already tracked for `Kape22Mapper.ParisTimeZone`; same
+  not-a-concern-on-target reasoning. Fold both into one shared `Lazy<TimeZoneInfo>` helper if a leaner
+  runtime is ever targeted.
+- **Persister DI / host wiring absent** — `Program.cs` still does not compose persistence or the
+  persister; `Kape22Persister` is constructed directly by its tests. Epic 3 (orchestration) owns
+  `AddDbContext` vs `AddDbContextFactory` and the per-Fichier persister lifetime.
+- **Rejection summary format is provisional** — `"<n> erreur(s) : <msg> ; <msg>"`. AC-FR14-2 (Story
+  3.3) refines the exact `L_D_LOG_COMMANDE` / `Logs` wording ("nb erreurs + libellés").
+- **`MQTTnetServices.Logs` half of AC-FR10-7 / AC-FR11 logging** — still not exercised; needs the
+  Serilog sink from Story 3.3.
+
+## Deferred from: code review of story-2.8 (2026-09-07)
+
+- **`Kape22Persister` runtime logic runs only in the CI-excluded `Category=Integration` suite** — `ci.yml`
+  runs `--filter Category=Unit` only (the SQL Server runner is still an open infra decision), so the
+  anti-duplicate guard branch, the atomic-rollback boundary and the `DbUpdateException`/`DbException` →
+  `PersistenceError` translation have no always-run coverage. The transaction-boundary cases genuinely
+  need a real server, but the branch logic and the exception translation could run against EF Core's
+  SQLite/in-memory provider in a `Category=Unit` test. Revisit when the CI SQL Server decision lands.
+- **The anti-duplicate guard has no database backstop** — `OkLogRowExists` is the sole defense against a
+  duplicate `L_D_KAPE22` insert. `AR-8` forbids migrations, so a unique index cannot be added from this
+  repo. A future owner of the AscoLSI schema should add a unique constraint on the D22 key
+  (`NumeroFichier` + `OF` + success marker) as the real backstop.
+- **`PersistRejected` writes one REJETÉ `L_D_LOG_COMMANDE` row per reprocessing** — the D22 guard only
+  suppresses re-inserts after a prior success, not after a rejection. A permanently malformed Fichier
+  that the Epic 3 orchestrator retries would accumulate rows. Expected to be moot once the orchestrator
+  moves rejected Fichiers to `error/` (Story 3.1, AC-FR12) instead of retrying; confirm there.
 
 - **AC-FR10-7's persistence + logging half is not exercised** — Story 2.7 delivers the mapper side:
   `Kape22Mapper.Map` now returns `MapResult.Warnings` and a Fichier whose only defects are coherence

@@ -145,9 +145,14 @@ public static class Kape22Mapper
         // missing Detail Indice) is a rejected Fichier.
         errors.AddRange(RequiredFieldCheck.Check(file));
 
+        // AC-FR11-4 / D22: the Header roulette and the trimmed Detail OF ride along even on a rejection,
+        // so the persister can write the REJETÉ L_D_LOG_COMMANDE line and key the anti-duplicate guard.
+        string numeroFichier = file.Header.NumeroFichier;
+        string of = file.Message.OF.Trim();
+
         return errors.Count > 0
-            ? new MapResult<L_D_KAPE22> { Errors = errors, Warnings = warnings }
-            : new MapResult<L_D_KAPE22> { Value = entity, Warnings = warnings };
+            ? new MapResult<L_D_KAPE22> { Errors = errors, NumeroFichier = numeroFichier, OF = of, Warnings = warnings }
+            : new MapResult<L_D_KAPE22> { NumeroFichier = numeroFichier, OF = of, Value = entity, Warnings = warnings };
     }
 
     // AC-FR10-1 / AC-FR10-3 / AC-FR10-4 / AC-FR10-5 (§0bis D16): the three non-blocking coherence
@@ -299,10 +304,18 @@ public static class Kape22Mapper
 // Outcome of Kape22Mapper.Map. Mirrors ConversionResult/P60DeserializeResult: Success is true exactly
 // when Errors is empty; Value is null on failure. Warnings are the non-blocking coherence signals of
 // FR-10 (D16) and never influence Success.
+// NumeroFichier (Header roulette) and OF (trimmed Detail Champ) are exposed even on a mapping failure,
+// as long as deserialization succeeded, so the Story 2.8 persister can write the "REJETÉ"
+// L_D_LOG_COMMANDE line (AC-FR11-4). Both stay null when deserialization itself failed, which is the
+// D15 "OF unreadable" path where no L_D_LOG_COMMANDE row is written.
 // Properties are declared in alphabetical order (CC-4).
 public sealed record MapResult<T>
 {
     public IReadOnlyList<ConversionError> Errors { get; init; } = [];
+
+    public string? NumeroFichier { get; init; }
+
+    public string? OF { get; init; }
 
     public bool Success => Errors.Count == 0;
 

@@ -54,7 +54,7 @@ development_status:
   2-5-contrôle-de-compatibilité-descripteur-table-au-démarrage: done
   2-6-champs-dérivés-combinés: done
   2-7-contrôles-de-cohérence-warnings-non-bloquants: done
-  2-8-persistance-transactionnelle-garde-fou-anti-doublon: backlog
+  2-8-persistance-transactionnelle-garde-fou-anti-doublon: done
   epic-2-retrospective: optional
 
   epic-3: backlog

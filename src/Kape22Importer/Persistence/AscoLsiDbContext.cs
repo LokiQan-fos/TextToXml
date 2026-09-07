@@ -36,6 +36,12 @@ public class AscoLsiDbContext(DbContextOptions<AscoLsiDbContext> options) : DbCo
             entity.ToTable("L_D_LOG_COMMANDE");
             entity.HasKey(row => row.Id);
             entity.Property(row => row.Id).ValueGeneratedOnAdd();
+
+            // The bounded string column lengths mirror scripts/schema/01-ascolsi-tables.sql (Annexe
+            // C.2), so an over-long value surfaces as a model error rather than only at the database.
+            entity.Property(row => row.Commande).HasMaxLength(LogCommandeColumnLengths.Commande);
+            entity.Property(row => row.OF).HasMaxLength(LogCommandeColumnLengths.OF);
+            entity.Property(row => row.User).HasMaxLength(LogCommandeColumnLengths.User);
         });
 
         // The real columns are legacy datetime, not datetime2. Pin the store type so EF stops emitting

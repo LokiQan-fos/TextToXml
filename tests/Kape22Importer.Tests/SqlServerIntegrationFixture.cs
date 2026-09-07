@@ -73,6 +73,17 @@ public sealed class SqlServerIntegrationFixture
     // Set when Available is false; carries the actionable reason to show in the skipped test.
     public string? SkipReason { get; }
 
+    // Commit + reset isolation regime (AR-12): empties the two AscoLSI harness tables and reseeds their
+    // identity, for the Story 2.8 tests that depend on committed state between two actions (the D22
+    // anti-duplicate guard, AC-FR11-6/11-7) or that verify a transaction boundary (AC-FR11-3/11-5) and
+    // therefore cannot run under an ambient TransactionScope. Each such test calls this first.
+    public void ResetData()
+    {
+        ExecuteNonQuery(
+            AscoLsiConnectionString,
+            "TRUNCATE TABLE dbo.L_D_KAPE22; TRUNCATE TABLE dbo.L_D_LOG_COMMANDE;");
+    }
+
     // A fresh context bound to the test instance. The caller owns its lifetime and its transaction.
     public AscoLsiDbContext NewAscoLsiContext()
     {
@@ -86,6 +97,16 @@ public sealed class SqlServerIntegrationFixture
     // A short login timeout keeps an instance that dies mid-run a quick failure rather than a long hang.
     private static string WithShortLoginTimeout(string connectionString) =>
         new SqlConnectionStringBuilder(connectionString) { ConnectTimeout = 3 }.ConnectionString;
+
+    private static void ExecuteNonQuery(string connectionString, string commandText)
+    {
+        using SqlConnection connection = new(WithShortLoginTimeout(connectionString));
+        connection.Open();
+
+        using SqlCommand command = connection.CreateCommand();
+        command.CommandText = commandText;
+        command.ExecuteNonQuery();
+    }
 
     private static void ApplySchema(string connectionString, string scriptFileName)
     {
