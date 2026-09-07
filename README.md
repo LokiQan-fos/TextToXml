@@ -28,11 +28,12 @@ Voir `_bmad-output/planning-artifacts/PRD.md` et `epics.md` pour le détail fonc
   `..\..\..\..\RiderProjects\PortalFosMarcegaglia\PortalSharedLibrary\PortalSharedLibrary.csproj`.
   Adapter cette ligne si le dépôt `PortalFosMarcegaglia` se trouve ailleurs.
 
-  La référence est **conditionnelle** (`Condition="Exists(...)"`) : un clone isolé
-  de `TextToXml` compile quand même `src/TextToXml` et ses tests
-  (`dotnet build src/TextToXml`, `dotnet test tests/TextToXml.Tests`). En
-  revanche `dotnet build TextToXml.sln` échoue tant que le dépôt voisin est
-  absent, car la solution liste `PortalSharedLibrary` (dossier `external/`).
+  La référence est **conditionnelle** (`Condition="Exists(...)"`) et n'est **pas**
+  listée dans `TextToXml.sln` : un clone isolé de `TextToXml` compile et teste
+  toute la solution sans le dépôt voisin (le CI en dépend). Quand
+  `PortalFosMarcegaglia` est présent, `Kape22Importer` le référence
+  automatiquement à la compilation ; ouvrir son `.csproj` séparément dans l'IDE
+  si l'on veut naviguer dans les sources de `PortalSharedLibrary`.
 
 - Une **instance SQL Server** joignable (édition Developer, gratuite) pour la
   catégorie de tests `Integration` (AR-12). Renseigner les chaînes de connexion
