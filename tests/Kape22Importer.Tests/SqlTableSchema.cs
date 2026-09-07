@@ -9,7 +9,10 @@ namespace Kape22Importer.Tests;
 
 // One column of a CREATE TABLE, parsed out of a scripts/schema/*.sql file. SqlType is the raw
 // upper-cased type token (for example "DATETIME"), kept so the parity test can catch store-type drift.
-internal sealed record SqlColumn(Type ClrType, bool IsNullable, string Name, string SqlType);
+// MaxLength is the declared character length of a bounded string column, or null for a non-string
+// column and for NVARCHAR(MAX) / NCHAR without a length. Properties are declared in alphabetical order
+// (CC-4).
+internal sealed record SqlColumn(Type ClrType, bool IsNullable, int? MaxLength, string Name, string SqlType);
 
 // Minimal reader for the generated scripts/schema/*.sql files, used only to lock the EF model against
 // the real schema (risk R-3). It understands just the subset those generated files use: one column per
@@ -21,7 +24,7 @@ internal static class SqlTableSchema
         RegexOptions.Singleline | RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private static readonly Regex ColumnLine = new(
-        @"^\s*\[(?<name>\w+)\]\s+(?<type>\w+)(?:\s*\([^)]*\))?(?:\s+IDENTITY\s*\([^)]*\))?\s+(?<nullability>NOT\s+NULL|NULL)\s*,?\s*$",
+        @"^\s*\[(?<name>\w+)\]\s+(?<type>\w+)(?:\s*\((?<length>[^)]*)\))?(?:\s+IDENTITY\s*\([^)]*\))?\s+(?<nullability>NOT\s+NULL|NULL)\s*,?\s*$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static IReadOnlyList<SqlColumn> Read(string scriptFileName, string tableName)
@@ -52,10 +55,27 @@ internal static class SqlTableSchema
                 .Equals("NOTNULL", StringComparison.OrdinalIgnoreCase);
 
             string sqlType = column.Groups["type"].Value.ToUpperInvariant();
-            columns.Add(new SqlColumn(ClrTypeFor(sqlType), isNullable, column.Groups["name"].Value, sqlType));
+            columns.Add(new SqlColumn(
+                ClrTypeFor(sqlType),
+                isNullable,
+                MaxLengthFor(sqlType, column.Groups["length"].Value),
+                column.Groups["name"].Value,
+                sqlType));
         }
 
         return columns;
+    }
+
+    // The bounded character length of a string column, or null for a non-string column and for a
+    // length token that is absent or MAX.
+    private static int? MaxLengthFor(string sqlType, string lengthToken)
+    {
+        if (ClrTypeFor(sqlType) != typeof(string))
+        {
+            return null;
+        }
+
+        return int.TryParse(lengthToken, out int length) ? length : null;
     }
 
     private static Type ClrTypeFor(string sqlType) => sqlType.ToUpperInvariant() switch

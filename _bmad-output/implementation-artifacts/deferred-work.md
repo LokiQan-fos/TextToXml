@@ -1,20 +1,48 @@
 # Deferred Work
 
-## Deferred from: code review of story-2.4 (2026-09-04)
+## Resolved by: Story 2.5 (2026-09-07)
 
-- **`Kape22Mapper.Map`'s reflection `SetValue` assumes DTO/entity types are already aligned** —
-  the code comment says "checked at worker startup by FR-8," but that startup compatibility check
-  is Story 2.5 (currently `backlog`). Nothing guards a type mismatch today beyond AC-FR7-3's
-  name-existence check. Pre-existing cross-story dependency, owned by Story 2.5.
+- **`Kape22Mapper.Map`'s reflection `SetValue` type-alignment assumption** — mitigated at worker
+  startup by `StartupCompatibilityCheck.Verify` (AC-FR8-1): a Champ `datatype` that does not fit the
+  `L_D_KAPE22` column CLR type aborts host startup. The `SetValue` call site itself is unchanged, so
+  a type mismatch that reaches it at runtime (e.g. a Descripteur edited without redeploy) is still
+  unguarded — see the residual item under the Story 2.5 review below.
+- **Blank NOT-NULL columns mapped through as empty string with no error** — `RequiredFieldCheck.Check`
+  (AC-FR8-5 / AC-FR8-6) returns one `RequiredFieldMissing` per empty NOT NULL Detail column, ordered
+  by the Descripteur `<value>` Position. `Kape22Mapper.Map` itself is unchanged, so the Story 2.4
+  blank-`Indice` test stays green.
+
+## Deferred from: code review of story-2.5 (2026-09-07)
+
+- **`RequiredFieldCheck.Check` has no production caller** — delivered with unit tests only; the
+  orchestrator that runs it per Fichier and turns its `ConversionError`s into a rejection is Story
+  2.8. AC-FR8-5 / AC-FR8-6 are accepted on unit behaviour alone until then.
+- **`Kape22Mapper.Map`'s reflection `SetValue` is still unguarded at the call site** — the FR-8
+  startup check catches an incompatible embedded Descripteur, but a runtime type mismatch that
+  reaches `SetValue` (Descripteur changed without a redeploy, or a path the check does not cover)
+  still throws a raw reflection exception. Add a guarded conversion in `Map` in a Story 2.4/2.8
+  hardening pass.
+- **`RequiredFieldCheck` / `StartupCompatibilityCheck` trust the `L_D_KAPE22` NRT annotations** —
+  `IsRequired` reads `NullabilityInfoContext.WriteState`; if the entity is ever re-scaffolded with a
+  `#nullable disable` region, `WriteState` is `Unknown`, every required string column silently drops
+  out and the check becomes a no-op for strings. `SqlColumn.IsNullable` (already parsed for the
+  parity test) is an authoritative fallback. Not imminent — `Directory.Build.props` sets
+  `<Nullable>enable</Nullable>` and the entity is hand-maintained.
+- **No `ILogger` records that the FR-8 startup check ran and passed** — in production there is no way
+  to tell "check passed" from "check never wired". Not required by any AC-FR8; Epic 3 (Story 3.3 /
+  3.4) owns worker logging and launcher integration — add a "FR-8 check passed: N mapped Champs
+  verified" line there.
+- **Embedded-descriptor reader still copied in test code** — `EmbeddedDescriptor` now backs the two
+  production sites, and `StartupCompatibilityTests` / `RequiredFieldMissingTests` use it, but
+  `Kape22MapperTests` / `P60XsdTests` / `P60DescriptorTests` still carry their own
+  `GetManifestResourceStream` helpers. Fold into a shared `TestSupport` in the hygiene pass already
+  tracked below.
+
+## Deferred from: code review of story-2.4 (2026-09-04)
 
 - **No test exercises a nullable DTO field actually blank landing as `null` on a nullable entity
   column** — only the non-nullable `Indice` blank-path (`Kape22MapperTests.cs:138`) is covered.
   Real coverage gap, not tied to a stated `AC-FRx-y`; worth a follow-up test.
-
-- **Blank NOT-NULL string columns (`Client`, `Coulee`, `Nuance`, `OF`, `Type`) map through as
-  empty string with no error and no test** — the spec's "Never" clause names only `Indice` as
-  exempt from `RequiredFieldMissing`-style validation. Confirm the generalization explicitly when
-  Story 2.6/FR-9 lands.
 
 - **Embedded-resource test helpers (`EmbeddedResource`, `EmbeddedP60Xml`, `ReadValidFixture`) are
   copy-pasted into a third test file (`Kape22MapperTests.cs`)** — repeats a pattern already present

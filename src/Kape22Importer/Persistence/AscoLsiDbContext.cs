@@ -21,6 +21,14 @@ public class AscoLsiDbContext(DbContextOptions<AscoLsiDbContext> options) : DbCo
             entity.ToTable("L_D_KAPE22");
             entity.HasKey(row => row.Id);
             entity.Property(row => row.Id).ValueGeneratedOnAdd();
+
+            // The bounded string column lengths come from constants derived once from the real schema
+            // (Annexe C), never a live sys.columns query. The startup compatibility check reads them
+            // back through the model (AC-FR8-2, risk R-6).
+            foreach ((string column, int maxLength) in Kape22ColumnLengths.MaxLengths)
+            {
+                entity.Property(column).HasMaxLength(maxLength);
+            }
         });
 
         modelBuilder.Entity<L_D_LOG_COMMANDE>(entity =>
