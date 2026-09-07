@@ -193,7 +193,11 @@ microservices à UI et ne s'appliquent à aucune story v1.
   sont **conservés à l'identique** sauf si le code sous‑jacent est modifié.
 - **CC-4 — Tri alphabétique.** Les propriétés des classes et des objets (records
   DTO, entités EF, classes de configuration, `ConversionError`, `ImportResult`…)
-  sont déclarées par **ordre alphabétique**.
+  sont déclarées par **ordre alphabétique** ; les initialiseurs d'objet suivent
+  le même ordre que la déclaration du type. **Dérogation (2026-09-07) :** ne sont
+  **pas** visés les tuples nommés locaux (`(string FieldId, string Segment, …)`)
+  ni les déconstructions, dont l'ordre des éléments est positionnel et porteur de
+  sens à la lecture ; ils restent libres de suivre l'ordre métier. Voir R-7.
 - **CC-5 — Vocabulaire.** Les identifiants de code et de test réutilisent **à
   l'identique** le vocabulaire du glossaire PRD §3 (`Fichier`, `Ligne`, `Bloc`,
   `Champ`, `Descripteur`, `Valeur brute`, `Valeur normalisée`, `XML normalisé`,
@@ -262,6 +266,7 @@ logs), **3.5** (`AC-FR15-3/4`), **3.6** (E2E 10 fichiers). Tests unitaires
 | R-4 | Ordre des enfants du XML normalisé vs `<xs:sequence>` de `P60.xsd` | validation `AC-FR5-14` / `AC-FR7-1` casse si divergence | Décision : XML émis dans l'**ordre du Descripteur**, `P60.xsd` en `<xs:sequence>` **même ordre** (Stories 1.6 & 2.3). | ✅ résolu |
 | R-5 | `xsd.exe` génère `Kape22File` dans l'ordre du schéma, pas alphabétique — conflit `CC-4` | friction inutile / post‑traitement fragile | `CC-4` **ne s'applique pas** aux fichiers générés ; membres ajoutés à la main → classe partielle triée (Story 2.3). | ✅ résolu |
 | R-6 | Source de `max_length` pour `AC-FR8-2` non spécifiée | dépendance schéma au runtime, ou constantes qui dérivent | Story 2.5 : constantes issues d'Annexe C dans la config d'entité, pas de requête `sys.columns` live. | ✅ résolu |
+| R-7 | Portée de `CC-4` sur les tuples nommés locaux et les déconstructions (Story 2.7, `Kape22Mapper.CheckFileName`) | friction de revue / réordonnancement qui casse la lisibilité positionnelle | **Tranché (utilisateur, 2026-09-07) :** `CC-4` **ne s'applique pas** aux tuples nommés locaux ni aux déconstructions ; leur ordre d'éléments reste métier/positionnel. `CC-4` continue de viser les classes, records, entités, classes de configuration et initialiseurs d'objet. Texte `CC-4` mis à jour. | ✅ résolu |
 
 > **C2 (utilisateur)** : le fichier `Templates/P60.xml` est présent et à jour dans
 > l'espace de travail — les Stories 2.2 / 2.3 en dérivent la liste complète des

@@ -1,5 +1,29 @@
 # Deferred Work
 
+## Deferred from: Story 2.7 (2026-09-07)
+
+- **AC-FR10-7's persistence + logging half is not exercised** — Story 2.7 delivers the mapper side:
+  `Kape22Mapper.Map` now returns `MapResult.Warnings` and a Fichier whose only defects are coherence
+  Warnings still yields an entity with an empty `Errors`. The "inserted into `L_D_KAPE22`,
+  `L_D_LOG_COMMANDE` status OK, Warnings land in `MQTTnetServices.Logs`" assertion needs Story 2.8
+  (transactional persistence) and Epic 3 Story 3.3 (the `MQTTnetServices.Logs` sink). Covered by a
+  unit test on the mapper only until then (`CoherenceWarningsTests.Map_FichierWithOnlyCoherenceWarnings_StillProducesEntity_AcFr10_7`).
+- **`MapResult.Warnings` is not yet folded into a `ConversionResult`** — the Story 2.8 orchestrator
+  owns merging Step 1 `ConversionResult.Warnings` (SegmentMismatch) with the mapper's FR-10 Warnings
+  and sorting the combined list by `LineNumber` (AC-FR6-4). `Kape22Mapper` returns its Warnings
+  unsorted.
+- **The existing `Kape22MapperTests` call sites still use `Map(xml, name)` with no clock** — the
+  deferred item from Story 2.6 was to fold a fixed clock in "when Story 2.7 edits that file"; Story
+  2.7 added a new file (`CoherenceWarningsTests`, fixed clock) instead of editing `Kape22MapperTests`,
+  so those call sites still run on `TimeProvider.System`. Still not flaky (reference `Date` "200"
+  valid every year); fold in next time that file is touched.
+- **`CoherenceWarningsTests` copies the mapper test scaffolding verbatim** — `FixedTimeProvider`,
+  `WinterClock`, `ConvertReferenceFichier`, `ReadValidFixture` and the `ReferenceFichierName` const are
+  duplicated from `DerivedFieldsTests` (Story 2.6). Same recurring pattern already tracked for the
+  embedded-resource helpers; the shared `TestSupport` in `TextToXml.Tests` (Epic 1 retro A-1) now
+  exists, so the fold-in target is there. Do it in the next test hardening pass that touches these
+  files.
+
 ## Deferred from: code review of story 2.6 (2026-09-07)
 
 - **`ParisTimeZone` is resolved in a `static` field initializer** — on a globalization-invariant host
