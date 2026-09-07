@@ -104,6 +104,44 @@ public class FormatIsolationTests
         Assert.True(pinsWindows1252, "No src/TextToXml source pins Windows-1252 (expected in the input decoder).");
     }
 
+    // AC-FR9-6: the P60 derived rules (day-of-year Header.Date, worker DateReception, roulette
+    // NumeroFichier) live in Kape22Importer, never in the generic library. No src/TextToXml source
+    // mentions DateReception, a day-of-year conversion or a time zone, and the importer does carry
+    // that logic.
+    [Fact]
+    [Trait("AC", "FR9-6")]
+    public void TextToXmlSource_HasNoNotionOfDerivedP60Rules_AcFr9_6()
+    {
+        string[] derivedRuleTokens =
+        [
+            "DateReception", "DayOfYear", "jour de l'année", "day of the year",
+            "Europe/Paris", "Romance Standard Time", "TimeProvider", "TimeZoneInfo",
+        ];
+
+        List<string> offenders = [];
+        foreach (string file in SourceFiles(Path.Combine(RepoLayout.RepoRoot, "src", "TextToXml")))
+        {
+            string text = File.ReadAllText(file);
+            offenders.AddRange(derivedRuleTokens
+                .Where(text.Contains)
+                .Select(token => $"{Path.GetFileName(file)} mentions '{token}'"));
+        }
+
+        Assert.True(offenders.Count == 0, string.Join(Environment.NewLine, offenders));
+
+        // The derived rules must exist in the importer instead: Kape22Mapper.Map assigns DateReception
+        // and resolves a time zone. The behavioural proof is DerivedFieldsTests; this pair only guards
+        // that the split cannot be defeated by moving the logic wholesale into TextToXml.
+        string importerMapper = File.ReadAllText(
+            Path.Combine(RepoLayout.RepoRoot, "src", "Kape22Importer", "Kape22Mapper.cs"));
+        Assert.Contains("entity.DateReception =", importerMapper);
+        Assert.Contains("TimeZoneInfo", importerMapper);
+    }
+
+    private static IEnumerable<string> SourceFiles(string projectDirectory) =>
+        Directory.EnumerateFiles(projectDirectory, "*.cs", SearchOption.AllDirectories)
+            .Where(path => !path.Replace('\\', '/').Contains("/obj/") && !path.Replace('\\', '/').Contains("/bin/"));
+
     private static List<string> Includes(string projectRelativePath, string elementName)
     {
         XDocument document = XDocument.Load(RepoLayout.ProjectFile(projectRelativePath));

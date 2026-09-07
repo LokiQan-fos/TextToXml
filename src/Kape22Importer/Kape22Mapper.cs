@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Reflection;
 using Kape22Importer.Persistence;
 using TextToXml;
@@ -10,9 +11,19 @@ namespace Kape22Importer;
 // L_D_KAPE22 entity (PRD Annexe B). Default rule: copy by case-insensitive property name (types are
 // already aligned, checked at worker startup by FR-8). NamingExceptions and IgnoredProperties are the
 // only two deviations from that default, built once like P60Deserializer's Lazy<> setup.
-// Header/Footer-derived columns (NumeroFichier, DateReception) are out of scope here (Story 2.6/2.7).
+// Story 2.6 (FR-9) adds the P60-specific derived rules on top of that copy: the day-of-year Header
+// Date (D4), the roulette NumeroFichier from the Header, the worker DateReception timestamp, and the
+// blank-Indice rejection; the DateEnfournementFour1/2 slices stay ignored (D14).
 public static class Kape22Mapper
 {
+    // A P60 Fichier is Header + Detail + Footer, so the Header Bloc is always the first Ligne (D3).
+    private const int HeaderLineNumber = 1;
+
+    // The derived rules interpret and stamp times in Paris local time (D4 for the Header Date,
+    // AC-FR9-3 for DateReception). Resolved once; .NET maps this IANA id to the Windows zone on
+    // Windows too.
+    private static readonly TimeZoneInfo ParisTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Europe/Paris");
+
     // Annexe B's one naming exception: DTO property name -> L_D_KAPE22 property name.
     public static readonly IReadOnlyDictionary<string, string> NamingExceptions =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -46,17 +57,21 @@ public static class Kape22Mapper
         NamingExceptions.TryGetValue(dtoPropertyName, out string? renamed) ? renamed : dtoPropertyName;
 
     // sourceFileName is accepted per the PRD API signature but unused until Story 2.7's file-name
-    // coherence check.
-    public static MapResult<L_D_KAPE22> Map(string normalizedXml, string sourceFileName)
+    // coherence check. The timeProvider parameter is injectable for testing (AC-FR9-1, AC-FR9-3);
+    // production passes TimeProvider.System.
+    public static MapResult<L_D_KAPE22> Map(string normalizedXml, string sourceFileName, TimeProvider? timeProvider = null)
     {
+        timeProvider ??= TimeProvider.System;
+
         P60DeserializeResult deserialized = P60Deserializer.Deserialize(normalizedXml);
         if (deserialized.File is null)
         {
             return new MapResult<L_D_KAPE22> { Errors = deserialized.Errors };
         }
 
+        Kape22File file = deserialized.File;
         L_D_KAPE22 entity = new();
-        Kape22FileMessage message = deserialized.File.Message;
+        Kape22FileMessage message = file.Message;
 
         foreach (PropertyInfo source in typeof(Kape22FileMessage).GetProperties())
         {
@@ -73,8 +88,83 @@ public static class Kape22Mapper
             target.SetValue(entity, value);
         }
 
-        return new MapResult<L_D_KAPE22> { Value = entity };
+        List<ConversionError> errors = [];
+
+        // AC-FR9-2: NumeroFichier is the Header roulette Champ, not the Detail homonym (which is ignored).
+        entity.NumeroFichier = file.Header.NumeroFichier;
+
+        // AC-FR9-2: the roulette feeds the NOT NULL NumeroFichier column and is half the D22
+        // anti-duplicate key, so a blank Header roulette rejects the Fichier here. RequiredFieldCheck
+        // skips it as a derived column, so the check lives with the derivation.
+        if (string.IsNullOrWhiteSpace(file.Header.NumeroFichier))
+        {
+            errors.Add(new ConversionError
+            {
+                Block = Block.Header,
+                Code = ErrorCode.RequiredFieldMissing,
+                Column = nameof(L_D_KAPE22.NumeroFichier),
+                FieldId = "NumeroFichier",
+                LineNumber = HeaderLineNumber,
+                Message = "Le Champ obligatoire 'NumeroFichier' de l'Entête est vide (colonne NumeroFichier NOT NULL).",
+            });
+        }
+
+        // AC-FR9-3: DateReception is the worker processing timestamp, in Paris local time.
+        entity.DateReception = ParisNow(timeProvider);
+
+        // AC-FR9-1 (D4): the Header Date is a day-of-year number in the current Paris year. Its
+        // converted value has no L_D_KAPE22 column in Epic 2, so only its validity is enforced here;
+        // "000", a non-numeric Champ, or a day past the length of that year rejects the Fichier.
+        if (!TryConvertHeaderDate(file.Header.Date, timeProvider, out _))
+        {
+            errors.Add(new ConversionError
+            {
+                Block = Block.Header,
+                Code = ErrorCode.InvalidDate,
+                FieldId = "Date",
+                LineNumber = HeaderLineNumber,
+                Message = $"Le Champ 'Date' de l'Entête ('{file.Header.Date}') n'est pas un numéro de jour valide pour l'année courante.",
+                RawValue = file.Header.Date,
+            });
+        }
+
+        // AC-FR9-4 and the per-file half of FR-8: a NOT NULL column left blank by Step 1 (notably a
+        // missing Detail Indice) is a rejected Fichier.
+        errors.AddRange(RequiredFieldCheck.Check(file));
+
+        return errors.Count > 0
+            ? new MapResult<L_D_KAPE22> { Errors = errors }
+            : new MapResult<L_D_KAPE22> { Value = entity };
     }
+
+    // AC-FR9-1 (D4): interprets a Header Date Champ as a day-of-year number in the current year, Paris
+    // time. Surrounding whitespace is tolerated (fixed-width source fields may be space-padded).
+    // Returns false for a non-numeric Champ, "000", or a number past the length of the current Paris
+    // year (365, or 366 in a leap year), so a converted date never leaves that year.
+    public static bool TryConvertHeaderDate(string raw, TimeProvider timeProvider, out DateTime date)
+    {
+        ArgumentNullException.ThrowIfNull(timeProvider);
+
+        date = default;
+        if (!int.TryParse(raw.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out int dayOfYear))
+        {
+            return false;
+        }
+
+        int year = ParisNow(timeProvider).Year;
+        int daysInYear = DateTime.IsLeapYear(year) ? 366 : 365;
+        if (dayOfYear < 1 || dayOfYear > daysInYear)
+        {
+            return false;
+        }
+
+        date = new DateTime(year, 1, 1).AddDays(dayOfYear - 1);
+        return true;
+    }
+
+    // The current instant in Paris local time, from the injected clock.
+    private static DateTime ParisNow(TimeProvider timeProvider) =>
+        TimeZoneInfo.ConvertTimeFromUtc(timeProvider.GetUtcNow().UtcDateTime, ParisTimeZone);
 
     // A blank DTO value (e.g. Indice) must not throw when the target column is a non-nullable value
     // type (int, not int?): substitute its default (0) instead. Nullable<T> targets stay null.

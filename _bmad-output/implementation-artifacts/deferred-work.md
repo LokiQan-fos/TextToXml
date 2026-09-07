@@ -1,5 +1,57 @@
 # Deferred Work
 
+## Deferred from: code review of story 2.6 (2026-09-07)
+
+- **`ParisTimeZone` is resolved in a `static` field initializer** — on a globalization-invariant host
+  or one without ICU / tz data, `TimeZoneInfo.FindSystemTimeZoneById("Europe/Paris")` would throw a
+  `TypeInitializationException` on first touch of any `Kape22Mapper` static member (`IsIgnored`,
+  `ResolveTargetName`, …), which `RequiredFieldCheck` and `StartupCompatibilityCheck` also use. Not a
+  concern on the .NET 10 / Windows Server target (`InvariantGlobalization` is not set, ICU is bundled).
+  Move to a `Lazy<TimeZoneInfo>` with a `"Romance Standard Time"` fallback if a leaner runtime is ever
+  targeted.
+- **The Paris clock is read twice per `Map` call** — once as `ParisNow(timeProvider)` for
+  `DateReception`, once inside `TryConvertHeaderDate` for the year. With `TimeProvider.System` the two
+  reads can straddle a New Year / DST boundary. Negligible for a file-import worker; the clean fix
+  reworks the deliberate `TryConvertHeaderDate(string, TimeProvider, out DateTime)` seam to take a
+  pre-resolved instant, so it waits until Story 2.8 wires the real clock.
+- **`Kape22Mapper.DefaultForNonNullable`'s value-type branch (`int` -> `0`) is now unreachable for a
+  persisted entity** — `Indice` was the only non-nullable value-type column fed by a Champ, and a
+  blank `Indice` is now rejected by `RequiredFieldCheck` before any `Value` is produced. The branch is
+  harmless (still correct if a future non-nullable derived column appears); simplify or delete it when
+  the mapper is next touched. Its only direct assertion left with `Map_BlankIndice_DoesNotThrowAndDefaultsToZero`.
+- **The Story 2.4 / 2.7 `Kape22MapperTests` call sites use `Map(xml, name)` with no clock** — they now
+  run on `TimeProvider.System`. Not flaky in practice (the reference fixture's `Date` "200" is valid
+  every year and no required Detail Champ is blank), but they should take a fixed clock for
+  determinism (AR-12). Fold in when Story 2.7 edits that file anyway.
+
+## Resolved by: Story 2.6 (2026-09-07)
+
+- **How Story 2.6 recombines `DateEnfournementFour1/2` `_Date` / `_Heure`** (deferred from review 2.2)
+  — it does not. AC-FR9-5 / D14: the four string slices stay in `Kape22Mapper.IgnoredProperties`, the
+  `DateEnfournementFour1/2` `DateTime?` columns are left `NULL`, and `DerivedFieldsTests` covers both
+  the reference Fichier and a Fichier where the four Champs carry values.
+- **`RequiredFieldCheck.Check` has no production caller** (deferred from review 2.5) — `Kape22Mapper.Map`
+  now calls it after the Annexe B copy, so a blank NOT NULL column (Detail Indice for AC-FR9-4, and the
+  string columns `Client` / `Coulee` / `Nuance` / `OF` / `Type` from the 2.5 note) rejects the Fichier
+  with `RequiredFieldMissing`. The Story 2.8 orchestrator still owns turning that `MapResult` into a
+  file move / log line.
+- **Blank NOT-NULL string columns mapped through as empty string with no error** (deferred from
+  spec/review 2.4) — resolved by the same `RequiredFieldCheck.Check` wiring.
+
+## Deferred from: Story 2.6 (2026-09-07)
+
+- **AC-FR9-1 range tightened from the literal "1..366" to the length of the current Paris year** —
+  `TryConvertHeaderDate` rejects `"366"` in a non-leap year so a converted date can never roll into
+  the next year (the AC's "jour dans l'année courante" intent). If the source system is ever found to
+  emit `"366"` in a 365-day year as a sentinel, revisit with the PM.
+- **The converted day-of-year `Header.Date` value is validated but not persisted** — no `L_D_KAPE22`
+  column consumes it in Epic 2. `Kape22Mapper.TryConvertHeaderDate` is public so the value is
+  reachable, but `Map` only enforces validity (`InvalidDate`). Surface it on the result (or a
+  successor type) when Story 2.8 needs "a file date".
+- **`Kape22Mapper.Map` stayed a `static` method** — the PRD reference API (`public sealed class
+  Kape22Mapper` with an instance `Map`) is still not matched; `TimeProvider` is threaded as an
+  optional third parameter instead of constructor-injected. Revisit if Story 2.8's DI wiring makes an
+  instance mapper cleaner.
 ## Resolved by: Story 2.5 (2026-09-07)
 
 - **`Kape22Mapper.Map`'s reflection `SetValue` type-alignment assumption** — mitigated at worker

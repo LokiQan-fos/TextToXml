@@ -150,21 +150,17 @@ public class Kape22MapperTests
             $"L_D_KAPE22 has no property named '{targetName}'.");
     }
 
-    // Edge case: a blank Indice (element omitted from the normalized XML) does not throw, and the
-    // non-nullable entity Indice is left at its default (0). No error is raised here (Story 2.6/FR-9 owns
-    // RequiredFieldMissing-style validation).
+    // Edge case: a blank Indice (element omitted from the normalized XML) does not throw. Story 2.6
+    // (AC-FR9-4) turned this into a RequiredFieldMissing rejection - see DerivedFieldsTests; here we
+    // only pin that Map stays exception-free on the blank-Indice path.
     [Fact]
-    public void Map_BlankIndice_DoesNotThrowAndDefaultsToZero()
+    public void Map_BlankIndice_DoesNotThrow()
     {
         string withoutIndice = Regex.Replace(ConvertReferenceFichier(), "<Indice>[^<]*</Indice>", string.Empty);
 
-        MapResult<L_D_KAPE22>? result = null;
-        Exception? exception = Record.Exception(() => result = Kape22Mapper.Map(withoutIndice, ReferenceFichierName));
+        Exception? exception = Record.Exception(() => Kape22Mapper.Map(withoutIndice, ReferenceFichierName));
 
         Assert.Null(exception);
-        Assert.True(result!.Success);
-        Assert.Empty(result.Errors);
-        Assert.Equal(0, result.Value!.Indice);
     }
 
     // Map's deserialization-failure passthrough: when P60Deserializer.Deserialize rejects the normalized
