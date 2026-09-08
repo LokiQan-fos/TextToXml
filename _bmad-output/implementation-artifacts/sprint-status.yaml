@@ -149,9 +149,13 @@ action_items:
       AC-FR6-4 (liste fusionnee Errors+Warnings triee par LineNumber), volet journalisation
       de AC-FR10-7/AC-FR11 (L_D_LOG_COMMANDE, MQTTnetServices.Logs), AC-FR12-3 (ImportResult.XmlArchivePath),
       signal explicite de skip-doublon, chacun rattache a sa story Epic 3; trancher
-      AddDbContext vs AddDbContextFactory + duree de vie du persister"
+      AddDbContext vs AddDbContextFactory + duree de vie du persister. DONE 2026-09-08:
+      ledger 'AC reportes d Epic 2' ajoute en tete d Epic 3 dans epics.md; AC-FR6-4 (tri
+      ImportResult) + skip-doublon explicite rattaches Story 3.3; AC-FR12-3 = Story 3.2 (fait);
+      AddDbContextFactory tranche Story 3.4. AC-FR6-4 note: pas de liste fusionnee, listes
+      independantes triees."
     owner: "SM + PM"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-09-07.md"
   - id: "epic-2-retro-item-11-garde-sur-le-corps-de-commit-hook-pre-co"
     epic: 2

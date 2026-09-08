@@ -1064,6 +1064,27 @@ Le worker `BackgroundService` + `PeriodicTimer` qui orchestre dossier → `TextT
 → archive → `Kape22Mapper` → EF → déplacement → double log, supervisé par le
 Launcher.
 
+### AC reportés d'Épic 2 — réconciliation (retro Épic 2 action A-3 / item-10, 2026-09-08)
+
+Quatre `AC` nommés ont franchi la frontière Épic 2 → Épic 3 via des notes
+`deferred-work.md` (F-3 de la retro). Requalification formelle, chacun rattaché à
+sa story porteuse :
+
+| `AC` reporté | Périmètre exact pour l'Épic 3 | Story porteuse | État |
+|---|---|---|---|
+| **AC-FR6-4** (tri par `LineNumber`) | Fait et testé au niveau `ConversionResult` (Story 1.7). **Étendu à `ImportResult`** : `Errors` **et** `Warnings` chacun trié par `LineNumber` croissant (`0` en tête), **listes indépendantes** — il n'y a **pas** de liste fusionnée `Errors`+`Warnings` (le mot « fusionnée » des notes de dette 2.7/2.8 est abandonné). Aujourd'hui `Kape22FichierProcessor.Import` concatène `conversion.Warnings` + `map.Warnings` sans re‑trier. | **Story 3.3** | à faire |
+| **Volet journalisation de AC-FR10-7 / AC-FR11** (`L_D_LOG_COMMANDE` « — OK », `MQTTnetServices.Logs`, `Warnings` de cohérence dans `Logs`) | Le volet `Kape22Mapper` / persistance est vert (stories 2.7 / 2.8). Le volet « ça atterrit dans les logs » **est** `AC-FR14-1` / `AC-FR14-8`. | **Story 3.3** (déjà couvert par `AC-FR14-1`, `AC-FR14-8`) | attaché |
+| **AC-FR12-3** (`ImportResult.XmlArchivePath`) | Champ posé et rempli par `Kape22FichierProcessor.Import` ; le XML physique est écrit par `InboxScanner.Archive`. | **Story 3.2** | **fait** — résiduel : `InboxScanner` ne consomme pas encore le champ (décision seam `IFichierProcessor` → Story 3.3) |
+| **Signal explicite de skip‑doublon** (D22 / `AC-FR11-6`) | Aujourd'hui structurel (`Success == true && InsertedId == null && Errors.Count == 0`). La journalisation « déjà importé, ignoré » en a besoin. | **Story 3.3** : ajouter un discriminant explicite sur `ImportResult` (drapeau `AlreadyImported` ou enum `Outcome`) plutôt que la détection structurelle. | à faire |
+
+**AddDbContext vs AddDbContextFactory + durée de vie du persister (F-11) :** tranché
+pour la **Story 3.4** (composition DI / worker) → `AddDbContextFactory<AscoLsiDbContext>`
+(fabrique singleton). Le worker est un `BackgroundService` singleton qui a besoin d'un
+contexte court‑vécu par Fichier ; `Kape22FichierProcessor` reçoit
+`Func<AscoLsiDbContext> newContext = () => factory.CreateDbContext()` (le seam existe
+déjà depuis la Story 3.2). Le `Kape22Persister` est construit par Fichier dans
+l'orchestrateur, jamais enregistré en DI.
+
 ### Story 3.1 : Scrutation du dossier de réception & cycle de vie du Fichier
 
 As a exploitant,
@@ -1194,10 +1215,24 @@ So that tout traitement — succès comme rejet — laisse une trace lisible.
 **Then** l'insertion `L_D_KAPE22` n'est pas empêchée (log best‑effort) ;
   `L_D_LOG_COMMANDE` reste dans la transaction de succès (AC-FR14-7, NFR-6)
 
+**Given** un `ImportResult` porteur d'`Errors` et/ou de `Warnings`
+**When** la journalisation les parcourt
+**Then** `Errors` et `Warnings` sont **chacun** triés par `LineNumber` croissant
+  (`0` en tête), listes indépendantes — `AC-FR6-4` étendu à `ImportResult`
+  (réconciliation A-3). `Kape22FichierProcessor.Import` retrie les `Warnings`
+  concaténées.
+
+**Given** un Fichier déjà importé (garde‑fou D22, `AC-FR11-6`)
+**When** l'orchestrateur le retraite
+**Then** `ImportResult` porte un discriminant explicite « déjà importé »
+  (drapeau/enum), pas seulement la forme structurelle ; la journalisation loggue
+  `Warning` « déjà importé, ignoré » (réconciliation A-3).
+
 **Tests xUnit (TDD — écrits en premier, CC-1) :** `AC-FR14-1`, `AC-FR14-2`,
-`AC-FR14-3`, `AC-FR14-4`, `AC-FR14-7`, `AC-FR14-8` — les cas écrivant en base
-(`L_D_LOG_COMMANDE`, `Logs`) sont en catégorie `Integration` sur le harnais
-SQL Server local de la Story 2.1 (AR-12).
+`AC-FR14-3`, `AC-FR14-4`, `AC-FR14-7`, `AC-FR14-8`, plus `AC-FR6-4` (tri
+`ImportResult`) et le skip‑doublon explicite (réconciliation A-3) — les cas
+écrivant en base (`L_D_LOG_COMMANDE`, `Logs`) sont en catégorie `Integration` sur
+le harnais SQL Server local de la Story 2.1 (AR-12).
 
 **Critères transverses :** CC-1, CC-2, CC-3, CC-4, CC-5, CC-7. **AR-12** : tests
 d'intégration sur SQL Server local.
@@ -1226,7 +1261,16 @@ So that il est supervisable et recyclable comme les autres workers du portail.
 **Then** le Fichier en cours finit ou reste dans `processing/` (jamais à moitié
   inséré) ; arrêt propre **< 5 s** (AC-FR14-6, NFR-9)
 
-**Tests xUnit (TDD — écrits en premier, CC-1) :** `AC-FR14-5`, `AC-FR14-6`.
+**Given** la composition DI de l'hôte
+**When** le worker s'initialise
+**Then** la persistance est enregistrée via `AddDbContextFactory<AscoLsiDbContext>`
+  (fabrique singleton) ; `Kape22FichierProcessor` reçoit
+  `Func<AscoLsiDbContext> = () => factory.CreateDbContext()` ; `Kape22Persister`
+  est construit par Fichier, jamais en DI (réconciliation A-3 / F-11).
+
+**Tests xUnit (TDD — écrits en premier, CC-1) :** `AC-FR14-5`, `AC-FR14-6`, plus
+un test de composition (l'hôte résout `IFichierProcessor` et une fabrique de
+contexte fraîche par appel).
 
 **Critères transverses :** CC-1, CC-2, CC-3, CC-4, CC-5, CC-7.
 

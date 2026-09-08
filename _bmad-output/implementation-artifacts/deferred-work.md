@@ -1,5 +1,26 @@
 # Deferred Work
 
+## Resolved by: epics.md reconciliation, retro Épic 2 action A-3 / item-10 (2026-09-08)
+
+The four `AC` that crossed the Épic 2 → Épic 3 boundary through deferred-work notes now have an
+explicit ledger in `epics.md` (new subsection at the head of Épic 3), each attached to its owning
+story. Supersedes every scattered "AC-FR6-4 / AC-FR10-7 logging half / skip-doublon signal" note
+below:
+
+- **AC-FR6-4** — done and tested at `ConversionResult` (Story 1.7). Extended to `ImportResult` by
+  **Story 3.3**: `Errors` and `Warnings` each sorted by `LineNumber` ascending, **independent lists**.
+  The "merged/fusionnée Errors+Warnings list" wording from the 2.7/2.8 notes is dropped — the PRD AC
+  and its tests were always about two independently-sorted lists.
+- **Logging half of AC-FR10-7 / AC-FR11** — is `AC-FR14-1` / `AC-FR14-8`, already **Story 3.3**.
+- **AC-FR12-3 (`ImportResult.XmlArchivePath`)** — **Story 3.2, done**. Residual (`InboxScanner` does not
+  read the field) is the Story 3.3 `IFichierProcessor` seam decision.
+- **Skip-doublon explicit signal** — **Story 3.3** adds an explicit `ImportResult` discriminator
+  (`AlreadyImported` flag or `Outcome` enum) rather than the structural
+  `Success && InsertedId == null && Errors.Count == 0` check.
+- **AddDbContext vs AddDbContextFactory + persister lifetime (F-11)** — settled for **Story 3.4**:
+  `AddDbContextFactory<AscoLsiDbContext>` (singleton factory), `Kape22Persister` built per Fichier in
+  the orchestrator, never DI-registered.
+
 ## Resolved by: code review patches of Story 3.2 (2026-09-08)
 
 - **AC-FR13-1/3/4/5 had zero CI coverage** (only `[SkippableFact]` Integration tests) — decision D1.
