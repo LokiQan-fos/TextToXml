@@ -52,6 +52,15 @@ public class Kape22MapperTests
             }
 
             string targetName = Kape22Mapper.ResolveTargetName(source.Name);
+
+            // A blank Champ on one of these columns is a legacy default, not a verbatim copy (Annexe B
+            // "Legacy blank-Champ defaults"), so it is not a homonymous-copy assertion. The blank int
+            // rule stays in the sweep: DefaultForNonNullable already yields the value it expects.
+            if (Kape22Mapper.LegacyBlankFillColumns.Contains(targetName))
+            {
+                continue;
+            }
+
             PropertyInfo target = typeof(L_D_KAPE22).GetProperty(
                 targetName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase)!;
 
@@ -63,19 +72,121 @@ public class Kape22MapperTests
         }
     }
 
-    // AC-FR7-4: the one Annexe B naming exception (DTO OFOriginInterne -> entity OForiginInterne) is applied.
+    // AC-FR7-4: the one Annexe B naming exception (DTO OFOriginInterne -> entity OForiginInterne) is
+    // applied. Exercised with a non-blank value: a blank OForiginInterne Champ now maps to NULL as a
+    // legacy default (AC-FR7-2), which would not prove the rename.
     [Fact]
     [Trait("AC", "FR7-4")]
     public void Map_OFOriginInterneChamp_LandsOnEntityOForiginInterne_AcFr7_4()
     {
-        string normalizedXml = ConvertReferenceFichier();
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(normalizedXml, ReferenceFichierName);
+        XDocument document = XDocument.Parse(ConvertReferenceFichier());
+        document.Root!.Element("message")!.Element("OForiginInterne")!.Value = "X";
 
-        XElement message = XDocument.Parse(normalizedXml).Root!.Element("message")!;
-        string expected = (string)message.Element("OForiginInterne")!;
+        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(document.ToString(), ReferenceFichierName);
 
         Assert.True(result.Success);
-        Assert.Equal(expected, result.Value!.OForiginInterne);
+        Assert.Equal("X", result.Value!.OForiginInterne);
+    }
+
+    // AC-FR7-2 (Annexe B "Legacy blank-Champ defaults"): a blank typed integer Champ maps to 0, not
+    // NULL. The legacy import zero-filled every blank int Champ (production parity 2026-09-07: no NULL
+    // in any L_D_KAPE22 int column over 17710 rows). The reference Fichier leaves both blank.
+    [Fact]
+    [Trait("AC", "FR7-2")]
+    public void Map_BlankTypedIntChamp_MapsToZeroNotNull_AcFr7_2()
+    {
+        L_D_KAPE22 entity = Kape22Mapper.Map(ConvertReferenceFichier(), ReferenceFichierName).Value!;
+
+        Assert.Equal(0, entity.MatriculeClient);
+        Assert.Equal(0, entity.ChutagePied);
+    }
+
+    // AC-FR7-2: a typed integer Champ carrying a real value is copied unchanged (reference Fichier
+    // DiametreProduit = 6250).
+    [Fact]
+    [Trait("AC", "FR7-2")]
+    public void Map_PopulatedTypedIntChamp_IsCopiedUnchanged_AcFr7_2()
+    {
+        L_D_KAPE22 entity = Kape22Mapper.Map(ConvertReferenceFichier(), ReferenceFichierName).Value!;
+
+        Assert.Equal(6250, entity.DiametreProduit);
+    }
+
+    // AC-FR7-2: a present int element whose value is 0 stays 0 - a real 0 is not the blank fill.
+    [Fact]
+    [Trait("AC", "FR7-2")]
+    public void Map_TypedIntChampValueZero_IsNotTreatedAsBlank_AcFr7_2()
+    {
+        XDocument document = XDocument.Parse(ConvertReferenceFichier());
+        document.Root!.Element("message")!.Element("Epaisseur")!.Value = "0";
+
+        L_D_KAPE22 entity = Kape22Mapper.Map(document.ToString(), ReferenceFichierName).Value!;
+
+        Assert.Equal(0, entity.Epaisseur);
+    }
+
+    // AC-FR7-2: OForiginInterne is the one string column the legacy import leaves NULL for a blank
+    // Champ (production parity: NULL in 100% of 17710 rows). The reference Fichier leaves it blank.
+    [Fact]
+    [Trait("AC", "FR7-2")]
+    public void Map_BlankOForiginInterneChamp_MapsToNull_AcFr7_2()
+    {
+        L_D_KAPE22 entity = Kape22Mapper.Map(ConvertReferenceFichier(), ReferenceFichierName).Value!;
+
+        Assert.Null(entity.OForiginInterne);
+    }
+
+    // AC-FR7-2: a populated OForiginInterne Champ is copied verbatim. assumed, unverified - the legacy
+    // import source is unavailable and no sample carries a populated value (see deferred-work.md).
+    [Fact]
+    [Trait("AC", "FR7-2")]
+    public void Map_PopulatedOForiginInterneChamp_IsCopiedVerbatim_AcFr7_2()
+    {
+        XDocument document = XDocument.Parse(ConvertReferenceFichier());
+        document.Root!.Element("message")!.Element("OForiginInterne")!.Value = "X";
+
+        L_D_KAPE22 entity = Kape22Mapper.Map(document.ToString(), ReferenceFichierName).Value!;
+
+        Assert.Equal("X", entity.OForiginInterne);
+    }
+
+    // AC-FR7-2: a blank AcompteSolde Champ maps to 'S' - the legacy default ('S' in 100% of 17710
+    // production rows). The reference Fichier leaves it blank.
+    [Fact]
+    [Trait("AC", "FR7-2")]
+    public void Map_BlankAcompteSoldeChamp_MapsToS_AcFr7_2()
+    {
+        L_D_KAPE22 entity = Kape22Mapper.Map(ConvertReferenceFichier(), ReferenceFichierName).Value!;
+
+        Assert.Equal("S", entity.AcompteSolde);
+    }
+
+    // AC-FR7-2: a populated AcompteSolde Champ is copied unchanged. assumed, unverified - the legacy
+    // import source is unavailable and no sample carries a populated value (see deferred-work.md).
+    [Fact]
+    [Trait("AC", "FR7-2")]
+    public void Map_PopulatedAcompteSoldeChamp_IsCopiedUnchanged_AcFr7_2()
+    {
+        XDocument document = XDocument.Parse(ConvertReferenceFichier());
+        document.Root!.Element("message")!.Element("AcompteSolde")!.Value = "A";
+
+        L_D_KAPE22 entity = Kape22Mapper.Map(document.ToString(), ReferenceFichierName).Value!;
+
+        Assert.Equal("A", entity.AcompteSolde);
+    }
+
+    // AC-FR7-2: the NULL fill is specific to OForiginInterne - every other blank string Champ still
+    // maps to an empty string (AC-FR5-6 emits the element, the default copy keeps it).
+    [Fact]
+    [Trait("AC", "FR7-2")]
+    public void Map_OtherBlankStringChamp_StaysEmptyString_AcFr7_2()
+    {
+        XDocument document = XDocument.Parse(ConvertReferenceFichier());
+        document.Root!.Element("message")!.Element("MarqueCommerciale")!.Value = string.Empty;
+
+        L_D_KAPE22 entity = Kape22Mapper.Map(document.ToString(), ReferenceFichierName).Value!;
+
+        Assert.Equal(string.Empty, entity.MarqueCommerciale);
     }
 
     // AC-FR7-4: proves ResolveTargetName actually substitutes the mapped name (case-sensitive check),

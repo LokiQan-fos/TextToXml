@@ -1069,6 +1069,23 @@ alignés, contrôlés au démarrage FR‑8).
 `Reserve`, `Filler`, `ReserveSVT`, `DateEnfournementFour1/2_Date`,
 `DateEnfournementFour1/2_Heure` (§0bis D14), tout `Id` commençant par `Reserve`.
 
+**Valeurs par défaut du legacy pour un Champ vide (parité `L_D_KAPE22` de
+production, contrôle 2026‑09‑07) :** un Champ vide n'est pas toujours copié tel
+quel — l'import actuel applique un défaut. Le nouveau mapper reproduit :
+
+| Règle | Portée | Champ vide ⇒ |
+|---|---|---|
+| Entier vide ⇒ `0` | **générale** (toute colonne `int`) | `0`, jamais `NULL` — la prod n'a aucun `NULL` sur les ~28 colonnes `int` (17 710 lignes) |
+| `OForiginInterne` ⇒ `NULL` | colonne | seule colonne `string` que le legacy laisse `NULL` (100 % des lignes) ; ses voisines `OFOrigin`/`OFDestination`/`OFDestinationInterne` restent `''` |
+| `AcompteSolde` ⇒ `'S'` | colonne | `'S'` sur 100 % des 17 710 lignes |
+
+Tout autre Champ `string` vide reste `''` (élément émis, `AC‑FR5‑6`). Le
+comportement pour un `OForiginInterne` / `AcompteSolde` **renseigné** (copie
+telle quelle) est supposé, non vérifié : la source de l'import legacy est
+indisponible et aucun échantillon ne porte de valeur. Divergence permanente
+assumée : `Client` (mojibake Windows‑1252 du legacy, le nouveau décodage est
+correct).
+
 **Contrôles automatiques :** au **build des tests** (FR‑7‑3), toute propriété DTO
 non mappée et non ignorée ⇒ échec ; toute colonne NOT NULL sans source ⇒ échec.
 Au **démarrage du worker** (FR‑8), incompatibilité de type ou `Size > max_length`

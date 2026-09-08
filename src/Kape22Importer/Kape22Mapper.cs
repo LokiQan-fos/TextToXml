@@ -59,6 +59,17 @@ public static class Kape22Mapper
         nameof(Kape22FileMessage.DateEnfournementFour2_Heure),
     };
 
+    // Annexe B "Legacy blank-Champ defaults": the two L_D_KAPE22 columns whose value for a blank
+    // Champ is a legacy default rather than a verbatim copy (see Map). Exposed so the AC-FR7-2
+    // completeness sweep skips them; the fixup itself is the two explicit assignments in Map. The
+    // general "blank int Champ -> 0" rule (D14b) needs no entry - it lives in DefaultForNonNullable.
+    // Names in case-insensitive dictionary order (CC-4).
+    public static readonly IReadOnlySet<string> LegacyBlankFillColumns = new HashSet<string>(StringComparer.Ordinal)
+    {
+        nameof(L_D_KAPE22.AcompteSolde),
+        nameof(L_D_KAPE22.OForiginInterne),
+    };
+
     // Any Champ Id starting with "Reserve" is ignored too (ReserveRefroidissoir, ReserveRefroidissoir2/3).
     public static bool IsIgnored(string dtoPropertyName) =>
         IgnoredProperties.Contains(dtoPropertyName)
@@ -99,6 +110,21 @@ public static class Kape22Mapper
 
             object? value = source.GetValue(message) ?? DefaultForNonNullable(target.PropertyType);
             target.SetValue(entity, value);
+        }
+
+        // Annexe B "Legacy blank-Champ defaults": two Champs the legacy import fills with a fixed
+        // value instead of copying it, confirmed against the production L_D_KAPE22 (parity check
+        // 2026-09-07). OForiginInterne is the one string column it leaves NULL; AcompteSolde it
+        // always writes 'S'. A populated Champ is copied verbatim by the loop above (assumed,
+        // unverified - the legacy import source is unavailable, see deferred-work.md).
+        if (string.IsNullOrWhiteSpace(message.OForiginInterne))
+        {
+            entity.OForiginInterne = null;
+        }
+
+        if (string.IsNullOrWhiteSpace(message.AcompteSolde))
+        {
+            entity.AcompteSolde = "S";
         }
 
         List<ConversionError> errors = [];
@@ -293,12 +319,23 @@ public static class Kape22Mapper
     private static DateTime ParisNow(TimeProvider timeProvider) =>
         TimeZoneInfo.ConvertTimeFromUtc(timeProvider.GetUtcNow().UtcDateTime, ParisTimeZone);
 
-    // A blank DTO value (e.g. Indice) must not throw when the target column is a non-nullable value
-    // type (int, not int?): substitute its default (0) instead. Nullable<T> targets stay null.
-    public static object? DefaultForNonNullable(Type targetType) =>
-        targetType.IsValueType && Nullable.GetUnderlyingType(targetType) is null
+    // The value a blank Champ takes on its L_D_KAPE22 column. An integer column (nullable or not)
+    // takes 0, never NULL: the legacy import zero-filled every blank int Champ (Annexe B "Legacy
+    // blank-Champ defaults" / production parity 2026-09-07 - no NULL in any L_D_KAPE22 int column
+    // over 17710 rows). Any other non-nullable value type keeps its own default (e.g. the NOT NULL
+    // Indice); every other nullable target stays null (a blank string keeps its empty value).
+    public static object? DefaultForNonNullable(Type targetType)
+    {
+        Type underlying = Nullable.GetUnderlyingType(targetType) ?? targetType;
+        if (underlying == typeof(int))
+        {
+            return 0;
+        }
+
+        return targetType.IsValueType && Nullable.GetUnderlyingType(targetType) is null
             ? Activator.CreateInstance(targetType)
             : null;
+    }
 }
 
 // Outcome of Kape22Mapper.Map. Mirrors ConversionResult/P60DeserializeResult: Success is true exactly

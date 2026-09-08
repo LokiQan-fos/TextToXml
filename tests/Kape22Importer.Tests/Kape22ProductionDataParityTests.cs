@@ -54,21 +54,16 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
         nameof(L_D_KAPE22.DateEnfournementFour2),
     };
 
-    // Columns where a correct new insert legitimately differs from the legacy production row, found by
-    // the 2026-09-07 parity run over the 100-Fichier sample. A difference on any column NOT listed here
-    // fails the test as a regression. Full write-up in deferred-work.md.
-    //   OForiginInterne  : Champ blank in all 100 -> legacy wrote NULL, new writes '' (empty NCHAR).
-    //   AcompteSolde     : Champ blank in all 100 -> legacy defaulted to 'S', new writes ''.
-    //   MatriculeClient  : Champ blank in all 100 -> legacy wrote 0, new writes NULL.
-    //   ChutagePied      : Champ blank in 12/100  -> legacy wrote 0, new writes NULL.
-    //   Client           : production value is mojibake from a legacy Windows-1252 decoding bug; the new
-    //                      pipeline decodes correctly and intentionally diverges (permanent).
+    // Columns where a correct new insert legitimately differs from the legacy production row. A
+    // difference on any column NOT listed here fails the test as a regression. Full write-up in
+    // deferred-work.md.
+    //   Client : production value is mojibake from a legacy Windows-1252 decoding bug (raw byte 0xD6
+    //            = 'Ö'); the new pipeline decodes correctly and intentionally diverges (permanent).
+    // OForiginInterne / AcompteSolde / MatriculeClient / ChutagePied were here after the 2026-09-07
+    // run; Kape22Mapper's "Legacy blank-Champ defaults" (Annexe B) now reproduces those, so they are
+    // expected to match.
     private static readonly HashSet<string> KnownLegacyDivergences = new(StringComparer.Ordinal)
     {
-        nameof(L_D_KAPE22.OForiginInterne),
-        nameof(L_D_KAPE22.AcompteSolde),
-        nameof(L_D_KAPE22.MatriculeClient),
-        nameof(L_D_KAPE22.ChutagePied),
         nameof(L_D_KAPE22.Client),
     };
 

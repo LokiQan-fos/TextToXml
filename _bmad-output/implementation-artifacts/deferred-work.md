@@ -1,35 +1,43 @@
 # Deferred Work
 
-## Deferred from: production data parity check (2026-09-07)
+## Resolved by: spec-parity-kape22-legacy-fill-rules (2026-09-07)
 
 `Kape22ProductionDataParityTests` (Category=Integration, opt-in behind
-`ConnectionStrings:AscoLSI_Production`) replays each of the 100 `P60/P60_847_682_0xx..1xx`
-sample Fichiers through `Converter` + `Kape22Mapper`, round-trips the mapped entity through the
-test database, and diffs it against the row the legacy import wrote in the **production**
-`L_D_KAPE22` (matched by OF + NumeroFichier — a clean 1:1). The legacy row is the reference:
-FR-7 requires the new insert to be identical. Four columns diverge because `Kape22Mapper` does
-not yet reproduce the legacy default-fill rules for abandoned Champs. Each Champ is **blank in
-every sample Fichier**, so only the "blank" branch of each rule is proven; the "populated"
-branch must be confirmed against the legacy import source before implementing.
+`ConnectionStrings:AscoLSI_Production`) replays the 100 `P60/P60_847_682_0xx..1xx` sample Fichiers
+through `Converter` + `Kape22Mapper`, round-trips the mapped entity through the test database, and
+diffs it against the legacy row in the **production** `L_D_KAPE22` (matched by OF + NumeroFichier, a
+clean 1:1). FR-7 requires the new insert to be identical. Four columns diverged; a full-table
+production profile (17 710 rows, read-only) settled the rules and `Kape22Mapper` now applies them
+(Annexe B "Valeurs par défaut du legacy pour un Champ vide"):
 
-- **`OForiginInterne` — blank Champ must map to `NULL`, not `''`** — the `Kape22Mapper` reflective
-  copy takes the DTO `string` (default `string.Empty`) and writes `''`; legacy wrote `NULL`.
-  Likely a general rule "blank nullable string Champ -> `NULL`", but only `OForiginInterne` is
-  blank across the sample, so scope it against the legacy source (does it null every blank string
-  column, or just the OF* ones?).
-- **`AcompteSolde` — blank Champ must default to `'S'`** — legacy stored `'S'` (Solde) for all 100;
-  the new mapper writes `''`. Need the legacy rule for a *populated* Champ (copy as-is? map A/S?).
-- **`MatriculeClient` — blank typed Champ must map to `0`, not `NULL`** — Step 1 omits the blank
-  `int` element, the DTO is `null`, `Kape22Mapper` writes `NULL`; legacy wrote `0`. Confirm whether
-  legacy zero-fills every blank `int?` column or only specific ones (only `MatriculeClient` and
-  `ChutagePied` are blank in the sample).
-- **`ChutagePied` — same as `MatriculeClient`** (blank in 12/100, legacy `0`, new `NULL`).
+- **Blank int Champ → `0`** — general rule in `DefaultForNonNullable`. Production has **no `NULL` in
+  any of the ~28 `int` columns**, so the legacy zero-fills every blank int Champ. Covers the
+  original `MatriculeClient` / `ChutagePied` divergences and the whole set.
+- **`OForiginInterne` blank → `NULL`** — column-scoped. It is the only string column ever `NULL` in
+  production; its `OF*` siblings stay `''`.
+- **`AcompteSolde` blank → `'S'`** — column-scoped. `'S'` in 100 % of 17 710 rows.
 
-Permanent, not deferred: **`Client` mojibake**. One production row holds `SKF ⟂sterreic` — the
-`Ö` (Windows-1252 `0xD6`) was corrupted by a legacy encoding bug. The new pipeline decodes
-Windows-1252 correctly (`SKF Österreic`) and is intended to diverge. `KnownLegacyDivergences` in
-the test keeps `Client` listed forever; the four rows above come off the list as `Kape22Mapper`
-learns each rule.
+`Kape22ProductionDataParityTests` passes 100/100 with only `Client` left in
+`KnownLegacyDivergences`.
+
+### Still deferred
+
+- **Populated-branch of `OForiginInterne` / `AcompteSolde` is `assumed, unverified`** — no sample
+  Fichier carries a value for either Champ and the legacy import source is **not available** (it is
+  the external current application, not in the database: no proc/view/job references `KAPE22` /
+  `L_D_KAPE22`). The mapper copies a populated value verbatim (tests
+  `Map_Populated{OForiginInterne,AcompteSolde}Champ_*_AcFr7_2` carry the `assumed, unverified`
+  comment). Revisit when a populated sample appears or the legacy source is found — a mapping other
+  than verbatim (e.g. `A`/`S` normalisation for `AcompteSolde`) would need a code change.
+
+### Permanent (not deferred)
+
+- **`Client` mojibake** — `P60_847_682_095` / `_151` hold raw `Client` bytes `53 4B 46 20 D6 …`;
+  `0xD6` is `Ö` in Windows-1252, so `SKF Österreic` is the correct decode and production stored the
+  corruption. The new pipeline decodes correctly and is intended to diverge. `Client` stays in
+  `KnownLegacyDivergences` forever. Decision **(b)**: `Client`-only — a wider parity run could
+  surface other legacy-mojibake string columns as false positives; diagnosable, revisit then rather
+  than building a generic mojibake-aware comparison now.
 
 ## Resolved by: Story 2.8 (2026-09-07)
 
