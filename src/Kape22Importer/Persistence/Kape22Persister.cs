@@ -13,7 +13,7 @@ namespace Kape22Importer.Persistence;
 // L_D_LOG_COMMANDE row for the same NumeroFichier + OF; if none, the L_D_KAPE22 insert and the "— OK"
 // L_D_LOG_COMMANDE insert are committed together (AC-FR11-1, AC-FR11-3), and InsertedId is the identity
 // value. If the guard finds a prior success, nothing is inserted and the Fichier comes back as an
-// already-imported skip: Success true, InsertedId null, empty Errors (AC-FR11-6).
+// already-imported skip: AlreadyImported true, Success true, InsertedId null, empty Errors (AC-FR11-6).
 // On a rejected Fichier: no L_D_KAPE22 row; a single "<NumeroFichier> — REJETÉ : <summary>"
 // L_D_LOG_COMMANDE row in its own transaction when the OF is readable (AC-FR11-4), nothing at all when
 // it is not (D15).
@@ -63,11 +63,11 @@ public sealed class Kape22Persister(AscoLsiDbContext context, IConfiguration con
         {
             // AC-FR11-6/11-7 (D22): a committed "<NumeroFichier> — OK" row for this NumeroFichier + OF
             // means the Fichier already imported (a crash between the commit and the file move). Skip
-            // it: no new row, InsertedId stays null, Success stays true so the orchestrator archives
-            // the Fichier and logs the "deja importe" warning.
+            // it: no new row, InsertedId stays null, Success stays true, AlreadyImported flags the skip
+            // so the orchestrator archives the Fichier and logs the "already imported" warning.
             if (OkLogRowExists(numeroFichier, of))
             {
-                return new ImportResult { Warnings = mapResult.Warnings };
+                return new ImportResult { AlreadyImported = true, Warnings = mapResult.Warnings };
             }
 
             context.Kape22Rows.Add(entity);

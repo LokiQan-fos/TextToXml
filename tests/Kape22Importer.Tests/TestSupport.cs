@@ -1,10 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Reflection;
 using System.Text;
 using System.Xml.Linq;
 using Kape22Importer.Persistence;
+using Microsoft.EntityFrameworkCore;
 using TextToXml;
 using TextToXml.Tests;
 using Xunit;
@@ -107,4 +109,26 @@ internal sealed class FixedClock(DateTimeOffset utcNow) : TimeProvider
     private readonly DateTimeOffset utcNow = utcNow;
 
     public override DateTimeOffset GetUtcNow() => this.utcNow;
+}
+
+// Hands out a fresh AscoLsiDbContext on every call, all bound to one EF in-memory database so a write
+// from an earlier Import is visible to a later one, and records every context handed out (Story 3.2,
+// AC-FR13-4). Reused by the Story 3.3 double-logging unit tests.
+internal sealed class InMemoryContextFactory
+{
+    private readonly string databaseName = Guid.NewGuid().ToString();
+
+    public List<AscoLsiDbContext> Handed { get; } = [];
+
+    public AscoLsiDbContext Next()
+    {
+        AscoLsiDbContext context = new(Build());
+        this.Handed.Add(context);
+        return context;
+    }
+
+    public AscoLsiDbContext Reader() => new(Build());
+
+    private DbContextOptions<AscoLsiDbContext> Build() =>
+        new DbContextOptionsBuilder<AscoLsiDbContext>().UseInMemoryDatabase(this.databaseName).Options;
 }

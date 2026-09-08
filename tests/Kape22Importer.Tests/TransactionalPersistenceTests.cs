@@ -76,17 +76,34 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
         using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
         Assert.Single(verify.Kape22Rows.AsNoTracking());
         L_D_LOG_COMMANDE log = Assert.Single(verify.LogCommandeRows.AsNoTracking());
-        Assert.Equal("P60", log.Commande);
         Assert.StartsWith(map.NumeroFichier!, log.Message);
         Assert.EndsWith("— OK", log.Message);
-        Assert.Equal(map.OF!.Trim(), log.OF.Trim());
-        Assert.Equal(0, log.NumLingot);
-        Assert.True(log.Trace == true);
-        Assert.Equal(InitiatingServer, log.User);
 
         // The log Date is the injected clock converted to Paris local time (WinterClock is 08:00 UTC,
         // Paris winter UTC+1), so the timeProvider seam and the conversion both have coverage.
         Assert.Equal(new DateTime(2026, 2, 10, 9, 0, 0), log.Date);
+    }
+
+    // AC-FR14-4 (D8, D25): the "— OK" L_D_LOG_COMMANDE row carries the fixed contract fields - User from
+    // Import:InitiatingServer, OF the trimmed raw Detail Champ (the Kape22Mapper already trims it),
+    // Commande "P60", NumLingot 0 and Trace true.
+    [SkippableFact]
+    [Trait("AC", "FR14-4")]
+    public void Persist_MapSuccess_OkLogRowCarriesTheContractFields_AcFr14_4()
+    {
+        Ready();
+        MapResult<L_D_KAPE22> map = MapReferenceFichier();
+
+        Persist(map);
+
+        using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
+        L_D_LOG_COMMANDE log = Assert.Single(verify.LogCommandeRows.AsNoTracking());
+        Assert.Equal("P60", log.Commande);
+        Assert.Equal(InitiatingServer, log.User);
+        Assert.Equal(map.OF, log.OF);
+        Assert.Equal(log.OF.Trim(), log.OF);
+        Assert.Equal(0, log.NumLingot);
+        Assert.True(log.Trace == true);
     }
 
     // AC-FR11-3: when the L_D_LOG_COMMANDE insert fails (an over-long Commande from configuration), the

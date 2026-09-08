@@ -12,6 +12,9 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <!-- Story 3.3: exercises the real Serilog MSSqlServer sink writing MQTTnetServices.Logs in DoubleJournalIntegrationTests (AR-12). -->
+    <PackageReference Include="Serilog.Extensions.Logging" />
+    <PackageReference Include="Serilog.Sinks.MSSqlServer" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <!-- Runtime skip for the AR-12 integration tests when no SQL Server test instance is reachable. -->

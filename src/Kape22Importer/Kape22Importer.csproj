@@ -5,6 +5,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- The test project exercises internal seams (Kape22FichierProcessor.SortedByLine, AC-FR6-4). -->
+    <InternalsVisibleTo Include="Kape22Importer.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- EF Core is a sanctioned runtime dependency of the importer (PRD NFR-8, AR-8). -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />

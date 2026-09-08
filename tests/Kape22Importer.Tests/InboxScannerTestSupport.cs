@@ -101,11 +101,18 @@ internal sealed class FakeFichierProcessor : IFichierProcessor
     }
 }
 
-// Minimal ILogger that keeps every entry, so a test can assert nothing was logged at Warning/Error
-// (AC-FR12-5, AC-FR12-7).
+// Minimal ILogger that keeps every entry with its level and its rendered message, so a test can assert
+// nothing was logged at Warning/Error (AC-FR12-5, AC-FR12-7) or inspect the double-logging lines
+// (Story 3.3, FR-14). Set Throw to make every Log call fail, so a test can prove the import still
+// succeeds when the MQTTnetServices.Logs sink is down (AC-FR14-7).
 internal sealed class RecordingLogger<T> : ILogger<T>
 {
     public List<(LogLevel Level, string Message)> Entries { get; } = [];
+
+    public bool Throw { get; init; }
+
+    public IReadOnlyList<(LogLevel Level, string Message)> AtLevel(LogLevel level) =>
+        [.. this.Entries.Where(entry => entry.Level == level)];
 
     public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 
@@ -116,6 +123,13 @@ internal sealed class RecordingLogger<T> : ILogger<T>
         EventId eventId,
         TState state,
         Exception? exception,
-        Func<TState, Exception?, string> formatter) =>
+        Func<TState, Exception?, string> formatter)
+    {
+        if (this.Throw)
+        {
+            throw new InvalidOperationException("MQTTnetServices.Logs is unavailable.");
+        }
+
         this.Entries.Add((logLevel, formatter(state, exception)));
+    }
 }

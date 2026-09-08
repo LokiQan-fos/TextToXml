@@ -84,6 +84,14 @@ public sealed class SqlServerIntegrationFixture
             "TRUNCATE TABLE dbo.L_D_KAPE22; TRUNCATE TABLE dbo.L_D_LOG_COMMANDE;");
     }
 
+    // Empties the MQTTnetServices.Logs harness table, for the Story 3.3 tests that assert on the rows
+    // the real Serilog.Sinks.MSSqlServer sink writes (FR-14). DELETE, not TRUNCATE: Logs has an identity
+    // column the assertions never read, and a shared instance may deny TRUNCATE.
+    public void ResetMqttLogs()
+    {
+        ExecuteNonQuery(MqttConnectionString, "DELETE FROM dbo.Logs;");
+    }
+
     // A fresh context bound to the test instance. The caller owns its lifetime and its transaction.
     public AscoLsiDbContext NewAscoLsiContext()
     {

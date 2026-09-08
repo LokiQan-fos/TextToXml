@@ -4,6 +4,7 @@ using System.Linq;
 using Kape22Importer.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 using TextToXml;
 using TextToXml.Tests;
 using Xunit;
@@ -51,7 +52,7 @@ public class Kape22FichierProcessorTests
         () => throw new XunitException("Persistence was reached; the Converter failure should have stopped the pipeline.");
 
     private static Kape22FichierProcessor Processor(Func<AscoLsiDbContext> newContext) =>
-        new(newContext, Configuration(), Options(), WinterClock());
+        new(newContext, Configuration(), Options(), WinterClock(), NullLogger<Kape22FichierProcessor>.Instance);
 
     // AC-FR13-2: Converter.Convert fails -> no normalized XML is produced, Kape22Mapper and
     // Kape22Persister are never reached, and ImportResult.Errors carries the Step 1 error.
@@ -197,26 +198,5 @@ public class Kape22FichierProcessorTests
         Assert.Empty(result.Errors);
         Assert.NotNull(result.NormalizedXml);
         Assert.Equal(ExpectedXmlArchivePath, result.XmlArchivePath);
-    }
-
-    // Hands out a fresh AscoLsiDbContext on every call, all bound to one in-memory database so a write
-    // from an earlier Import is visible to a later one, and records every context handed out.
-    private sealed class InMemoryContextFactory
-    {
-        private readonly string databaseName = Guid.NewGuid().ToString();
-
-        public List<AscoLsiDbContext> Handed { get; } = [];
-
-        public AscoLsiDbContext Next()
-        {
-            AscoLsiDbContext context = new(Build());
-            this.Handed.Add(context);
-            return context;
-        }
-
-        public AscoLsiDbContext Reader() => new(Build());
-
-        private DbContextOptions<AscoLsiDbContext> Build() =>
-            new DbContextOptionsBuilder<AscoLsiDbContext>().UseInMemoryDatabase(this.databaseName).Options;
     }
 }

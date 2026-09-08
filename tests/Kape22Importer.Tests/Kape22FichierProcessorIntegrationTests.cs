@@ -4,6 +4,7 @@ using System.Linq;
 using Kape22Importer.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 using TextToXml;
 using TextToXml.Tests;
 using Xunit;
@@ -48,7 +49,7 @@ public class Kape22FichierProcessorIntegrationTests(SqlServerIntegrationFixture 
             .Build();
 
     private Kape22FichierProcessor Processor() =>
-        new(fixture.NewAscoLsiContext, Configuration(), Options(), WinterClock());
+        new(fixture.NewAscoLsiContext, Configuration(), Options(), WinterClock(), NullLogger<Kape22FichierProcessor>.Instance);
 
     private void Ready()
     {
