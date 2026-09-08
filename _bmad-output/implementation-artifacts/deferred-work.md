@@ -1,5 +1,48 @@
 # Deferred Work
 
+## Deferred from: code review of story 3.1 (2026-09-08)
+
+- **No per-Fichier exception isolation in `RunTick` / `ProcessFromProcessing`** — an unreadable or
+  poison Fichier (throw from `fileSource.Read` or `processor.Process`) unwinds the whole tick; every
+  later Fichier in that batch is skipped, and next tick the same Fichier is first in the `processing/`
+  resume scan and throws again — a permanent head-of-line block. The resume loop is created by
+  AC-FR12-6 here, but the fix (try/catch per Fichier + a quarantine/`error` path for infrastructure
+  failures) belongs to Story 3.5 (robustesse de la boucle worker).
+- **Stability check does two `List("")` probes with no interval between them** — inert against a real
+  slow upload on `DirectoryFileSource` (both `FileInfo.Length` reads happen in the same instant); a
+  freshly-created 0-byte Fichier also passes both probes. `InboxScannerTests` only pass because
+  `InMemoryFileSource.MarkUnstableOnce` fakes the disagreement. Story 3.4 owns worker timing — carry
+  size memory across ticks, or gate on `LastWriteTimeUtc` older than N seconds, and drop zero-length.
+- **Retention age is the Fichier's own mtime, not the archival time** — `Archive` uses `File.Move`,
+  which preserves the original timestamp, and `PurgeRetention` filters on `entry.LastWriteTimeUtc`. A
+  Fichier that aged on the FTP share past `RetentionDays` is archived and then purged on the next
+  run — the archive copy is lost. Purge should run off archival time (dated folder, sidecar write
+  time, or a touch on move). Story 3.2/3.4 hardening.
+- **Name collisions overwrite silently** — `Archive` / `Reject` use `Move(..., overwrite: true)` and
+  `Write` overwrites; two Fichiers with the same name in the same month, or a Fichier named
+  `<x>.xml` colliding with another Fichier's sidecar, clobber the earlier archived copy with no
+  guard and no log. Story 3.2.
+- **`FichierProcessingResult.Warnings` is declared but never read by `InboxScanner`** — processor
+  warnings are dropped on both the success and the rejection branch. Story 3.3 (double logging) is
+  the consumer; surface them (log at Warning, or a `<name>.warnings.json` sidecar) there.
+- **Rejections log at `Information`, same level as successes** — `ProcessFromProcessing` emits one
+  `LogInformation` for both outcomes. A bad-data reject is an operational event and should surface
+  at Warning with the error count. Story 3.3.
+- **`TimeZoneInfo.FindSystemTimeZoneById("Europe/Paris")` in a static initializer with no fallback**
+  — `TypeInitializationException` on first use if the host lacks the tz data / runs
+  invariant-globalization. Pre-existing pattern, duplicated verbatim from `Kape22Mapper` and
+  `Kape22Persister`; fold a shared resilient accessor into a repo-wide hygiene pass.
+- **`PurgeRetention` never removes emptied `<yyyy>/<MM>` directories** — `archive/` accumulates empty
+  month folders forever; `DirectoryFileSource` has no directory-cleanup path. Story 3.4.
+- **`DirectoryFileSource` adapter hardening** — no path-traversal guard on `folder` / `name` (a `..`
+  segment escapes the reception root); `List` / `ListRecursive` throw and abort the tick if a file
+  vanishes between `EnumerateFiles` and `FileInfo`; `Move` throws `FileNotFoundException` on a
+  missing source though the interface only promises silent-missing for `Delete`. Story 3.2/3.4.
+- **No integration test pairs `InboxScanner` with `DirectoryFileSource`, and no DI composition root
+  roots the adapter at `Import:InboxPath`** — every `InboxScannerTests` case uses the in-memory fake;
+  the two implementations can drift (recursive-list folder semantics, move-overwrite, list order).
+  Story 3.4 owns DI + the `PeriodicTimer` worker loop and was explicitly deferred by the story.
+
 ## Resolved by: spec-parity-kape22-legacy-fill-rules (2026-09-07)
 
 `Kape22ProductionDataParityTests` (Category=Integration, opt-in behind
