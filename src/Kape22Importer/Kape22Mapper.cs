@@ -328,7 +328,7 @@ public static class Kape22Mapper
 
     // The current instant in Paris local time (D4, AC-FR9-3), from the injected clock.
     private static DateTime ParisNow(TimeProvider timeProvider) =>
-        TimeZoneInfo.ConvertTimeFromUtc(timeProvider.GetUtcNow().UtcDateTime, ParisTime.Instance);
+        TimeZoneInfo.ConvertTimeFromUtc(timeProvider.GetUtcNow().UtcDateTime, ParisTime.Zone);
 
     // The value a blank Champ takes on its L_D_KAPE22 column. An integer column (nullable or not)
     // takes 0, never NULL: the legacy import zero-filled every blank int Champ (Annexe B "Legacy

@@ -1,5 +1,44 @@
 # Deferred Work
 
+## Resolved by: code review patches of Story 3.2 (2026-09-08)
+
+- **AC-FR13-1/3/4/5 had zero CI coverage** (only `[SkippableFact]` Integration tests) — decision D1.
+  `Microsoft.EntityFrameworkCore.InMemory` added as a test-only dependency; `Kape22FichierProcessorTests`
+  now runs the mapper-failure and success branches (result shape, `NormalizedXml`, `XmlArchivePath`,
+  fresh-context-per-call, warning merge) in `Category=Unit` over an in-memory `AscoLsiDbContext`. The
+  Integration tests stay for the real-SQL transaction and column-length assertions.
+- **An uncaught exception from `IFichierProcessor.Process` unwound the whole tick** (AC-FR13-4) —
+  decision D2. `InboxScanner.ProcessFromProcessing` now wraps `processor.Process` in a try/catch: the
+  Fichier is logged at Error, quarantined in `error/` with an `.errors.json`, and the loop continues.
+  Story 3.5 still owns the refinement of which failures should instead leave the Fichier in
+  `processing/` for a retry (AC-FR15-3).
+- **Mapper FR-10 coherence warnings were dropped on a rejected Fichier** — `Kape22Persister.PersistRejected`
+  returns no `Warnings`, so `Kape22FichierProcessor` now merges `map.Warnings` directly
+  (`[.. conversion.Warnings, .. map.Warnings]`) instead of reading them back off the persister result.
+- Minor: `Kape22FichierProcessor.Import` guards `content` / `fichierName` at the trust boundary;
+  `ParisTime.Instance` renamed `ParisTime.Zone`; `Merge` helper inlined.
+
+## Deferred from: code review of Story 3.2 / epics.md (2026-09-08)
+
+- **`Kape22FichierProcessor` takes both `IConfiguration` and `ImportOptions`, with overlapping fields** —
+  `Kape22Persister` still reads `Import:InitiatingServer` / `Import:Commande` straight from
+  `IConfiguration`, while `ImportOptions.InitiatingServer` carries the same value; `options` is otherwise
+  used only for `ArchiveFolder`. Two sources of truth in one type. The clean fix changes
+  `Kape22Persister`'s constructor to take `ImportOptions` (a Story 2.8 seam), tied to the still-open
+  epic-2 retro item 10 ("trancher AddDbContext vs AddDbContextFactory + durée de vie du persister").
+- **No orchestrator test for the no-OF (D15) rejection path** — `Import_MapperFailure_*` covers only the
+  OF-readable `REJETÉ` case. When deserialization itself fails, `map.OF` is null and `Kape22Persister`
+  writes nothing; the orchestrator still returns `NormalizedXml` for `error/`. The persister's D15 branch
+  is covered by `TransactionalPersistenceTests`; an end-to-end orchestrator case is hard to construct
+  from raw bytes (a Converter-valid Fichier that fails P60.xsd deserialization) and low value. Revisit
+  in Story 3.6 (end-to-end harness).
+- **`XmlArchivePath` and `InboxScanner.Archive` still read the clock at different instants** — even with a
+  shared date-folder helper, `Kape22FichierProcessor.Import` computes the path when it runs and
+  `InboxScanner.Archive` writes the file later; a tick that straddles Paris midnight on the 1st of a
+  month names one `<yyyy>/<MM>` folder on the result and writes to another. Negligible for a file-import
+  worker; the real fix is the Story 3.3 seam decision (`InboxScanner` consumes `ImportResult`, or the
+  orchestrator owns the physical archive write).
+
 ## Resolved by: Epic 3 story-0 hygiene, retro action A-1 volets (a)(c)(d) (2026-09-08)
 
 - **(c) `Europe/Paris` timezone duplicated four ways** (F-12, notes 2.6 / 2.8) — `Kape22Mapper`,
@@ -12,8 +51,10 @@
   Champ/column CLR-type mismatch that escaped the FR-8 startup check would throw a raw reflection
   `ArgumentException` out of `Map`, breaking its "never throw for data reasons" contract. Now caught and
   re-thrown as a `StartupCompatibilityException` (deployment-fault family). No dedicated test: the path
-  is unreachable while `StartupCompatibilityCheck.Verify` is wired; a softer `ConversionError` code
-  would touch the frozen `ErrorCode` contract (PM/architect call).
+  is unreachable while the descriptor, the P60.xsd, the generated DTO and the entity agree (locked by
+  `P60XsdTests` / `SchemaModelParityTests` / `StartupCompatibilityTests` at build time); a softer
+  `ConversionError` code would touch the frozen `ErrorCode` contract. The Story 3.2 code review
+  (2026-09-08, decision D3) accepted this CC-1 exception as-is.
 - **(a) test scaffolding duplicated across the suite** (F-10, notes 2.4 / 2.5 / 2.6 / 2.8) —
   `PersistenceTestSupport` promoted to `tests/Kape22Importer.Tests/TestSupport.cs`. The reference
   Fichier name, `WinterClock` / `FixedClock`, `ConvertReferenceFichier`, `ReadValidFixture`,

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using TextToXml;
 
 namespace Kape22Importer;
 
@@ -81,7 +82,34 @@ public sealed class InboxScanner(
     private void ProcessFromProcessing(string fichierName)
     {
         byte[] content = fileSource.Read(options.ProcessingFolder, fichierName);
-        FichierProcessingResult result = processor.Process(fichierName, content);
+
+        FichierProcessingResult result;
+        try
+        {
+            result = processor.Process(fichierName, content);
+        }
+        catch (Exception exception)
+        {
+            // AC-FR13-4: one Fichier's unexpected failure (a deployment fault surfacing from the mapper,
+            // an EF error that escapes Kape22Persister, a bug) must not unwind the tick and strand every
+            // later Fichier. It is logged at Error and quarantined in error/, and the loop moves on.
+            // Story 3.5 refines which failures should instead leave the Fichier in processing/ for a
+            // later retry (AC-FR15-3).
+            logger.LogError(
+                exception, "Fichier {Fichier} threw during processing; quarantined to error/.", fichierName);
+            result = new FichierProcessingResult
+            {
+                Errors =
+                [
+                    new ConversionError
+                    {
+                        Block = Block.File,
+                        Code = ErrorCode.PersistenceError,
+                        Message = $"Traitement interrompu par une erreur inattendue : {exception.Message}",
+                    },
+                ],
+            };
+        }
 
         if (result.Success)
         {
@@ -100,7 +128,7 @@ public sealed class InboxScanner(
     // to it as <name>.xml.
     private void Archive(string fichierName, string? normalizedXml)
     {
-        DateTimeOffset parisNow = TimeZoneInfo.ConvertTime(timeProvider.GetUtcNow(), ParisTime.Instance);
+        DateTimeOffset parisNow = TimeZoneInfo.ConvertTime(timeProvider.GetUtcNow(), ParisTime.Zone);
         string dateFolder = $"{options.ArchiveFolder}/{parisNow.Year:D4}/{parisNow.Month:D2}";
 
         fileSource.Move(options.ProcessingFolder, fichierName, dateFolder, fichierName);

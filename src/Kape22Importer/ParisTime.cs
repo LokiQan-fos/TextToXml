@@ -10,9 +10,9 @@ namespace Kape22Importer;
 // host with neither fails here with a clear message rather than a TypeInitializationException.
 internal static class ParisTime
 {
-    private static readonly Lazy<TimeZoneInfo> Zone = new(Resolve);
+    private static readonly Lazy<TimeZoneInfo> Cached = new(Resolve);
 
-    public static TimeZoneInfo Instance => Zone.Value;
+    public static TimeZoneInfo Zone => Cached.Value;
 
     private static TimeZoneInfo Resolve()
     {

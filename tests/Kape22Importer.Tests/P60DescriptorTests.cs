@@ -28,7 +28,6 @@ public class P60DescriptorTests
     // The only two datatypes the P60 Descripteur is allowed to carry in v1 (D6): no datetime, no decimal.
     private static readonly string[] AllowedDatatypes = ["int", "string"];
 
-
     // The ten Annexe A.4 reference Fichiers, the same set ValidFixturesTests copies into the test output.
     public static TheoryData<string> ReferenceFichierNames()
     {

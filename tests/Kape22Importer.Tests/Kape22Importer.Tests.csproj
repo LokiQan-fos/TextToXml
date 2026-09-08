@@ -8,6 +8,8 @@
     <PackageReference Include="coverlet.collector" />
     <!-- The AR-12 fixture opens SqlConnection / SqlCommand directly to apply scripts/schema/. -->
     <PackageReference Include="Microsoft.Data.SqlClient" />
+    <!-- Backs the Category=Unit orchestration tests (Kape22FichierProcessorTests); the transaction and column-length assertions stay on SQL Server (AR-12). -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit" />

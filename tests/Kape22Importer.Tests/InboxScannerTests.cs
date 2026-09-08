@@ -141,6 +141,29 @@ public class InboxScannerTests
         Assert.Contains("Client", document.RootElement[0].GetProperty("Message").GetString());
     }
 
+    // AC-FR13-4: an unexpected exception from IFichierProcessor.Process on one Fichier is caught,
+    // logged at Error, the Fichier is quarantined in error/ with an <name>.errors.json, and the tick
+    // carries on to the next Fichier instead of unwinding.
+    [Fact]
+    [Trait("AC", "FR13-4")]
+    public void Tick_ProcessorThrowsOnOneFichier_QuarantinesItAndKeepsProcessingTheRest_AcFr13_4()
+    {
+        InMemoryFileSource source = new();
+        source.Add("", "P60_847_682_001", Bytes("poison"), Now.AddMinutes(-2));
+        source.Add("", "P60_847_682_002", Bytes("clean"), Now.AddMinutes(-1));
+        FakeFichierProcessor processor = new((name, _) => name == "P60_847_682_001"
+            ? throw new InvalidOperationException("boom")
+            : new FichierProcessingResult { NormalizedXml = "<file />" });
+        RecordingLogger<InboxScanner> logger = new();
+
+        Scanner(source, processor, logger: logger).RunTick();
+
+        Assert.True(source.Exists("error", "P60_847_682_001"), "the poison Fichier must land in error/.");
+        Assert.True(source.Exists("error", "P60_847_682_001.errors.json"));
+        Assert.True(source.Exists(ArchiveDateFolder, "P60_847_682_002"), "the next Fichier must still be processed.");
+        Assert.Contains(logger.Entries, entry => entry.Level == LogLevel.Error);
+    }
+
     // AC-FR12-5: a Fichier whose size is still changing between two probes is left in the inbox,
     // not processed, and nothing is logged as a Warning or an Error.
     [Fact]

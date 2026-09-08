@@ -127,7 +127,7 @@ public sealed class Kape22Persister(AscoLsiDbContext context, IConfiguration con
     private L_D_LOG_COMMANDE BuildLogRow(string of, string message) => new()
     {
         Commande = configuration[CommandeKey] ?? DefaultCommande,
-        Date = TimeZoneInfo.ConvertTimeFromUtc((timeProvider ?? TimeProvider.System).GetUtcNow().UtcDateTime, ParisTime.Instance),
+        Date = TimeZoneInfo.ConvertTimeFromUtc((timeProvider ?? TimeProvider.System).GetUtcNow().UtcDateTime, ParisTime.Zone),
         Message = message,
         // P60 rows are not lingot-scoped; the NOT NULL column carries the neutral 0.
         NumLingot = 0,

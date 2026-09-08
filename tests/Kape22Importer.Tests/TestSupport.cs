@@ -20,6 +20,11 @@ internal static class TestSupport
     // The reference Fichier and its own well-formed name (File_Emet_Recepteur_NumeroFichier).
     public const string ReferenceFichierName = "P60_847_682_001";
 
+    // The reference Fichier's Client Detail Champ. Blanking it (BlankClientReferenceFichier) forces a
+    // Step 2 rejection (RequiredFieldMissing) while the Fichier still deserializes, so NumeroFichier and
+    // OF stay readable and Kape22Persister writes the REJETÉ log row.
+    public const string ReferenceClient = "APERAM ALLOYS";
+
     // The LogicalName Kape22Importer.csproj pins for the embedded P60 Descripteur and schema. The
     // Descripteur has a production accessor (EmbeddedDescriptor.Xml); the schema does not.
     public const string EmbeddedP60XmlResourceName = "Kape22Importer.Templates.P60.xml";
@@ -64,6 +69,11 @@ internal static class TestSupport
     // A valid P60 reference Fichier from the TextToXml fixtures; its bytes are already Windows-1252.
     public static byte[] ReadValidFixture(string fichierName) =>
         File.ReadAllBytes(RepoLayout.ProjectFile($"tests/TextToXml.Tests/fixtures/valid/{fichierName}"));
+
+    // The reference Fichier's raw bytes with its Client Champ blanked in place, so Converter.Convert
+    // still succeeds but Kape22Mapper.Map rejects the Fichier with RequiredFieldMissing.
+    public static byte[] BlankClientReferenceFichier() =>
+        WithText(ReadValidFixture(ReferenceFichierName), ReferenceClient, new string(' ', ReferenceClient.Length));
 
     // The bytes of source with every occurrence of find replaced by replacement. Latin-1 round-trips
     // every byte 1:1, so an ASCII substring swap keeps a fixed-width Fichier's layout intact.

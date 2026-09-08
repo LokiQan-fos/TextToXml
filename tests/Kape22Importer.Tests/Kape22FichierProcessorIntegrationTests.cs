@@ -24,9 +24,6 @@ public class Kape22FichierProcessorIntegrationTests(SqlServerIntegrationFixture 
 {
     private const string InitiatingServer = "AFS017";
 
-    // The Client Detail Champ of the reference Fichier, blanked to force a Step 2 (Mapper) rejection.
-    private const string ReferenceClient = "APERAM ALLOYS";
-
     // WinterClock is 2026-02-10 08:00 UTC; Paris winter is UTC+1, so the archive date folder is 2026/02.
     private const string ExpectedXmlArchivePath = "archive/2026/02/" + ReferenceFichierName + ".xml";
 
@@ -52,9 +49,6 @@ public class Kape22FichierProcessorIntegrationTests(SqlServerIntegrationFixture 
 
     private Kape22FichierProcessor Processor() =>
         new(fixture.NewAscoLsiContext, Configuration(), Options(), WinterClock());
-
-    private static byte[] BlankClient() =>
-        WithText(ReadValidFixture(ReferenceFichierName), ReferenceClient, new string(' ', ReferenceClient.Length));
 
     private void Ready()
     {
@@ -115,7 +109,7 @@ public class Kape22FichierProcessorIntegrationTests(SqlServerIntegrationFixture 
     {
         Ready();
 
-        ImportResult result = Processor().Import(ReferenceFichierName, BlankClient());
+        ImportResult result = Processor().Import(ReferenceFichierName, BlankClientReferenceFichier());
 
         Assert.False(result.Success);
         Assert.NotNull(result.NormalizedXml);
@@ -139,7 +133,7 @@ public class Kape22FichierProcessorIntegrationTests(SqlServerIntegrationFixture 
         Ready();
         Kape22FichierProcessor processor = Processor();
 
-        ImportResult rejected = processor.Import(ReferenceFichierName, BlankClient());
+        ImportResult rejected = processor.Import(ReferenceFichierName, BlankClientReferenceFichier());
         ImportResult clean = processor.Import(ReferenceFichierName, ReadValidFixture(ReferenceFichierName));
 
         Assert.False(rejected.Success);

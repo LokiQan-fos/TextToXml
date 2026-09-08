@@ -26,9 +26,14 @@ public sealed class Kape22FichierProcessor(
     TimeProvider timeProvider)
     : IFichierProcessor
 {
-    // Runs the full per-Fichier pipeline and reports the step reached (AC-FR13-1).
+    // Runs the full per-Fichier pipeline and reports the step reached (AC-FR13-1). The bytes come from
+    // IFileSource and the name from a directory listing; both are guarded here like Converter.Convert
+    // and Kape22Persister.Persist guard their own inputs.
     public ImportResult Import(string fichierName, byte[] content)
     {
+        ArgumentException.ThrowIfNullOrEmpty(fichierName);
+        ArgumentNullException.ThrowIfNull(content);
+
         // The first stage turns the raw bytes into the normalized XML. A failure here stops the pipeline
         // with no Xml, so the Fichier goes to error/ with only its .errors.json (AC-FR13-2).
         ConversionResult conversion = Converter.Convert(content, EmbeddedDescriptor.Xml);
@@ -46,6 +51,12 @@ public sealed class Kape22FichierProcessor(
         // next to the Fichier in error/ for diagnosis (AC-FR13-3).
         MapResult<L_D_KAPE22> map = Kape22Mapper.Map(normalizedXml, fichierName, timeProvider);
 
+        // The Step 1 Segment warnings ahead of the mapper's FR-10 coherence warnings, kept whichever
+        // step the Fichier reaches. A rejected MapResult drops its Warnings on the way through
+        // Kape22Persister, so they are taken from map here, not from the persister result. AC-FR6-4 (one
+        // list sorted by LineNumber) is a separate reconciliation still open in the epics.
+        IReadOnlyList<ConversionError> warnings = [.. conversion.Warnings, .. map.Warnings];
+
         // The final stage persists, over a context that belongs to this Fichier alone so its transaction
         // and EF change tracker never touch another Fichier's (AC-FR13-4).
         using AscoLsiDbContext context = newContext();
@@ -53,11 +64,7 @@ public sealed class Kape22FichierProcessor(
 
         if (!persisted.Success)
         {
-            return persisted with
-            {
-                NormalizedXml = normalizedXml,
-                Warnings = Merge(conversion.Warnings, persisted.Warnings),
-            };
+            return persisted with { NormalizedXml = normalizedXml, Warnings = warnings };
         }
 
         // Success (a fresh insert or the anti-duplicate skip, AC-FR11-6): the Fichier and its normalized
@@ -65,7 +72,7 @@ public sealed class Kape22FichierProcessor(
         return persisted with
         {
             NormalizedXml = normalizedXml,
-            Warnings = Merge(conversion.Warnings, persisted.Warnings),
+            Warnings = warnings,
             XmlArchivePath = ArchivePath(fichierName),
         };
     }
@@ -86,22 +93,7 @@ public sealed class Kape22FichierProcessor(
     // Kept in step with InboxScanner.Archive; a shared helper is tracked in deferred-work.md.
     private string ArchivePath(string fichierName)
     {
-        DateTimeOffset parisNow = TimeZoneInfo.ConvertTime(timeProvider.GetUtcNow(), ParisTime.Instance);
+        DateTimeOffset parisNow = TimeZoneInfo.ConvertTime(timeProvider.GetUtcNow(), ParisTime.Zone);
         return $"{options.ArchiveFolder}/{parisNow.Year:D4}/{parisNow.Month:D2}/{fichierName}.xml";
-    }
-
-    // This lists the Step 1 Segment warnings ahead of the persistence warnings, keeping both sets
-    // visible. AC-FR6-4 (a single list sorted by LineNumber) is a separate reconciliation still open in
-    // the epics.
-    private static IReadOnlyList<ConversionError> Merge(
-        IReadOnlyList<ConversionError> first,
-        IReadOnlyList<ConversionError> second)
-    {
-        if (first.Count == 0)
-        {
-            return second;
-        }
-
-        return second.Count == 0 ? first : [.. first, .. second];
     }
 }
