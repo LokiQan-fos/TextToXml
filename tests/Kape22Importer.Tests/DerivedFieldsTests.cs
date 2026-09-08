@@ -1,13 +1,11 @@
 using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
-using System.Linq;
 using System.Xml.Linq;
 using Kape22Importer.Persistence;
 using TextToXml;
 using TextToXml.Tests;
 using Xunit;
+using static Kape22Importer.Tests.TestSupport;
 
 namespace Kape22Importer.Tests;
 
@@ -19,8 +17,6 @@ namespace Kape22Importer.Tests;
 [Trait("Category", TestCategory.Unit)]
 public class DerivedFieldsTests
 {
-    private const string ReferenceFichierName = "P60_847_682_001";
-
     // AC-FR9-1: "245" is day 245 of the current year, and the current year is read from the Paris
     // wall clock, not from UTC - so a UTC instant that is already the next year in Paris derives the
     // Paris year.
@@ -36,7 +32,7 @@ public class DerivedFieldsTests
     public void TryConvertHeaderDate_ValidDayNumber_ReturnsDateInParisYear_AcFr9_1(
         string raw, string utcNow, string expectedDate)
     {
-        TimeProvider clock = new FixedTimeProvider(DateTimeOffset.Parse(utcNow, CultureInfo.InvariantCulture));
+        TimeProvider clock = new FixedClock(DateTimeOffset.Parse(utcNow, CultureInfo.InvariantCulture));
 
         bool converted = Kape22Mapper.TryConvertHeaderDate(raw, clock, out DateTime date);
 
@@ -58,7 +54,7 @@ public class DerivedFieldsTests
     [Trait("AC", "FR9-1")]
     public void TryConvertHeaderDate_ZeroOutOfRangeOrNonNumeric_ReturnsFalse_AcFr9_1(string raw)
     {
-        TimeProvider clock = new FixedTimeProvider(DateTimeOffset.Parse("2026-06-01T12:00:00Z", CultureInfo.InvariantCulture));
+        TimeProvider clock = new FixedClock(DateTimeOffset.Parse("2026-06-01T12:00:00Z", CultureInfo.InvariantCulture));
 
         Assert.False(Kape22Mapper.TryConvertHeaderDate(raw, clock, out _));
     }
@@ -172,7 +168,7 @@ public class DerivedFieldsTests
         MapResult<L_D_KAPE22> result = Kape22Mapper.Map(
             ConvertReferenceFichier(),
             ReferenceFichierName,
-            new FixedTimeProvider(DateTimeOffset.Parse("2026-02-10T08:00:00Z", CultureInfo.InvariantCulture)));
+            new FixedClock(DateTimeOffset.Parse("2026-02-10T08:00:00Z", CultureInfo.InvariantCulture)));
 
         Assert.True(result.Success);
         Assert.Equal(new DateTime(2026, 2, 10, 9, 0, 0), result.Value!.DateReception);
@@ -187,7 +183,7 @@ public class DerivedFieldsTests
         MapResult<L_D_KAPE22> result = Kape22Mapper.Map(
             ConvertReferenceFichier(),
             ReferenceFichierName,
-            new FixedTimeProvider(DateTimeOffset.Parse("2026-07-10T08:00:00Z", CultureInfo.InvariantCulture)));
+            new FixedClock(DateTimeOffset.Parse("2026-07-10T08:00:00Z", CultureInfo.InvariantCulture)));
 
         Assert.True(result.Success);
         Assert.Equal(new DateTime(2026, 7, 10, 10, 0, 0), result.Value!.DateReception);
@@ -291,29 +287,5 @@ public class DerivedFieldsTests
         }
 
         return document.ToString();
-    }
-
-    // A fixed winter instant (Paris UTC+1) for the tests that do not assert on DateReception.
-    private static TimeProvider WinterClock() =>
-        new FixedTimeProvider(DateTimeOffset.Parse("2026-02-10T08:00:00Z", CultureInfo.InvariantCulture));
-
-    private static string ConvertReferenceFichier()
-    {
-        ConversionResult conversion = Converter.Convert(ReadValidFixture(ReferenceFichierName), EmbeddedDescriptor.Xml);
-        Assert.True(conversion.Success, "reference fixture failed to convert.");
-        return conversion.Xml!;
-    }
-
-    // A valid P60 reference Fichier from the TextToXml fixtures; its bytes are already Windows-1252.
-    private static byte[] ReadValidFixture(string fichierName) =>
-        File.ReadAllBytes(RepoLayout.ProjectFile($"tests/TextToXml.Tests/fixtures/valid/{fichierName}"));
-
-    // Minimal TimeProvider stub: only GetUtcNow is consumed, the derived rules resolve the Paris zone
-    // explicitly rather than through LocalTimeZone.
-    private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
-    {
-        private readonly DateTimeOffset utcNow = utcNow;
-
-        public override DateTimeOffset GetUtcNow() => this.utcNow;
     }
 }

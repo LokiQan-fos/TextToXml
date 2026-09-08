@@ -3,7 +3,7 @@ using Kape22Importer.Persistence;
 using TextToXml;
 using TextToXml.Tests;
 using Xunit;
-using static Kape22Importer.Tests.PersistenceTestSupport;
+using static Kape22Importer.Tests.TestSupport;
 
 namespace Kape22Importer.Tests;
 

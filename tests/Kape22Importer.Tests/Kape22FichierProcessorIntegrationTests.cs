@@ -1,14 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using Kape22Importer.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using TextToXml;
 using TextToXml.Tests;
 using Xunit;
-using static Kape22Importer.Tests.PersistenceTestSupport;
+using static Kape22Importer.Tests.TestSupport;
 
 namespace Kape22Importer.Tests;
 
@@ -53,10 +52,6 @@ public class Kape22FichierProcessorIntegrationTests(SqlServerIntegrationFixture 
 
     private Kape22FichierProcessor Processor() =>
         new(fixture.NewAscoLsiContext, Configuration(), Options(), WinterClock());
-
-    // Latin-1 round-trips every byte 1:1, so an ASCII substring swap keeps the fixed-width layout intact.
-    private static byte[] WithText(byte[] source, string find, string replacement) =>
-        Encoding.Latin1.GetBytes(Encoding.Latin1.GetString(source).Replace(find, replacement));
 
     private static byte[] BlankClient() =>
         WithText(ReadValidFixture(ReferenceFichierName), ReferenceClient, new string(' ', ReferenceClient.Length));

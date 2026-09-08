@@ -1,13 +1,10 @@
 using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.IO;
-using System.Linq;
 using System.Xml.Linq;
 using Kape22Importer.Persistence;
 using TextToXml;
 using TextToXml.Tests;
 using Xunit;
+using static Kape22Importer.Tests.TestSupport;
 
 namespace Kape22Importer.Tests;
 
@@ -19,8 +16,6 @@ namespace Kape22Importer.Tests;
 [Trait("Category", TestCategory.Unit)]
 public class CoherenceWarningsTests
 {
-    private const string ReferenceFichierName = "P60_847_682_001";
-
     // AC-FR10-1 (D18): Footer.Records counts 3 = Entete + message + Pied; any other value is a
     // Warning {Block:Footer, FieldId:"Records", Code:InterBlockMismatch}, and the Fichier is still
     // mapped to an entity.
@@ -228,29 +223,5 @@ public class CoherenceWarningsTests
         XDocument document = XDocument.Parse(ConvertReferenceFichier());
         mutate(document);
         return document.ToString();
-    }
-
-    // A fixed winter instant (Paris UTC+1); the coherence tests do not assert on DateReception but Map
-    // needs a deterministic clock (AR-12).
-    private static TimeProvider WinterClock() =>
-        new FixedTimeProvider(DateTimeOffset.Parse("2026-02-10T08:00:00Z", CultureInfo.InvariantCulture));
-
-    private static string ConvertReferenceFichier()
-    {
-        ConversionResult conversion = Converter.Convert(ReadValidFixture(ReferenceFichierName), EmbeddedDescriptor.Xml);
-        Assert.True(conversion.Success, "reference fixture failed to convert.");
-        return conversion.Xml!;
-    }
-
-    // A valid P60 reference Fichier from the TextToXml fixtures; its bytes are already Windows-1252.
-    private static byte[] ReadValidFixture(string fichierName) =>
-        File.ReadAllBytes(RepoLayout.ProjectFile($"tests/TextToXml.Tests/fixtures/valid/{fichierName}"));
-
-    // Minimal TimeProvider stub: only GetUtcNow is consumed.
-    private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
-    {
-        private readonly DateTimeOffset utcNow = utcNow;
-
-        public override DateTimeOffset GetUtcNow() => this.utcNow;
     }
 }

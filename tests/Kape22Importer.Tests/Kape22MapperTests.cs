@@ -1,6 +1,5 @@
 using System;
 using System.Globalization;
-using System.IO;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
@@ -8,6 +7,7 @@ using Kape22Importer.Persistence;
 using TextToXml;
 using TextToXml.Tests;
 using Xunit;
+using static Kape22Importer.Tests.TestSupport;
 
 namespace Kape22Importer.Tests;
 
@@ -17,10 +17,6 @@ namespace Kape22Importer.Tests;
 [Trait("Category", TestCategory.Unit)]
 public class Kape22MapperTests
 {
-    private const string EmbeddedP60XmlResourceName = "Kape22Importer.Templates.P60.xml";
-
-    private const string ReferenceFichierName = "P60_847_682_001";
-
     // AC-FR7-2: every homonymous Detail property lands on the entity with the DTO's typed value.
     // Spot-checks OF/Client/Coulee/Nuance/Type/Indice directly against the normalized XML (ground
     // truth, independent of Kape22Mapper's own reflection), then sweeps every other mapped property.
@@ -29,7 +25,7 @@ public class Kape22MapperTests
     public void Map_ValidFichier_CopiesEveryHomonymousDetailProperty_AcFr7_2()
     {
         string normalizedXml = ConvertReferenceFichier();
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(normalizedXml, ReferenceFichierName);
+        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(normalizedXml, ReferenceFichierName, WinterClock());
 
         Assert.True(result.Success);
         Assert.Empty(result.Errors);
@@ -82,7 +78,7 @@ public class Kape22MapperTests
         XDocument document = XDocument.Parse(ConvertReferenceFichier());
         document.Root!.Element("message")!.Element("OForiginInterne")!.Value = "X";
 
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(document.ToString(), ReferenceFichierName);
+        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(document.ToString(), ReferenceFichierName, WinterClock());
 
         Assert.True(result.Success);
         Assert.Equal("X", result.Value!.OForiginInterne);
@@ -95,7 +91,7 @@ public class Kape22MapperTests
     [Trait("AC", "FR7-2")]
     public void Map_BlankTypedIntChamp_MapsToZeroNotNull_AcFr7_2()
     {
-        L_D_KAPE22 entity = Kape22Mapper.Map(ConvertReferenceFichier(), ReferenceFichierName).Value!;
+        L_D_KAPE22 entity = Kape22Mapper.Map(ConvertReferenceFichier(), ReferenceFichierName, WinterClock()).Value!;
 
         Assert.Equal(0, entity.MatriculeClient);
         Assert.Equal(0, entity.ChutagePied);
@@ -107,7 +103,7 @@ public class Kape22MapperTests
     [Trait("AC", "FR7-2")]
     public void Map_PopulatedTypedIntChamp_IsCopiedUnchanged_AcFr7_2()
     {
-        L_D_KAPE22 entity = Kape22Mapper.Map(ConvertReferenceFichier(), ReferenceFichierName).Value!;
+        L_D_KAPE22 entity = Kape22Mapper.Map(ConvertReferenceFichier(), ReferenceFichierName, WinterClock()).Value!;
 
         Assert.Equal(6250, entity.DiametreProduit);
     }
@@ -120,7 +116,7 @@ public class Kape22MapperTests
         XDocument document = XDocument.Parse(ConvertReferenceFichier());
         document.Root!.Element("message")!.Element("Epaisseur")!.Value = "0";
 
-        L_D_KAPE22 entity = Kape22Mapper.Map(document.ToString(), ReferenceFichierName).Value!;
+        L_D_KAPE22 entity = Kape22Mapper.Map(document.ToString(), ReferenceFichierName, WinterClock()).Value!;
 
         Assert.Equal(0, entity.Epaisseur);
     }
@@ -131,7 +127,7 @@ public class Kape22MapperTests
     [Trait("AC", "FR7-2")]
     public void Map_BlankOForiginInterneChamp_MapsToNull_AcFr7_2()
     {
-        L_D_KAPE22 entity = Kape22Mapper.Map(ConvertReferenceFichier(), ReferenceFichierName).Value!;
+        L_D_KAPE22 entity = Kape22Mapper.Map(ConvertReferenceFichier(), ReferenceFichierName, WinterClock()).Value!;
 
         Assert.Null(entity.OForiginInterne);
     }
@@ -145,7 +141,7 @@ public class Kape22MapperTests
         XDocument document = XDocument.Parse(ConvertReferenceFichier());
         document.Root!.Element("message")!.Element("OForiginInterne")!.Value = "X";
 
-        L_D_KAPE22 entity = Kape22Mapper.Map(document.ToString(), ReferenceFichierName).Value!;
+        L_D_KAPE22 entity = Kape22Mapper.Map(document.ToString(), ReferenceFichierName, WinterClock()).Value!;
 
         Assert.Equal("X", entity.OForiginInterne);
     }
@@ -156,7 +152,7 @@ public class Kape22MapperTests
     [Trait("AC", "FR7-2")]
     public void Map_BlankAcompteSoldeChamp_MapsToS_AcFr7_2()
     {
-        L_D_KAPE22 entity = Kape22Mapper.Map(ConvertReferenceFichier(), ReferenceFichierName).Value!;
+        L_D_KAPE22 entity = Kape22Mapper.Map(ConvertReferenceFichier(), ReferenceFichierName, WinterClock()).Value!;
 
         Assert.Equal("S", entity.AcompteSolde);
     }
@@ -170,7 +166,7 @@ public class Kape22MapperTests
         XDocument document = XDocument.Parse(ConvertReferenceFichier());
         document.Root!.Element("message")!.Element("AcompteSolde")!.Value = "A";
 
-        L_D_KAPE22 entity = Kape22Mapper.Map(document.ToString(), ReferenceFichierName).Value!;
+        L_D_KAPE22 entity = Kape22Mapper.Map(document.ToString(), ReferenceFichierName, WinterClock()).Value!;
 
         Assert.Equal("A", entity.AcompteSolde);
     }
@@ -184,7 +180,7 @@ public class Kape22MapperTests
         XDocument document = XDocument.Parse(ConvertReferenceFichier());
         document.Root!.Element("message")!.Element("MarqueCommerciale")!.Value = string.Empty;
 
-        L_D_KAPE22 entity = Kape22Mapper.Map(document.ToString(), ReferenceFichierName).Value!;
+        L_D_KAPE22 entity = Kape22Mapper.Map(document.ToString(), ReferenceFichierName, WinterClock()).Value!;
 
         Assert.Equal(string.Empty, entity.MarqueCommerciale);
     }
@@ -227,7 +223,7 @@ public class Kape22MapperTests
     [Trait("AC", "FR7-5")]
     public void Map_ValidFichier_RaisesNoErrorDespiteIgnoredProperties_AcFr7_5()
     {
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(ConvertReferenceFichier(), ReferenceFichierName);
+        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(ConvertReferenceFichier(), ReferenceFichierName, WinterClock());
 
         Assert.True(result.Success);
         Assert.Empty(result.Errors);
@@ -269,7 +265,7 @@ public class Kape22MapperTests
     {
         string withoutIndice = Regex.Replace(ConvertReferenceFichier(), "<Indice>[^<]*</Indice>", string.Empty);
 
-        Exception? exception = Record.Exception(() => Kape22Mapper.Map(withoutIndice, ReferenceFichierName));
+        Exception? exception = Record.Exception(() => Kape22Mapper.Map(withoutIndice, ReferenceFichierName, WinterClock()));
 
         Assert.Null(exception);
     }
@@ -280,7 +276,7 @@ public class Kape22MapperTests
     [Fact]
     public void Map_NonConformantNormalizedXml_ReturnsDeserializerErrorsAndNoValue()
     {
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(NonConformantNormalizedXml(), ReferenceFichierName);
+        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(NonConformantNormalizedXml(), ReferenceFichierName, WinterClock());
 
         Assert.False(result.Success);
         Assert.Null(result.Value);
@@ -288,34 +284,4 @@ public class Kape22MapperTests
         Assert.Equal(Block.File, error.Block);
         Assert.Equal(ErrorCode.PersistenceError, error.Code);
     }
-
-    private static string ConvertReferenceFichier()
-    {
-        ConversionResult conversion = Converter.Convert(ReadValidFixture(ReferenceFichierName), EmbeddedP60Xml());
-        Assert.True(conversion.Success, "reference fixture failed to convert.");
-        return conversion.Xml!;
-    }
-
-    // Builds a normalized XML that P60.xsd rejects by inserting an element the schema does not declare
-    // as the first child of <message>. Mirrors P60XsdTests.NonConformantNormalizedXml.
-    private static string NonConformantNormalizedXml() =>
-        ConvertReferenceFichier().Replace("<message>", "<message><Bogus>x</Bogus>", StringComparison.Ordinal);
-
-    // Reads an embedded resource of Kape22Importer exactly as the importer will at runtime.
-    private static string EmbeddedResource(string logicalName)
-    {
-        Assembly importer = typeof(P60Deserializer).Assembly;
-
-        using Stream stream = importer.GetManifestResourceStream(logicalName)
-            ?? throw new InvalidOperationException(
-                $"The embedded resource '{logicalName}' is missing from {importer.GetName().Name}.");
-        using StreamReader reader = new(stream);
-        return reader.ReadToEnd();
-    }
-
-    private static string EmbeddedP60Xml() => EmbeddedResource(EmbeddedP60XmlResourceName);
-
-    // A valid P60 reference Fichier from the TextToXml fixtures; its bytes are already Windows-1252.
-    private static byte[] ReadValidFixture(string fichierName) =>
-        File.ReadAllBytes(RepoLayout.ProjectFile($"tests/TextToXml.Tests/fixtures/valid/{fichierName}"));
 }

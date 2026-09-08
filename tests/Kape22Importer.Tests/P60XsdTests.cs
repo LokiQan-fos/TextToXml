@@ -12,6 +12,7 @@ using System.Xml.Serialization;
 using TextToXml;
 using TextToXml.Tests;
 using Xunit;
+using static Kape22Importer.Tests.TestSupport;
 
 namespace Kape22Importer.Tests;
 
@@ -25,12 +26,6 @@ namespace Kape22Importer.Tests;
 [Trait("Category", TestCategory.Unit)]
 public class P60XsdTests
 {
-    // The LogicalName Kape22Importer.csproj will pin for the embedded schema, mirroring the P60.xml
-    // convention from Story 2.2.
-    private const string EmbeddedP60XsdResourceName = "Kape22Importer.Templates.P60.xsd";
-
-    private const string EmbeddedP60XmlResourceName = "Kape22Importer.Templates.P60.xml";
-
     private static readonly XNamespace Xs = "http://www.w3.org/2001/XMLSchema";
 
     // The three normalized-XML sections, in skeleton order.
@@ -150,7 +145,7 @@ public class P60XsdTests
     [Trait("AC", "FR5-14")]
     public void Converter_ReferenceFichier_NormalizedXmlValidatesAgainstP60Xsd_AcFr5_14(string fichierName)
     {
-        ConversionResult result = Converter.Convert(ReadValidFixture(fichierName), EmbeddedP60Xml());
+        ConversionResult result = Converter.Convert(ReadValidFixture(fichierName), EmbeddedDescriptor.Xml);
         Assert.True(result.Success, $"{fichierName} did not convert cleanly.");
 
         IReadOnlyList<string> schemaErrors = SchemaValidationErrors(result.Xml!);
@@ -187,7 +182,7 @@ public class P60XsdTests
     [Trait("AC", "FR5-12b")]
     public void P60Deserializer_ValidFichier_RoundTripsIntoKape22File_AcFr5_12b()
     {
-        ConversionResult conversion = Converter.Convert(ReadValidFixture("P60_847_682_001"), EmbeddedP60Xml());
+        ConversionResult conversion = Converter.Convert(ReadValidFixture("P60_847_682_001"), EmbeddedDescriptor.Xml);
         Assert.True(conversion.Success);
 
         P60DeserializeResult result = P60Deserializer.Deserialize(conversion.Xml!);
@@ -218,7 +213,7 @@ public class P60XsdTests
     [Trait("AC", "FR5-12b")]
     public void P60Deserializer_OmittedTypedChamp_DeserializesToNullProperty_AcFr5_12b()
     {
-        ConversionResult conversion = Converter.Convert(ReadValidFixture("P60_847_682_001"), EmbeddedP60Xml());
+        ConversionResult conversion = Converter.Convert(ReadValidFixture("P60_847_682_001"), EmbeddedDescriptor.Xml);
         Assert.True(conversion.Success);
 
         string withoutIndice = Regex.Replace(conversion.Xml!, "<Indice>[^<]*</Indice>", string.Empty);
@@ -259,14 +254,6 @@ public class P60XsdTests
         Assert.Equal(
             schema.Select(element => (element.Name, element.Type)).ToArray(),
             dto);
-    }
-
-    // Builds a normalized XML that P60.xsd rejects by inserting an element the schema does not declare
-    // as the first child of <message>.
-    private static string NonConformantNormalizedXml()
-    {
-        ConversionResult conversion = Converter.Convert(ReadValidFixture("P60_847_682_001"), EmbeddedP60Xml());
-        return conversion.Xml!.Replace("<message>", "<message><Bogus>x</Bogus>", StringComparison.Ordinal);
     }
 
     // Validates an instance document against the embedded P60.xsd and returns every validation message.
@@ -344,25 +331,5 @@ public class P60XsdTests
 
     private static XElement SchemaRoot() => XDocument.Parse(EmbeddedP60Xsd()).Root!;
 
-    private static XElement DescriptorRoot() => XDocument.Parse(EmbeddedP60Xml()).Root!;
-
-    // Reads an embedded resource of Kape22Importer exactly as the importer will at runtime.
-    private static string EmbeddedResource(string logicalName)
-    {
-        Assembly importer = typeof(P60Deserializer).Assembly;
-
-        using Stream stream = importer.GetManifestResourceStream(logicalName)
-            ?? throw new InvalidOperationException(
-                $"The embedded resource '{logicalName}' is missing from {importer.GetName().Name}.");
-        using StreamReader reader = new(stream);
-        return reader.ReadToEnd();
-    }
-
-    private static string EmbeddedP60Xsd() => EmbeddedResource(EmbeddedP60XsdResourceName);
-
-    private static string EmbeddedP60Xml() => EmbeddedResource(EmbeddedP60XmlResourceName);
-
-    // A valid P60 reference Fichier from the TextToXml fixtures; its bytes are already Windows-1252.
-    private static byte[] ReadValidFixture(string fichierName) =>
-        File.ReadAllBytes(RepoLayout.ProjectFile($"tests/TextToXml.Tests/fixtures/valid/{fichierName}"));
+    private static XElement DescriptorRoot() => XDocument.Parse(EmbeddedDescriptor.Xml).Root!;
 }

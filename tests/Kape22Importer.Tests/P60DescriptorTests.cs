@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore.Metadata;
 using TextToXml;
 using TextToXml.Tests;
 using Xunit;
+using static Kape22Importer.Tests.TestSupport;
 
 namespace Kape22Importer.Tests;
 
@@ -27,8 +28,6 @@ public class P60DescriptorTests
     // The only two datatypes the P60 Descripteur is allowed to carry in v1 (D6): no datetime, no decimal.
     private static readonly string[] AllowedDatatypes = ["int", "string"];
 
-    // The LogicalName pinned by Kape22Importer.csproj for the embedded Descripteur.
-    private const string EmbeddedP60ResourceName = "Kape22Importer.Templates.P60.xml";
 
     // The ten Annexe A.4 reference Fichiers, the same set ValidFixturesTests copies into the test output.
     public static TheoryData<string> ReferenceFichierNames()
@@ -47,9 +46,9 @@ public class P60DescriptorTests
     {
         Assembly importer = typeof(AscoLsiDbContext).Assembly;
 
-        Assert.Contains(EmbeddedP60ResourceName, importer.GetManifestResourceNames());
+        Assert.Contains(EmbeddedP60XmlResourceName, importer.GetManifestResourceNames());
 
-        using Stream? stream = importer.GetManifestResourceStream(EmbeddedP60ResourceName);
+        using Stream? stream = importer.GetManifestResourceStream(EmbeddedP60XmlResourceName);
         Assert.NotNull(stream);
         using StreamReader reader = new(stream);
         string content = reader.ReadToEnd();
@@ -65,7 +64,7 @@ public class P60DescriptorTests
     [MemberData(nameof(ReferenceFichierNames))]
     public void P60Xml_ConvertsEveryReferenceFichierWithoutErrorOrWarning(string fichierName)
     {
-        ConversionResult result = Converter.Convert(ReadValidFixture(fichierName), EmbeddedP60Xml());
+        ConversionResult result = Converter.Convert(ReadValidFixture(fichierName), EmbeddedDescriptor.Xml);
 
         Assert.True(
             result.Errors.Count == 0,
@@ -79,7 +78,7 @@ public class P60DescriptorTests
     [Fact]
     public void P60Xml_RootDeclaresExpectedMessageCountOne()
     {
-        XElement root = XDocument.Parse(EmbeddedP60Xml()).Root!;
+        XElement root = XDocument.Parse(EmbeddedDescriptor.Xml).Root!;
 
         Assert.Equal("1", (string?)root.Attribute("expectedMessageCount"));
     }
@@ -87,7 +86,7 @@ public class P60DescriptorTests
     [Fact]
     public void P60Xml_DeclaresTheSegmentControlWithThe000EofAnd999Markers()
     {
-        XElement root = XDocument.Parse(EmbeddedP60Xml()).Root!;
+        XElement root = XDocument.Parse(EmbeddedDescriptor.Xml).Root!;
 
         Assert.Equal("Segment", (string?)root.Attribute("segmentField"));
         Assert.Equal("000", (string?)root.Attribute("headerMarker"));
@@ -102,7 +101,7 @@ public class P60DescriptorTests
         byte[] input = ReadValidFixture("P60_847_682_001");
         input[9] = input[10] = input[11] = (byte)'Z';
 
-        ConversionResult result = Converter.Convert(input, EmbeddedP60Xml());
+        ConversionResult result = Converter.Convert(input, EmbeddedDescriptor.Xml);
 
         Assert.Contains(result.Warnings, warning =>
             warning.Code == ErrorCode.SegmentMismatch && warning.FieldId == "Segment");
@@ -160,7 +159,7 @@ public class P60DescriptorTests
     [InlineData("footer", 80)]
     public void P60Xml_EachBlocTilesItsSpanContiguously(string blocName, int expectedLength)
     {
-        XElement bloc = XDocument.Parse(EmbeddedP60Xml()).Root!.Element(blocName)!;
+        XElement bloc = XDocument.Parse(EmbeddedDescriptor.Xml).Root!.Element(blocName)!;
 
         int cursor = 0;
         foreach (XElement value in bloc.Elements("value"))
@@ -173,18 +172,6 @@ public class P60DescriptorTests
         }
 
         Assert.Equal(expectedLength, cursor);
-    }
-
-    // Reads the embedded P60 Descripteur exactly as the importer will at runtime, without disk access.
-    private static string EmbeddedP60Xml()
-    {
-        Assembly importer = typeof(AscoLsiDbContext).Assembly;
-
-        using Stream stream = importer.GetManifestResourceStream(EmbeddedP60ResourceName)
-            ?? throw new InvalidOperationException(
-                $"The embedded resource '{EmbeddedP60ResourceName}' is missing from {importer.GetName().Name}.");
-        using StreamReader reader = new(stream);
-        return reader.ReadToEnd();
     }
 
     // The int columns of L_D_KAPE22, taken from the built EF model exposed by Story 2.1, excluding the
@@ -206,15 +193,11 @@ public class P60DescriptorTests
             .ToHashSet(StringComparer.Ordinal);
     }
 
-    // A valid P60 reference Fichier from the TextToXml fixtures; its bytes are already Windows-1252.
-    private static byte[] ReadValidFixture(string fichierName) =>
-        File.ReadAllBytes(RepoLayout.ProjectFile($"tests/TextToXml.Tests/fixtures/valid/{fichierName}"));
-
     // Every <value> of the descriptor, across header, message and footer.
     private static IEnumerable<XElement> ValueElements() =>
-        XDocument.Parse(EmbeddedP60Xml()).Root!.Descendants("value");
+        XDocument.Parse(EmbeddedDescriptor.Xml).Root!.Descendants("value");
 
     // Only the <message> Bloc <value>s, the ones that map to an L_D_KAPE22 column.
     private static IEnumerable<XElement> MessageValueElements() =>
-        XDocument.Parse(EmbeddedP60Xml()).Root!.Element("message")!.Elements("value");
+        XDocument.Parse(EmbeddedDescriptor.Xml).Root!.Element("message")!.Elements("value");
 }

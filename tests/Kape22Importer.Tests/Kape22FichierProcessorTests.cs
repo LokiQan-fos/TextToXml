@@ -5,7 +5,7 @@ using TextToXml;
 using TextToXml.Tests;
 using Xunit;
 using Xunit.Sdk;
-using static Kape22Importer.Tests.PersistenceTestSupport;
+using static Kape22Importer.Tests.TestSupport;
 
 namespace Kape22Importer.Tests;
 

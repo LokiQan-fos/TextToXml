@@ -1,5 +1,34 @@
 # Deferred Work
 
+## Resolved by: Epic 3 story-0 hygiene, retro action A-1 volets (a)(c)(d) (2026-09-08)
+
+- **(c) `Europe/Paris` timezone duplicated four ways** (F-12, notes 2.6 / 2.8) — `Kape22Mapper`,
+  `Kape22Persister`, `InboxScanner` and `Kape22FichierProcessor` each carried their own
+  `private static readonly TimeZoneInfo ParisTimeZone = FindSystemTimeZoneById("Europe/Paris")`.
+  Replaced by one `internal static ParisTime.Instance` (`Lazy<TimeZoneInfo>`, IANA id then
+  `"Romance Standard Time"` fallback, `TimeZoneNotFoundException` if neither). All four static fields
+  are gone.
+- **(d) `Kape22Mapper.Map`'s reflective `SetValue` was unguarded** (F-7, notes 2.4 / 2.5) — a
+  Champ/column CLR-type mismatch that escaped the FR-8 startup check would throw a raw reflection
+  `ArgumentException` out of `Map`, breaking its "never throw for data reasons" contract. Now caught and
+  re-thrown as a `StartupCompatibilityException` (deployment-fault family). No dedicated test: the path
+  is unreachable while `StartupCompatibilityCheck.Verify` is wired; a softer `ConversionError` code
+  would touch the frozen `ErrorCode` contract (PM/architect call).
+- **(a) test scaffolding duplicated across the suite** (F-10, notes 2.4 / 2.5 / 2.6 / 2.8) —
+  `PersistenceTestSupport` promoted to `tests/Kape22Importer.Tests/TestSupport.cs`. The reference
+  Fichier name, `WinterClock` / `FixedClock`, `ConvertReferenceFichier`, `ReadValidFixture`,
+  `NonConformantNormalizedXml`, the embedded-resource reader (`EmbeddedP60Xsd`, resource-name consts)
+  and `WithText` now live there once; `DerivedFieldsTests`, `CoherenceWarningsTests`, `Kape22MapperTests`,
+  `P60XsdTests`, `P60DescriptorTests` and the two Story 3.2 test files consume it via
+  `using static Kape22Importer.Tests.TestSupport;` (net -111 lines). Note 2.6 also folded in: the
+  `Kape22MapperTests` `Map(xml, name)` call sites now pass `WinterClock()`.
+
+### Still open from A-1
+
+- **(b) split `Kape22Mapper`** into `CoherenceChecker` (FR-10) + `DerivedFields` (FR-9), and decide
+  `static` vs `sealed class` + instance `Map` (F-2). Deferred to its own story: touches every call site
+  (`Kape22FichierProcessor`, `TestSupport`, all mapper tests).
+
 ## Deferred from: Story 3.2 (2026-09-08)
 
 - **`ImportResult.InsertedId` / `XmlArchivePath` never reach `InboxScanner`** — `Kape22FichierProcessor`
