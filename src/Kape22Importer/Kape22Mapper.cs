@@ -31,11 +31,6 @@ public static class Kape22Mapper
     // separators (AC-FR10-4).
     private const int FileNameSegmentCount = 4;
 
-    // The derived rules interpret and stamp times in Paris local time (D4 for the Header Date,
-    // AC-FR9-3 for DateReception). Resolved once; .NET maps this IANA id to the Windows zone on
-    // Windows too.
-    private static readonly TimeZoneInfo ParisTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Europe/Paris");
-
     // Annexe B's one naming exception: DTO property name -> L_D_KAPE22 property name.
     public static readonly IReadOnlyDictionary<string, string> NamingExceptions =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -109,7 +104,23 @@ public static class Kape22Mapper
                 targetName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase)!;
 
             object? value = source.GetValue(message) ?? DefaultForNonNullable(target.PropertyType);
-            target.SetValue(entity, value);
+            try
+            {
+                target.SetValue(entity, value);
+            }
+            catch (ArgumentException error)
+            {
+                // FR-8's startup check (StartupCompatibilityCheck.Verify) rejects a Descripteur whose
+                // datatype does not fit its L_D_KAPE22 column before any Fichier is processed. If a
+                // mismatch still reaches this reflective assignment - the check was not wired, or a path
+                // it does not cover - surface it as the same deployment-fault type instead of a raw
+                // reflection exception leaving Map.
+                throw new StartupCompatibilityException(
+                    $"Champ '{source.Name}' produced a {value?.GetType().Name ?? "null"} value that "
+                    + $"column {target.Name} ({target.PropertyType.Name}) cannot accept; the FR-8 "
+                    + "compatibility check should have caught this at startup.",
+                    error);
+            }
         }
 
         // Annexe B "Legacy blank-Champ defaults": two Champs the legacy import fills with a fixed
@@ -315,9 +326,9 @@ public static class Kape22Mapper
         return true;
     }
 
-    // The current instant in Paris local time, from the injected clock.
+    // The current instant in Paris local time (D4, AC-FR9-3), from the injected clock.
     private static DateTime ParisNow(TimeProvider timeProvider) =>
-        TimeZoneInfo.ConvertTimeFromUtc(timeProvider.GetUtcNow().UtcDateTime, ParisTimeZone);
+        TimeZoneInfo.ConvertTimeFromUtc(timeProvider.GetUtcNow().UtcDateTime, ParisTime.Instance);
 
     // The value a blank Champ takes on its L_D_KAPE22 column. An integer column (nullable or not)
     // takes 0, never NULL: the legacy import zero-filled every blank int Champ (Annexe B "Legacy

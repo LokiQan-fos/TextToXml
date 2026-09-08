@@ -39,9 +39,6 @@ public sealed class Kape22Persister(AscoLsiDbContext context, IConfiguration con
     // on it, so Story 3.3 must keep it stable when it finalizes the log wording.
     private const string OkMessageSuffix = " — OK";
 
-    // The derived timestamps are interpreted in Paris local time, like Kape22Mapper.DateReception.
-    private static readonly TimeZoneInfo ParisTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Europe/Paris");
-
     // Import:InitiatingServer, resolved and length-checked once at construction (see ResolveUser).
     private readonly string user = ResolveUser(configuration);
 
@@ -130,7 +127,7 @@ public sealed class Kape22Persister(AscoLsiDbContext context, IConfiguration con
     private L_D_LOG_COMMANDE BuildLogRow(string of, string message) => new()
     {
         Commande = configuration[CommandeKey] ?? DefaultCommande,
-        Date = TimeZoneInfo.ConvertTimeFromUtc((timeProvider ?? TimeProvider.System).GetUtcNow().UtcDateTime, ParisTimeZone),
+        Date = TimeZoneInfo.ConvertTimeFromUtc((timeProvider ?? TimeProvider.System).GetUtcNow().UtcDateTime, ParisTime.Instance),
         Message = message,
         // P60 rows are not lingot-scoped; the NOT NULL column carries the neutral 0.
         NumLingot = 0,

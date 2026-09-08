@@ -1,5 +1,35 @@
 # Deferred Work
 
+## Deferred from: Story 3.2 (2026-09-08)
+
+- **`ImportResult.InsertedId` / `XmlArchivePath` never reach `InboxScanner`** — `Kape22FichierProcessor`
+  exposes the full `ImportResult` through `Import`, but the `IFichierProcessor.Process` adapter narrows
+  it to `FichierProcessingResult` (Errors / NormalizedXml / Warnings), which is all `InboxScanner`
+  consumes. Story 3.3 (double journalisation) needs `InsertedId`, the row count and the durée for the
+  `MQTTnetServices.Logs` `Information` line — decide there whether `IFichierProcessor.Process` returns
+  `ImportResult`, or `InboxScanner` calls `Import` directly, or the scanner is folded into the
+  orchestrator's caller.
+- **Archive-date-folder formula duplicated** — `Kape22FichierProcessor.ArchivePath` and
+  `InboxScanner.Archive` both compose `{ArchiveFolder}/{parisYear:D4}/{parisMonth:D2}` from a Paris-
+  local `timeProvider.GetUtcNow()`, and both carry their own
+  `TimeZoneInfo.FindSystemTimeZoneById("Europe/Paris")` static (the tz-data risk already tracked repo-
+  wide). Extract one helper (on `ImportOptions`, or a small `ArchiveLayout`) so the scanner's physical
+  write and the orchestrator's reported `XmlArchivePath` cannot drift. Story 3.4 hardening.
+- **`Kape22FichierProcessor` has no `ILogger`** — dropped from the ctor for now (unread parameter fails
+  `-warnaserror`). Story 3.3 adds it back with the double-journalisation wiring.
+- **Warnings merge is concatenation, not AC-FR6-4** — `Merge` puts Step 1 Segment warnings ahead of the
+  persister's warnings without sorting by `LineNumber`. AC-FR6-4 (one merged Errors+Warnings list sorted
+  by `LineNumber`) is still an open reconciliation in `epics.md` (epic-2 retro action item 10); wire it
+  through here once that lands.
+- **`AC-FR13-1` order is proven by end-state, not call tracing** — the integration test asserts the
+  committed rows + non-null `InsertedId`/`NormalizedXml`/`XmlArchivePath`, which can only all be true if
+  every step ran in order. The literal "capture XML *before* Map" from the AC is structural (the XML is
+  held in memory; physical placement in archive/ vs error/ is `InboxScanner`'s, after the outcome is
+  known). No standalone spy-based ordering test.
+- **No integration test pairs `Kape22FichierProcessor` with `InboxScanner`** — the orchestrator tests
+  drive `Import` directly. The end-to-end tick (in-memory `IFileSource` + real orchestrator + real DB)
+  is Story 3.6, and the DI composition root is Story 3.4.
+
 ## Deferred from: code review of story 3.1 (2026-09-08)
 
 - **No per-Fichier exception isolation in `RunTick` / `ProcessFromProcessing`** — an unreadable or

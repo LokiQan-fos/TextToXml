@@ -28,9 +28,6 @@ public sealed class InboxScanner(
     // The rejection report kept next to a Fichier in error/ (AC-FR12-4).
     private const string ErrorsReportExtension = ".errors.json";
 
-    // The derived archive date folder is read in Paris local time, like Kape22Mapper.DateReception.
-    private static readonly TimeZoneInfo ParisTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Europe/Paris");
-
     // Sidecar files are UTF-8 without a BOM, like the XML preview harness.
     private static readonly Encoding Utf8NoBom = new UTF8Encoding(false);
 
@@ -103,7 +100,7 @@ public sealed class InboxScanner(
     // to it as <name>.xml.
     private void Archive(string fichierName, string? normalizedXml)
     {
-        DateTimeOffset parisNow = TimeZoneInfo.ConvertTime(timeProvider.GetUtcNow(), ParisTimeZone);
+        DateTimeOffset parisNow = TimeZoneInfo.ConvertTime(timeProvider.GetUtcNow(), ParisTime.Instance);
         string dateFolder = $"{options.ArchiveFolder}/{parisNow.Year:D4}/{parisNow.Month:D2}";
 
         fileSource.Move(options.ProcessingFolder, fichierName, dateFolder, fichierName);
