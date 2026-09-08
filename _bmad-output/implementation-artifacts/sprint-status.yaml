@@ -59,7 +59,7 @@ development_status:
 
   epic-3: in-progress
   3-1-scrutation-du-dossier-de-réception-cycle-de-vie-du-fichier: done
-  3-2-orchestration-par-fichier: in-progress
+  3-2-orchestration-par-fichier: review
   3-3-double-journalisation-mqttnetservices-logs-l_d_log_commande: backlog
   3-4-intégration-launcher-arrêt-propre: backlog
   3-5-robustesse-de-la-boucle-worker: backlog
