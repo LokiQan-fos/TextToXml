@@ -110,7 +110,7 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
         ConversionResult conversion = Converter.Convert(bytes, EmbeddedDescriptor.Xml);
         Assert.True(conversion.Success, $"Step 1 failed for {fichierName}: {Describe(conversion.Errors)}");
 
-        MapResult<L_D_KAPE22> mapping = Kape22Mapper.Map(conversion.Xml!, fichierName, StableClock());
+        MapResult<L_D_KAPE22> mapping = new Kape22Mapper(StableClock()).Map(conversion.Xml!, fichierName);
         Assert.True(mapping.Success, $"Step 2 mapping failed for {fichierName}: {Describe(mapping.Errors)}");
         L_D_KAPE22 mapped = mapping.Value!;
 

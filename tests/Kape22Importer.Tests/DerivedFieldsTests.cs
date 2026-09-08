@@ -34,7 +34,7 @@ public class DerivedFieldsTests
     {
         TimeProvider clock = new FixedClock(DateTimeOffset.Parse(utcNow, CultureInfo.InvariantCulture));
 
-        bool converted = Kape22Mapper.TryConvertHeaderDate(raw, clock, out DateTime date);
+        bool converted = new DerivedFields(clock).TryConvertHeaderDate(raw, out DateTime date);
 
         Assert.True(converted);
         Assert.Equal(DateTime.Parse(expectedDate, CultureInfo.InvariantCulture), date);
@@ -56,7 +56,7 @@ public class DerivedFieldsTests
     {
         TimeProvider clock = new FixedClock(DateTimeOffset.Parse("2026-06-01T12:00:00Z", CultureInfo.InvariantCulture));
 
-        Assert.False(Kape22Mapper.TryConvertHeaderDate(raw, clock, out _));
+        Assert.False(new DerivedFields(clock).TryConvertHeaderDate(raw, out _));
     }
 
     // AC-FR9-1: a Header.Date the mapper cannot convert produces exactly one InvalidDate error, on the
@@ -67,7 +67,7 @@ public class DerivedFieldsTests
     {
         string xml = NormalizedXmlWithHeaderDate("000");
 
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(xml, ReferenceFichierName, WinterClock());
+        MapResult<L_D_KAPE22> result = Map(xml, ReferenceFichierName);
 
         Assert.False(result.Success);
         Assert.Null(result.Value);
@@ -84,7 +84,7 @@ public class DerivedFieldsTests
     [Trait("AC", "FR9-1")]
     public void Map_ValidReferenceFichier_RaisesNoInvalidDate_AcFr9_1()
     {
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(ConvertReferenceFichier(), ReferenceFichierName, WinterClock());
+        MapResult<L_D_KAPE22> result = Map(ConvertReferenceFichier(), ReferenceFichierName);
 
         Assert.DoesNotContain(result.Errors, error => error.Code == ErrorCode.InvalidDate);
     }
@@ -100,7 +100,7 @@ public class DerivedFieldsTests
         document.Root!.Element("header")!.Element("Date")!.Value = "000";
         document.Root!.Element("message")!.Element("Indice")!.Remove();
 
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(document.ToString(), ReferenceFichierName, WinterClock());
+        MapResult<L_D_KAPE22> result = Map(document.ToString(), ReferenceFichierName);
 
         Assert.False(result.Success);
         Assert.Null(result.Value);
@@ -118,7 +118,7 @@ public class DerivedFieldsTests
         XDocument document = XDocument.Parse(ConvertReferenceFichier());
         document.Root!.Element("header")!.Element("NumeroFichier")!.Value = "   ";
 
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(document.ToString(), ReferenceFichierName, WinterClock());
+        MapResult<L_D_KAPE22> result = Map(document.ToString(), ReferenceFichierName);
 
         Assert.False(result.Success);
         Assert.Null(result.Value);
@@ -137,7 +137,7 @@ public class DerivedFieldsTests
         string normalizedXml = ConvertReferenceFichier();
         string headerRoulette = (string)XDocument.Parse(normalizedXml).Root!.Element("header")!.Element("NumeroFichier")!;
 
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(normalizedXml, ReferenceFichierName, WinterClock());
+        MapResult<L_D_KAPE22> result = Map(normalizedXml, ReferenceFichierName);
 
         Assert.True(result.Success);
         Assert.Equal(headerRoulette, result.Value!.NumeroFichier);
@@ -153,7 +153,7 @@ public class DerivedFieldsTests
         string headerRoulette = (string)document.Root!.Element("header")!.Element("NumeroFichier")!;
         document.Root!.Element("message")!.Element("NumeroFichier")!.Value = "999";
 
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(document.ToString(), ReferenceFichierName, WinterClock());
+        MapResult<L_D_KAPE22> result = Map(document.ToString(), ReferenceFichierName);
 
         Assert.True(result.Success);
         Assert.Equal(headerRoulette, result.Value!.NumeroFichier);
@@ -165,10 +165,9 @@ public class DerivedFieldsTests
     [Trait("AC", "FR9-3")]
     public void Map_ValidFichier_DateReceptionIsParisWinterTimestamp_AcFr9_3()
     {
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(
-            ConvertReferenceFichier(),
-            ReferenceFichierName,
-            new FixedClock(DateTimeOffset.Parse("2026-02-10T08:00:00Z", CultureInfo.InvariantCulture)));
+        MapResult<L_D_KAPE22> result = new Kape22Mapper(
+            new FixedClock(DateTimeOffset.Parse("2026-02-10T08:00:00Z", CultureInfo.InvariantCulture)))
+            .Map(ConvertReferenceFichier(), ReferenceFichierName);
 
         Assert.True(result.Success);
         Assert.Equal(new DateTime(2026, 2, 10, 9, 0, 0), result.Value!.DateReception);
@@ -180,10 +179,9 @@ public class DerivedFieldsTests
     [Trait("AC", "FR9-3")]
     public void Map_ValidFichier_DateReceptionHonoursParisSummerTime_AcFr9_3()
     {
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(
-            ConvertReferenceFichier(),
-            ReferenceFichierName,
-            new FixedClock(DateTimeOffset.Parse("2026-07-10T08:00:00Z", CultureInfo.InvariantCulture)));
+        MapResult<L_D_KAPE22> result = new Kape22Mapper(
+            new FixedClock(DateTimeOffset.Parse("2026-07-10T08:00:00Z", CultureInfo.InvariantCulture)))
+            .Map(ConvertReferenceFichier(), ReferenceFichierName);
 
         Assert.True(result.Success);
         Assert.Equal(new DateTime(2026, 7, 10, 10, 0, 0), result.Value!.DateReception);
@@ -197,7 +195,7 @@ public class DerivedFieldsTests
     {
         string xml = NormalizedXmlWithoutDetailChamps("Indice");
 
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(xml, ReferenceFichierName, WinterClock());
+        MapResult<L_D_KAPE22> result = Map(xml, ReferenceFichierName);
 
         Assert.False(result.Success);
         Assert.Null(result.Value);
@@ -216,7 +214,7 @@ public class DerivedFieldsTests
             (string)XDocument.Parse(normalizedXml).Root!.Element("message")!.Element("Indice")!,
             CultureInfo.InvariantCulture);
 
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(normalizedXml, ReferenceFichierName, WinterClock());
+        MapResult<L_D_KAPE22> result = Map(normalizedXml, ReferenceFichierName);
 
         Assert.True(result.Success);
         Assert.Equal(expected, result.Value!.Indice);
@@ -227,7 +225,7 @@ public class DerivedFieldsTests
     [Trait("AC", "FR9-5")]
     public void Map_ValidReferenceFichier_LeavesDateEnfournementColumnsNull_AcFr9_5()
     {
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(ConvertReferenceFichier(), ReferenceFichierName, WinterClock());
+        MapResult<L_D_KAPE22> result = Map(ConvertReferenceFichier(), ReferenceFichierName);
 
         Assert.True(result.Success);
         Assert.Null(result.Value!.DateEnfournementFour1);
@@ -248,7 +246,7 @@ public class DerivedFieldsTests
         message.Element("DateEnfournementFour2_Date")!.Value = "0304";
         message.Element("DateEnfournementFour2_Heure")!.Value = "1145";
 
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(document.ToString(), ReferenceFichierName, WinterClock());
+        MapResult<L_D_KAPE22> result = Map(document.ToString(), ReferenceFichierName);
 
         Assert.True(result.Success);
         Assert.Null(result.Value!.DateEnfournementFour1);

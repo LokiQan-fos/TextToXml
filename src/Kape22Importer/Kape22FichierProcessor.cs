@@ -49,7 +49,7 @@ public sealed class Kape22FichierProcessor(
         // writes the "<NumeroFichier> — REJETÉ" L_D_LOG_COMMANDE line when the OF is readable
         // (AC-FR11-4). The normalized XML rides along on the result so InboxScanner can drop <nom>.xml
         // next to the Fichier in error/ for diagnosis (AC-FR13-3).
-        MapResult<L_D_KAPE22> map = Kape22Mapper.Map(normalizedXml, fichierName, timeProvider);
+        MapResult<L_D_KAPE22> map = new Kape22Mapper(timeProvider).Map(normalizedXml, fichierName);
 
         // The Step 1 Segment warnings ahead of the mapper's FR-10 coherence warnings, kept whichever
         // step the Fichier reaches. A rejected MapResult drops its Warnings on the way through

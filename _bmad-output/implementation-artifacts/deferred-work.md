@@ -64,11 +64,17 @@
   `using static Kape22Importer.Tests.TestSupport;` (net -111 lines). Note 2.6 also folded in: the
   `Kape22MapperTests` `Map(xml, name)` call sites now pass `WinterClock()`.
 
-### Still open from A-1
+### A-1 volet (b) — done 2026-09-08
 
-- **(b) split `Kape22Mapper`** into `CoherenceChecker` (FR-10) + `DerivedFields` (FR-9), and decide
-  `static` vs `sealed class` + instance `Map` (F-2). Deferred to its own story: touches every call site
-  (`Kape22FichierProcessor`, `TestSupport`, all mapper tests).
+- **`Kape22Mapper` split** (F-2) — `CoherenceChecker` (public static, FR-10 Warnings) and `DerivedFields`
+  (public sealed class, ctor `TimeProvider`, FR-9 roulette / DateReception / day-of-year) are now their
+  own files. `Kape22Mapper` is a `sealed class` with a constructor-injected clock and an instance
+  `Map(normalizedXml, sourceFileName)` — the PRD reference API. The Annexe B naming tables (`IsIgnored`,
+  `ResolveTargetName`, `NamingExceptions`, `LegacyBlankFillColumns`, `DefaultForNonNullable`) stay
+  `public static` on `Kape22Mapper`, so `RequiredFieldCheck` / `StartupCompatibilityCheck` and the
+  completeness tests are untouched. Pure refactor, 592 tests unchanged. `Kape22FichierProcessor` now
+  does `new Kape22Mapper(timeProvider).Map(...)`; `TestSupport.Map(xml, name)` funnels the mapper tests.
+  `epic-2-retro-item-8` (A-1) is now fully closed.
 
 ## Deferred from: Story 3.2 (2026-09-08)
 

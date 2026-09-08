@@ -1,8 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
-using System.IO;
-using System.Linq;
 using System.Reflection;
 using Kape22Importer.Persistence;
 using TextToXml;
@@ -13,23 +10,13 @@ namespace Kape22Importer;
 // L_D_KAPE22 entity (PRD Annexe B). Default rule: copy by case-insensitive property name (types are
 // already aligned, checked at worker startup by FR-8). NamingExceptions and IgnoredProperties are the
 // only two deviations from that default, built once like P60Deserializer's Lazy<> setup.
-// Story 2.6 (FR-9) adds the P60-specific derived rules on top of that copy: the day-of-year Header
-// Date (D4), the roulette NumeroFichier from the Header, the worker DateReception timestamp, and the
-// blank-Indice rejection; the DateEnfournementFour1/2 slices stay ignored (D14).
-public static class Kape22Mapper
+// The P60-specific work sits in two collaborators (Epic 3 story-0 hygiene, retro action A-1 volet b):
+// CoherenceChecker for the FR-10 non-blocking Warnings, DerivedFields for the FR-9 rules (day-of-year
+// Header Date D4, roulette NumeroFichier, worker DateReception). The clock is constructor-injected so
+// those derived timestamps are deterministic under test (AR-12); production leaves it null.
+public sealed class Kape22Mapper(TimeProvider? timeProvider = null)
 {
-    // A P60 Fichier is Header + Detail + Footer, so the Header Bloc is always the first Ligne (D3).
-    private const int HeaderLineNumber = 1;
-
-    // The Footer is the third and last Ligne of a P60 Fichier (D3).
-    private const int FooterLineNumber = 3;
-
-    // Footer.Records must count exactly Entete + message + Pied (§0bis D18).
-    private const int ExpectedRecordCount = 3;
-
-    // A P60 Fichier name decomposes as File_Emet_Recepteur_NumeroFichier: four segments, three
-    // separators (AC-FR10-4).
-    private const int FileNameSegmentCount = 4;
+    private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
 
     // Annexe B's one naming exception: DTO property name -> L_D_KAPE22 property name.
     public static readonly IReadOnlyDictionary<string, string> NamingExceptions =
@@ -74,13 +61,9 @@ public static class Kape22Mapper
     public static string ResolveTargetName(string dtoPropertyName) =>
         NamingExceptions.TryGetValue(dtoPropertyName, out string? renamed) ? renamed : dtoPropertyName;
 
-    // sourceFileName feeds the FR-10 file-name coherence check (AC-FR10-4, AC-FR10-5). The
-    // timeProvider parameter is injectable for testing (AC-FR9-1, AC-FR9-3); production passes
-    // TimeProvider.System.
-    public static MapResult<L_D_KAPE22> Map(string normalizedXml, string sourceFileName, TimeProvider? timeProvider = null)
+    // sourceFileName feeds the FR-10 file-name coherence check (AC-FR10-4, AC-FR10-5).
+    public MapResult<L_D_KAPE22> Map(string normalizedXml, string sourceFileName)
     {
-        timeProvider ??= TimeProvider.System;
-
         P60DeserializeResult deserialized = P60Deserializer.Deserialize(normalizedXml);
         if (deserialized.File is null)
         {
@@ -88,7 +71,7 @@ public static class Kape22Mapper
         }
 
         Kape22File file = deserialized.File;
-        List<ConversionError> warnings = CheckCoherence(file, sourceFileName);
+        List<ConversionError> warnings = CoherenceChecker.Check(file, sourceFileName);
         L_D_KAPE22 entity = new();
         Kape22FileMessage message = file.Message;
 
@@ -140,43 +123,9 @@ public static class Kape22Mapper
 
         List<ConversionError> errors = [];
 
-        // AC-FR9-2: NumeroFichier is the Header roulette Champ, not the Detail homonym (which is ignored).
-        entity.NumeroFichier = file.Header.NumeroFichier;
-
-        // AC-FR9-2: the roulette feeds the NOT NULL NumeroFichier column and is half the D22
-        // anti-duplicate key, so a blank Header roulette rejects the Fichier here. RequiredFieldCheck
-        // skips it as a derived column, so the check lives with the derivation.
-        if (string.IsNullOrWhiteSpace(file.Header.NumeroFichier))
-        {
-            errors.Add(new ConversionError
-            {
-                Block = Block.Header,
-                Code = ErrorCode.RequiredFieldMissing,
-                Column = nameof(L_D_KAPE22.NumeroFichier),
-                FieldId = "NumeroFichier",
-                LineNumber = HeaderLineNumber,
-                Message = "Le Champ obligatoire 'NumeroFichier' de l'Entête est vide (colonne NumeroFichier NOT NULL).",
-            });
-        }
-
-        // AC-FR9-3: DateReception is the worker processing timestamp, in Paris local time.
-        entity.DateReception = ParisNow(timeProvider);
-
-        // AC-FR9-1 (D4): the Header Date is a day-of-year number in the current Paris year. Its
-        // converted value has no L_D_KAPE22 column in Epic 2, so only its validity is enforced here;
-        // "000", a non-numeric Champ, or a day past the length of that year rejects the Fichier.
-        if (!TryConvertHeaderDate(file.Header.Date, timeProvider, out _))
-        {
-            errors.Add(new ConversionError
-            {
-                Block = Block.Header,
-                Code = ErrorCode.InvalidDate,
-                FieldId = "Date",
-                LineNumber = HeaderLineNumber,
-                Message = $"Le Champ 'Date' de l'Entête ('{file.Header.Date}') n'est pas un numéro de jour valide pour l'année courante.",
-                RawValue = file.Header.Date,
-            });
-        }
+        // FR-9 (D4): DerivedFields stamps NumeroFichier and DateReception on the entity and rejects a
+        // blank Header roulette or an invalid day-of-year Date.
+        errors.AddRange(new DerivedFields(this.clock).Apply(file, entity));
 
         // AC-FR9-4 and the per-file half of FR-8: a NOT NULL column left blank by Step 1 (notably a
         // missing Detail Indice) is a rejected Fichier.
@@ -191,144 +140,6 @@ public static class Kape22Mapper
             ? new MapResult<L_D_KAPE22> { Errors = errors, NumeroFichier = numeroFichier, OF = of, Warnings = warnings }
             : new MapResult<L_D_KAPE22> { NumeroFichier = numeroFichier, OF = of, Value = entity, Warnings = warnings };
     }
-
-    // AC-FR10-1 / AC-FR10-3 / AC-FR10-4 / AC-FR10-5 (§0bis D16): the three non-blocking coherence
-    // checks. Each divergence is one Warning; none of them stops the Fichier from being mapped or
-    // inserted. Order: Footer.Records, then the inter-Bloc File Champ, then the file-name segments.
-    public static List<ConversionError> CheckCoherence(Kape22File file, string sourceFileName)
-    {
-        ArgumentNullException.ThrowIfNull(file);
-
-        List<ConversionError> warnings = [];
-
-        // AC-FR10-1 (D18): Footer.Records must be exactly 3. A blank or non-numeric Champ is still
-        // "not 3", so it is a Warning here, never a blocking typing error (the Champ is datatype
-        // "string" in the Descripteur and is not validated in Step 1).
-        if (!int.TryParse(file.Footer.Records.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out int records)
-            || records != ExpectedRecordCount)
-        {
-            warnings.Add(new ConversionError
-            {
-                Block = Block.Footer,
-                Code = ErrorCode.InterBlockMismatch,
-                FieldId = "Records",
-                LineNumber = FooterLineNumber,
-                Message = $"Le Champ 'Records' du Pied ('{file.Footer.Records}') ne vaut pas {ExpectedRecordCount} (Entête + message + Pied).",
-                RawValue = file.Footer.Records,
-            });
-        }
-
-        // AC-FR10-3: the File Champ (Position 0, Size 3) is present in the three Blocs and must agree.
-        // Trimmed before the comparison, like the file-name segment check, so space padding on a single
-        // Bloc is not read as a divergence.
-        string[] fileChamps = [file.Header.File.Trim(), file.Message.File.Trim(), file.Footer.File.Trim()];
-        if (fileChamps.Distinct(StringComparer.Ordinal).Count() > 1)
-        {
-            warnings.Add(new ConversionError
-            {
-                Block = Block.File,
-                Code = ErrorCode.InterBlockMismatch,
-                FieldId = "File",
-                Message = $"Le Champ 'File' diffère entre les Blocs : Entête '{file.Header.File}', Détail '{file.Message.File}', Pied '{file.Footer.File}'.",
-            });
-        }
-
-        warnings.AddRange(CheckFileName(file.Header, sourceFileName));
-
-        return warnings;
-    }
-
-    // AC-FR10-4 / AC-FR10-5: the Fichier name decomposes as File_Emet_Recepteur_NumeroFichier. A name
-    // outside that pattern (not exactly three separators, once any extension is dropped) is a single
-    // FileNameMismatch citing the name; otherwise each segment differing from its Entête homonym is
-    // its own FileNameMismatch. Leading zeros are ignored for NumeroFichier only.
-    private static IEnumerable<ConversionError> CheckFileName(Kape22FileHeader header, string sourceFileName)
-    {
-        string bareName = Path.GetFileNameWithoutExtension(sourceFileName);
-        string[] segments = bareName.Split('_');
-        if (segments.Length != FileNameSegmentCount)
-        {
-            return
-            [
-                new ConversionError
-                {
-                    Block = Block.File,
-                    Code = ErrorCode.FileNameMismatch,
-                    Message = $"Le nom de fichier '{bareName}' ne suit pas le motif attendu 'File_Emet_Recepteur_NumeroFichier'.",
-                    RawValue = bareName,
-                },
-            ];
-        }
-
-        // Descripteur Champ Id -> the name segment expected to match it, in name order.
-        (string FieldId, string Segment, string Expected)[] pairs =
-        [
-            ("File", segments[0], header.File),
-            ("Emet", segments[1], header.Emet),
-            ("Recepteur", segments[2], header.Recepteur),
-            ("NumeroFichier", segments[3], header.NumeroFichier),
-        ];
-
-        List<ConversionError> mismatches = [];
-        foreach ((string fieldId, string segment, string expected) in pairs)
-        {
-            bool matches = fieldId == "NumeroFichier"
-                ? SameNumber(segment, expected)
-                : string.Equals(segment.Trim(), expected.Trim(), StringComparison.Ordinal);
-            if (matches)
-            {
-                continue;
-            }
-
-            mismatches.Add(new ConversionError
-            {
-                Block = Block.File,
-                Code = ErrorCode.FileNameMismatch,
-                FieldId = fieldId,
-                Message = $"Le segment '{segment}' du nom de fichier ne correspond pas au Champ '{fieldId}' de l'Entête ('{expected}').",
-                RawValue = segment,
-            });
-        }
-
-        return mismatches;
-    }
-
-    // True when both operands are integers of equal value (leading zeros ignored), or equal as trimmed
-    // text when either is not numeric.
-    private static bool SameNumber(string left, string right) =>
-        int.TryParse(left.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out int leftNumber)
-        && int.TryParse(right.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out int rightNumber)
-            ? leftNumber == rightNumber
-            : string.Equals(left.Trim(), right.Trim(), StringComparison.Ordinal);
-
-    // AC-FR9-1 (D4): interprets a Header Date Champ as a day-of-year number in the current year, Paris
-    // time. Surrounding whitespace is tolerated (fixed-width source fields may be space-padded).
-    // Returns false for a non-numeric Champ, "000", or a number past the length of the current Paris
-    // year (365, or 366 in a leap year), so a converted date never leaves that year.
-    public static bool TryConvertHeaderDate(string raw, TimeProvider timeProvider, out DateTime date)
-    {
-        ArgumentNullException.ThrowIfNull(timeProvider);
-
-        date = default;
-        if (!int.TryParse(raw.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out int dayOfYear))
-        {
-            return false;
-        }
-
-        int year = ParisNow(timeProvider).Year;
-        int daysInYear = DateTime.IsLeapYear(year) ? 366 : 365;
-        if (dayOfYear < 1 || dayOfYear > daysInYear)
-        {
-            return false;
-        }
-
-        date = new DateTime(year, 1, 1).AddDays(dayOfYear - 1);
-        return true;
-    }
-
-    // The current instant in Paris local time (D4, AC-FR9-3), from the injected clock.
-    private static DateTime ParisNow(TimeProvider timeProvider) =>
-        TimeZoneInfo.ConvertTimeFromUtc(timeProvider.GetUtcNow().UtcDateTime, ParisTime.Zone);
 
     // The value a blank Champ takes on its L_D_KAPE22 column. An integer column (nullable or not)
     // takes 0, never NULL: the legacy import zero-filled every blank int Champ (Annexe B "Legacy

@@ -26,7 +26,7 @@ public class CoherenceWarningsTests
         string xml = NormalizedReferenceXml(document =>
             document.Root!.Element("footer")!.Element("Records")!.Value = "00009");
 
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(xml, ReferenceFichierName, WinterClock());
+        MapResult<L_D_KAPE22> result = Map(xml, ReferenceFichierName);
 
         Assert.True(result.Success);
         Assert.NotNull(result.Value);
@@ -45,7 +45,7 @@ public class CoherenceWarningsTests
         string xml = NormalizedReferenceXml(document =>
             document.Root!.Element("footer")!.Element("Records")!.Value = "abc");
 
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(xml, ReferenceFichierName, WinterClock());
+        MapResult<L_D_KAPE22> result = Map(xml, ReferenceFichierName);
 
         Assert.True(result.Success);
         Assert.Contains(
@@ -58,7 +58,7 @@ public class CoherenceWarningsTests
     [Trait("AC", "FR10-2")]
     public void Map_FooterRecordsThree_RaisesNoRecordsWarning_AcFr10_2()
     {
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(ConvertReferenceFichier(), ReferenceFichierName, WinterClock());
+        MapResult<L_D_KAPE22> result = Map(ConvertReferenceFichier(), ReferenceFichierName);
 
         Assert.True(result.Success);
         Assert.DoesNotContain(result.Warnings, candidate => candidate.FieldId == "Records");
@@ -72,7 +72,7 @@ public class CoherenceWarningsTests
         string xml = NormalizedReferenceXml(document =>
             document.Root!.Element("footer")!.Element("Records")!.Value = "3");
 
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(xml, ReferenceFichierName, WinterClock());
+        MapResult<L_D_KAPE22> result = Map(xml, ReferenceFichierName);
 
         Assert.DoesNotContain(result.Warnings, candidate => candidate.FieldId == "Records");
     }
@@ -86,7 +86,7 @@ public class CoherenceWarningsTests
         string xml = NormalizedReferenceXml(document =>
             document.Root!.Element("message")!.Element("File")!.Value = "X60");
 
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(xml, ReferenceFichierName, WinterClock());
+        MapResult<L_D_KAPE22> result = Map(xml, ReferenceFichierName);
 
         Assert.True(result.Success);
         Assert.NotNull(result.Value);
@@ -101,7 +101,7 @@ public class CoherenceWarningsTests
     [Trait("AC", "FR10-3")]
     public void Map_FileChampConsistentAcrossBlocs_RaisesNoFileWarning_AcFr10_3()
     {
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(ConvertReferenceFichier(), ReferenceFichierName, WinterClock());
+        MapResult<L_D_KAPE22> result = Map(ConvertReferenceFichier(), ReferenceFichierName);
 
         Assert.DoesNotContain(result.Warnings, candidate => candidate.FieldId == "File");
     }
@@ -118,7 +118,7 @@ public class CoherenceWarningsTests
     public void Map_NameSegmentDiffersFromHeaderHomonym_YieldsFileNameMismatchWarning_AcFr10_4(
         string sourceFileName, string expectedFieldId, string expectedRawValue)
     {
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(ConvertReferenceFichier(), sourceFileName, WinterClock());
+        MapResult<L_D_KAPE22> result = Map(ConvertReferenceFichier(), sourceFileName);
 
         Assert.True(result.Success);
         ConversionError warning = Assert.Single(
@@ -134,7 +134,7 @@ public class CoherenceWarningsTests
     [Trait("AC", "FR10-4")]
     public void Map_NumeroFichierNameSegmentDiffersOnlyByLeadingZeros_RaisesNoWarning_AcFr10_4()
     {
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(ConvertReferenceFichier(), "P60_847_682_1", WinterClock());
+        MapResult<L_D_KAPE22> result = Map(ConvertReferenceFichier(), "P60_847_682_1");
 
         Assert.DoesNotContain(result.Warnings, candidate => candidate.Code == ErrorCode.FileNameMismatch);
     }
@@ -149,7 +149,7 @@ public class CoherenceWarningsTests
     public void Map_NameOutsideExpectedPattern_YieldsSingleFileNameMismatchCitingName_AcFr10_5(
         string sourceFileName)
     {
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(ConvertReferenceFichier(), sourceFileName, WinterClock());
+        MapResult<L_D_KAPE22> result = Map(ConvertReferenceFichier(), sourceFileName);
 
         Assert.True(result.Success);
         ConversionError warning = Assert.Single(result.Warnings);
@@ -164,7 +164,7 @@ public class CoherenceWarningsTests
     [Trait("AC", "FR10-5")]
     public void Map_WellFormedNameWithTxtExtension_RaisesNoWarning_AcFr10_5()
     {
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(ConvertReferenceFichier(), "P60_847_682_001.txt", WinterClock());
+        MapResult<L_D_KAPE22> result = Map(ConvertReferenceFichier(), "P60_847_682_001.txt");
 
         Assert.Empty(result.Warnings);
     }
@@ -175,7 +175,7 @@ public class CoherenceWarningsTests
     [Trait("AC", "FR10-6")]
     public void Map_NameAndHeaderConcordant_RaisesNoWarning_AcFr10_6()
     {
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(ConvertReferenceFichier(), ReferenceFichierName, WinterClock());
+        MapResult<L_D_KAPE22> result = Map(ConvertReferenceFichier(), ReferenceFichierName);
 
         Assert.True(result.Success);
         Assert.Empty(result.Warnings);
@@ -194,7 +194,7 @@ public class CoherenceWarningsTests
             document.Root!.Element("message")!.Element("File")!.Value = "X60";
         });
 
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(xml, "P60_999_682_001", WinterClock());
+        MapResult<L_D_KAPE22> result = Map(xml, "P60_999_682_001");
 
         Assert.True(result.Success);
         Assert.Empty(result.Errors);
@@ -211,7 +211,7 @@ public class CoherenceWarningsTests
         string xml = NormalizedReferenceXml(document =>
             document.Root!.Element("footer")!.Element("Records")!.Value = "42");
 
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(xml, ReferenceFichierName, WinterClock());
+        MapResult<L_D_KAPE22> result = Map(xml, ReferenceFichierName);
 
         Assert.True(result.Success);
         Assert.Empty(result.Errors);

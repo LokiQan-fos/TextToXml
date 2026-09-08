@@ -25,7 +25,7 @@ public class Kape22MapperTests
     public void Map_ValidFichier_CopiesEveryHomonymousDetailProperty_AcFr7_2()
     {
         string normalizedXml = ConvertReferenceFichier();
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(normalizedXml, ReferenceFichierName, WinterClock());
+        MapResult<L_D_KAPE22> result = Map(normalizedXml, ReferenceFichierName);
 
         Assert.True(result.Success);
         Assert.Empty(result.Errors);
@@ -78,7 +78,7 @@ public class Kape22MapperTests
         XDocument document = XDocument.Parse(ConvertReferenceFichier());
         document.Root!.Element("message")!.Element("OForiginInterne")!.Value = "X";
 
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(document.ToString(), ReferenceFichierName, WinterClock());
+        MapResult<L_D_KAPE22> result = Map(document.ToString(), ReferenceFichierName);
 
         Assert.True(result.Success);
         Assert.Equal("X", result.Value!.OForiginInterne);
@@ -91,7 +91,7 @@ public class Kape22MapperTests
     [Trait("AC", "FR7-2")]
     public void Map_BlankTypedIntChamp_MapsToZeroNotNull_AcFr7_2()
     {
-        L_D_KAPE22 entity = Kape22Mapper.Map(ConvertReferenceFichier(), ReferenceFichierName, WinterClock()).Value!;
+        L_D_KAPE22 entity = Map(ConvertReferenceFichier(), ReferenceFichierName).Value!;
 
         Assert.Equal(0, entity.MatriculeClient);
         Assert.Equal(0, entity.ChutagePied);
@@ -103,7 +103,7 @@ public class Kape22MapperTests
     [Trait("AC", "FR7-2")]
     public void Map_PopulatedTypedIntChamp_IsCopiedUnchanged_AcFr7_2()
     {
-        L_D_KAPE22 entity = Kape22Mapper.Map(ConvertReferenceFichier(), ReferenceFichierName, WinterClock()).Value!;
+        L_D_KAPE22 entity = Map(ConvertReferenceFichier(), ReferenceFichierName).Value!;
 
         Assert.Equal(6250, entity.DiametreProduit);
     }
@@ -116,7 +116,7 @@ public class Kape22MapperTests
         XDocument document = XDocument.Parse(ConvertReferenceFichier());
         document.Root!.Element("message")!.Element("Epaisseur")!.Value = "0";
 
-        L_D_KAPE22 entity = Kape22Mapper.Map(document.ToString(), ReferenceFichierName, WinterClock()).Value!;
+        L_D_KAPE22 entity = Map(document.ToString(), ReferenceFichierName).Value!;
 
         Assert.Equal(0, entity.Epaisseur);
     }
@@ -127,7 +127,7 @@ public class Kape22MapperTests
     [Trait("AC", "FR7-2")]
     public void Map_BlankOForiginInterneChamp_MapsToNull_AcFr7_2()
     {
-        L_D_KAPE22 entity = Kape22Mapper.Map(ConvertReferenceFichier(), ReferenceFichierName, WinterClock()).Value!;
+        L_D_KAPE22 entity = Map(ConvertReferenceFichier(), ReferenceFichierName).Value!;
 
         Assert.Null(entity.OForiginInterne);
     }
@@ -141,7 +141,7 @@ public class Kape22MapperTests
         XDocument document = XDocument.Parse(ConvertReferenceFichier());
         document.Root!.Element("message")!.Element("OForiginInterne")!.Value = "X";
 
-        L_D_KAPE22 entity = Kape22Mapper.Map(document.ToString(), ReferenceFichierName, WinterClock()).Value!;
+        L_D_KAPE22 entity = Map(document.ToString(), ReferenceFichierName).Value!;
 
         Assert.Equal("X", entity.OForiginInterne);
     }
@@ -152,7 +152,7 @@ public class Kape22MapperTests
     [Trait("AC", "FR7-2")]
     public void Map_BlankAcompteSoldeChamp_MapsToS_AcFr7_2()
     {
-        L_D_KAPE22 entity = Kape22Mapper.Map(ConvertReferenceFichier(), ReferenceFichierName, WinterClock()).Value!;
+        L_D_KAPE22 entity = Map(ConvertReferenceFichier(), ReferenceFichierName).Value!;
 
         Assert.Equal("S", entity.AcompteSolde);
     }
@@ -166,7 +166,7 @@ public class Kape22MapperTests
         XDocument document = XDocument.Parse(ConvertReferenceFichier());
         document.Root!.Element("message")!.Element("AcompteSolde")!.Value = "A";
 
-        L_D_KAPE22 entity = Kape22Mapper.Map(document.ToString(), ReferenceFichierName, WinterClock()).Value!;
+        L_D_KAPE22 entity = Map(document.ToString(), ReferenceFichierName).Value!;
 
         Assert.Equal("A", entity.AcompteSolde);
     }
@@ -180,7 +180,7 @@ public class Kape22MapperTests
         XDocument document = XDocument.Parse(ConvertReferenceFichier());
         document.Root!.Element("message")!.Element("MarqueCommerciale")!.Value = string.Empty;
 
-        L_D_KAPE22 entity = Kape22Mapper.Map(document.ToString(), ReferenceFichierName, WinterClock()).Value!;
+        L_D_KAPE22 entity = Map(document.ToString(), ReferenceFichierName).Value!;
 
         Assert.Equal(string.Empty, entity.MarqueCommerciale);
     }
@@ -223,7 +223,7 @@ public class Kape22MapperTests
     [Trait("AC", "FR7-5")]
     public void Map_ValidFichier_RaisesNoErrorDespiteIgnoredProperties_AcFr7_5()
     {
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(ConvertReferenceFichier(), ReferenceFichierName, WinterClock());
+        MapResult<L_D_KAPE22> result = Map(ConvertReferenceFichier(), ReferenceFichierName);
 
         Assert.True(result.Success);
         Assert.Empty(result.Errors);
@@ -265,7 +265,7 @@ public class Kape22MapperTests
     {
         string withoutIndice = Regex.Replace(ConvertReferenceFichier(), "<Indice>[^<]*</Indice>", string.Empty);
 
-        Exception? exception = Record.Exception(() => Kape22Mapper.Map(withoutIndice, ReferenceFichierName, WinterClock()));
+        Exception? exception = Record.Exception(() => Map(withoutIndice, ReferenceFichierName));
 
         Assert.Null(exception);
     }
@@ -276,7 +276,7 @@ public class Kape22MapperTests
     [Fact]
     public void Map_NonConformantNormalizedXml_ReturnsDeserializerErrorsAndNoValue()
     {
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(NonConformantNormalizedXml(), ReferenceFichierName, WinterClock());
+        MapResult<L_D_KAPE22> result = Map(NonConformantNormalizedXml(), ReferenceFichierName);
 
         Assert.False(result.Success);
         Assert.Null(result.Value);

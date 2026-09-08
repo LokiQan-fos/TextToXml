@@ -36,16 +36,20 @@ internal static class TestSupport
     public static TimeProvider WinterClock() =>
         new FixedClock(DateTimeOffset.Parse("2026-02-10T08:00:00Z", CultureInfo.InvariantCulture));
 
+    // Kape22Mapper.Map on the fixed WinterClock, the clock most mapper tests want.
+    public static MapResult<L_D_KAPE22> Map(string normalizedXml, string sourceFileName) =>
+        new Kape22Mapper(WinterClock()).Map(normalizedXml, sourceFileName);
+
     // A mapped, insertable entity from the untouched reference Fichier.
     public static MapResult<L_D_KAPE22> MapReferenceFichier() =>
-        Kape22Mapper.Map(ConvertReferenceFichier(), ReferenceFichierName, WinterClock());
+        Map(ConvertReferenceFichier(), ReferenceFichierName);
 
     // Converts the reference Fichier, applies a mutation to the normalized XML, then maps it.
     public static MapResult<L_D_KAPE22> MapMutatedFichier(Action<XDocument> mutate)
     {
         XDocument document = XDocument.Parse(ConvertReferenceFichier());
         mutate(document);
-        return Kape22Mapper.Map(document.ToString(), ReferenceFichierName, WinterClock());
+        return Map(document.ToString(), ReferenceFichierName);
     }
 
     // Sets the text of a Champ element in the named Bloc. Blanking a NOT NULL string Champ (Client, ...)

@@ -127,11 +127,10 @@ action_items:
       (lecteur ressource embarquee, horloge/FixedTimeProvider, ConvertReferenceFichier);
       scinder Kape22Mapper en CoherenceChecker (FR-10) + DerivedFields (FR-9) et trancher
       static vs sealed class + Map d instance; un Lazy<TimeZoneInfo> partage Kape22Mapper/Kape22Persister;
-      conversion gardee au site SetValue de Map. DONE 2026-09-08 (commits 259b3d2, 1c7e522):
-      (a) TestSupport partage, (c) ParisTime.Instance, (d) garde SetValue. Reste (b) scinder
-      Kape22Mapper -> story dediee."
+      conversion gardee au site SetValue de Map. DONE 2026-09-08: (a)(c)(d) commits 259b3d2/1c7e522,
+      (b) scission Kape22Mapper -> CoherenceChecker + DerivedFields + sealed class Map d instance."
     owner: "Dev"
-    status: in-progress
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-09-07.md"
   - id: "epic-2-retro-item-9-gate-ci-de-la-categorie-integration-job"
     epic: 2

@@ -56,7 +56,7 @@ public class P60BatchPreviewTests
 
         Assert.True(conversion.Success, $"Step 1 failed for {fichierName}:\n{Describe(conversion.Errors)}");
 
-        MapResult<L_D_KAPE22> mapping = Kape22Mapper.Map(conversion.Xml!, fichierName, TimeProvider.System);
+        MapResult<L_D_KAPE22> mapping = new Kape22Mapper().Map(conversion.Xml!, fichierName);
 
         Assert.True(mapping.Success, $"Step 2 mapping failed for {fichierName}:\n{Describe(mapping.Errors)}");
     }

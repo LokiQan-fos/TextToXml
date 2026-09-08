@@ -24,7 +24,7 @@ public class MapResultFileMetadataTests
         string expectedRoulette = (string)document.Root!.Element("header")!.Element("NumeroFichier")!;
         string expectedOf = (string)document.Root!.Element("message")!.Element("OF")!;
 
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map(xml, ReferenceFichierName, WinterClock());
+        MapResult<L_D_KAPE22> result = Map(xml, ReferenceFichierName);
 
         Assert.True(result.Success);
         Assert.Equal(expectedRoulette, result.NumeroFichier);
@@ -64,7 +64,7 @@ public class MapResultFileMetadataTests
     [Fact]
     public void Map_DeserializationFails_LeavesNumeroFichierAndOfNull()
     {
-        MapResult<L_D_KAPE22> result = Kape22Mapper.Map("<file>not valid against P60.xsd</file>", ReferenceFichierName, WinterClock());
+        MapResult<L_D_KAPE22> result = Map("<file>not valid against P60.xsd</file>", ReferenceFichierName);
 
         Assert.False(result.Success);
         Assert.Contains(result.Errors, error => error.Code == ErrorCode.PersistenceError);

@@ -129,13 +129,13 @@ public class FormatIsolationTests
 
         Assert.True(offenders.Count == 0, string.Join(Environment.NewLine, offenders));
 
-        // The derived rules must exist in the importer instead: Kape22Mapper.Map assigns DateReception
-        // and resolves a time zone. The behavioural proof is DerivedFieldsTests; this pair only guards
-        // that the split cannot be defeated by moving the logic wholesale into TextToXml.
-        string importerMapper = File.ReadAllText(
-            Path.Combine(RepoLayout.RepoRoot, "src", "Kape22Importer", "Kape22Mapper.cs"));
-        Assert.Contains("entity.DateReception =", importerMapper);
-        Assert.Contains("TimeZoneInfo", importerMapper);
+        // The derived rules must exist in the importer instead: DerivedFields assigns DateReception and
+        // resolves a time zone. The behavioural proof is DerivedFieldsTests; this pair only guards that
+        // the split cannot be defeated by moving the logic wholesale into TextToXml.
+        string importerSource = string.Concat(
+            SourceFiles(Path.Combine(RepoLayout.RepoRoot, "src", "Kape22Importer")).Select(File.ReadAllText));
+        Assert.Contains("entity.DateReception =", importerSource);
+        Assert.Contains("TimeZoneInfo", importerSource);
     }
 
     private static IEnumerable<string> SourceFiles(string projectDirectory) =>
