@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Xml.Linq;
 using Kape22Importer.Persistence;
@@ -55,7 +54,7 @@ public sealed class Kape22FichierProcessor(
                 Errors = SortedByLine(conversion.Errors),
                 Warnings = SortedByLine(conversion.Warnings),
             };
-            Journal(fichierName, failed, numeroFichier: null, of: null, lineCount: 0, timeProvider.GetElapsedTime(startedAt));
+            Journal(fichierName, failed, numeroFichier: null, of: null, normalizedXml: null, timeProvider.GetElapsedTime(startedAt));
             return failed;
         }
 
@@ -87,7 +86,7 @@ public sealed class Kape22FichierProcessor(
             XmlArchivePath = persisted.Success ? ArchivePath(fichierName) : null,
         };
 
-        Journal(fichierName, result, map.NumeroFichier, map.OF, DetailLineCount(normalizedXml), timeProvider.GetElapsedTime(startedAt));
+        Journal(fichierName, result, map.NumeroFichier, map.OF, normalizedXml, timeProvider.GetElapsedTime(startedAt));
         return result;
     }
 
@@ -106,21 +105,23 @@ public sealed class Kape22FichierProcessor(
     // FR-14: the MQTTnetServices.Logs half of the double logging, one line per Fichier, prefixed
     // "[Kape22Importer][<Event>] : ..." like the other portal workers. Best-effort (AC-FR14-7): a Logs
     // sink that is down must never stop the L_D_KAPE22 insert, which has already committed by the time
-    // this runs, so every failure to log is swallowed.
+    // this runs, so every failure to log - the DetailLineCount parse included - is swallowed.
     private void Journal(
         string fichierName,
         ImportResult result,
         string? numeroFichier,
         string? of,
-        int lineCount,
+        string? normalizedXml,
         TimeSpan elapsed)
     {
         try
         {
             if (!result.Success)
             {
-                // AC-FR14-2 / AC-FR14-3: rejection - list every Error. The L_D_LOG_COMMANDE "REJETÉ"
-                // line (readable OF only) is Kape22Persister's; this is the always-written Logs line.
+                // AC-FR14-2 / AC-FR14-3: rejection - list every Error. Coherence Warnings, if any, are
+                // not listed here; the "second Warning line" of AC-FR14-8 is a fresh-success signal
+                // only. The L_D_LOG_COMMANDE "REJETÉ" line (readable OF only) is Kape22Persister's; this
+                // is the always-written Logs line.
                 logger.LogError(
                     "[Kape22Importer][ImportRejected] : {Fichier} — {ErrorCount} erreur(s) : {Errors}",
                     fichierName,
@@ -132,7 +133,8 @@ public sealed class Kape22FichierProcessor(
             if (result.AlreadyImported)
             {
                 // AC-FR11-6 (D22): the Fichier is fine, it was already imported by an earlier run that
-                // crashed before the file move.
+                // crashed before the file move. This run inserted nothing, so no coherence Warning line
+                // follows even when the ImportResult still carries Warnings.
                 logger.LogWarning(
                     "[Kape22Importer][AlreadyImported] : {Fichier} NumeroFichier={NumeroFichier} OF={OF} déjà importé, ignoré.",
                     fichierName,
@@ -149,7 +151,7 @@ public sealed class Kape22FichierProcessor(
                 numeroFichier,
                 of?.Trim(),
                 result.InsertedId,
-                lineCount,
+                DetailLineCount(normalizedXml),
                 (long)elapsed.TotalMilliseconds);
 
             // AC-FR14-8: a Fichier imported with coherence Warnings gets a second Warning line listing
@@ -166,7 +168,9 @@ public sealed class Kape22FichierProcessor(
         catch (Exception exception)
         {
             // AC-FR14-7: the import itself has already succeeded; a logging failure is not its problem.
-            Debug.WriteLine($"MQTTnetServices.Logs write failed for {fichierName}: {exception.Message}");
+            // Written to the process error stream rather than Debug.WriteLine, which is compiled out of a
+            // Release build, so a sustained Logs outage still leaves a trace (NFR-6).
+            Console.Error.WriteLine($"MQTTnetServices.Logs write failed for {fichierName}: {exception.Message}");
         }
     }
 
@@ -177,11 +181,11 @@ public sealed class Kape22FichierProcessor(
         [.. entries.OrderBy(entry => entry.LineNumber)];
 
     // The number of Detail Lignes in the normalized XML (the <message> sections), reported as "nb
-    // Lignes" on the success Logs line (AC-FR14-1). Converter.Convert has already produced this XML on
-    // the path that reaches here, so it parses; the null-conditional only covers a missing Root and
-    // never turns a committed import into a crash on the Logs line.
-    private static int DetailLineCount(string normalizedXml) =>
-        XDocument.Parse(normalizedXml).Root?.Elements("message").Count() ?? 0;
+    // Lignes" on the success Logs line (AC-FR14-1). Called from inside Journal's try, so an unexpected
+    // parse failure is swallowed with every other logging failure and never crashes a committed import
+    // (AC-FR14-7). normalizedXml is non-null on the success path; the guard covers the signature only.
+    private static int DetailLineCount(string? normalizedXml) =>
+        normalizedXml is null ? 0 : XDocument.Parse(normalizedXml).Root?.Elements("message").Count() ?? 0;
 
     // The path where InboxScanner will write the normalized XML next to the archived Fichier (D11).
     // Kept in step with InboxScanner.Archive; a shared helper is tracked in deferred-work.md.

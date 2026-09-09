@@ -116,11 +116,80 @@ public class DoubleJournalIntegrationTests(SqlServerIntegrationFixture fixture)
         Assert.Empty(verify.LogCommandeRows.AsNoTracking());
     }
 
+    // AC-FR14-8: an imported Fichier carrying coherence Warnings lands the Information success row plus a
+    // second Warning row in Logs naming each warning code, both through the real Serilog level mapping
+    // and MSSqlServer sink. The name "P60_999_682_001" diverges from the Header roulette
+    // (FileNameMismatch) and Footer.Records "00009" is not 3 (InterBlockMismatch), while the bytes still
+    // import.
+    [SkippableFact]
+    [Trait("AC", "FR14-8")]
+    public void Import_SuccessWithCoherenceWarnings_WritesTheWarningRowToMqttLogs_AcFr14_8()
+    {
+        Ready();
+        byte[] footerRecordsNotThree = WithText(ReadValidFixture(ReferenceFichierName), "00003", "00009");
+
+        ImportResult result = RunWithSerilog("P60_999_682_001", footerRecordsNotThree);
+
+        Assert.True(result.Success);
+
+        List<LogRow> rows = ReadMqttLogs();
+        Assert.Equal(2, rows.Count);
+        Assert.Contains(rows, row => row.Level == "Information" && row.Message.Contains("[Kape22Importer][ImportSucceeded]"));
+        LogRow warning = Assert.Single(rows, row => row.Level == "Warning");
+        Assert.Contains("[Kape22Importer][CoherenceWarnings]", warning.Message);
+        Assert.Contains(nameof(ErrorCode.FileNameMismatch), warning.Message);
+        Assert.Contains(nameof(ErrorCode.InterBlockMismatch), warning.Message);
+    }
+
+    // AC-FR11-6 (D22): a Fichier whose key already carries a committed "— OK" L_D_LOG_COMMANDE row comes
+    // back AlreadyImported with no new L_D_KAPE22 row, and lands one Warning row in Logs prefixed
+    // "[Kape22Importer][AlreadyImported]" - through the real sink, not a RecordingLogger.
+    [SkippableFact]
+    [Trait("AC", "FR11-6")]
+    public void Import_FichierAlreadyImported_WritesTheAlreadyImportedWarningRowToMqttLogs_AcFr11_6()
+    {
+        Ready();
+        SeedOkLogRow();
+
+        ImportResult result = RunWithSerilog(ReferenceFichierName, ReadValidFixture(ReferenceFichierName));
+
+        Assert.True(result.Success);
+        Assert.True(result.AlreadyImported);
+        Assert.Null(result.InsertedId);
+
+        LogRow row = Assert.Single(ReadMqttLogs());
+        Assert.Equal("Warning", row.Level);
+        Assert.Contains("[Kape22Importer][AlreadyImported]", row.Message);
+
+        using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
+        Assert.Empty(verify.Kape22Rows.AsNoTracking());
+        Assert.Single(verify.LogCommandeRows.AsNoTracking());
+    }
+
     private void Ready()
     {
         Skip.IfNot(fixture.Available, fixture.SkipReason ?? "SQL Server test instance unavailable.");
         fixture.ResetData();
         fixture.ResetMqttLogs();
+    }
+
+    // Seeds the committed "<NumeroFichier> — OK" L_D_LOG_COMMANDE row the D22 guard keys on, matching
+    // what Kape22Persister.OkLogRowExists compares (the trimmed Detail OF, "<NumeroFichier> — OK").
+    private void SeedOkLogRow()
+    {
+        MapResult<L_D_KAPE22> reference = MapReferenceFichier();
+        using AscoLsiDbContext context = fixture.NewAscoLsiContext();
+        context.LogCommandeRows.Add(new L_D_LOG_COMMANDE
+        {
+            Commande = "P60",
+            Date = new DateTime(2026, 2, 9, 12, 0, 0),
+            Message = $"{reference.NumeroFichier} — OK",
+            NumLingot = 0,
+            OF = reference.OF!,
+            Trace = true,
+            User = InitiatingServer,
+        });
+        context.SaveChanges();
     }
 
     // Processes one Fichier with an ILogger backed by the real Serilog MSSqlServer sink, then flushes

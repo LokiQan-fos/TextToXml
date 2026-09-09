@@ -39,17 +39,17 @@ public class Kape22FichierProcessorIntegrationTests(SqlServerIntegrationFixture 
         RetentionDays = 30,
     };
 
-    private static IConfiguration Configuration() =>
+    private static IConfiguration Configuration(string? commande = null) =>
         new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Import:Commande"] = "P60",
+                ["Import:Commande"] = commande ?? "P60",
                 ["Import:InitiatingServer"] = InitiatingServer,
             })
             .Build();
 
-    private Kape22FichierProcessor Processor() =>
-        new(fixture.NewAscoLsiContext, Configuration(), Options(), WinterClock(), NullLogger<Kape22FichierProcessor>.Instance);
+    private Kape22FichierProcessor Processor(string? commande = null) =>
+        new(fixture.NewAscoLsiContext, Configuration(commande), Options(), WinterClock(), NullLogger<Kape22FichierProcessor>.Instance);
 
     private void Ready()
     {
@@ -146,6 +146,29 @@ public class Kape22FichierProcessorIntegrationTests(SqlServerIntegrationFixture 
         List<string> messages = verify.LogCommandeRows.AsNoTracking().Select(row => row.Message).ToList();
         Assert.Contains(messages, message => message.Contains("REJETÉ"));
         Assert.Contains(messages, message => message.EndsWith("— OK"));
+    }
+
+    // AC-FR6-4 extended to ImportResult: when the mapper rejects a Fichier and the REJETÉ
+    // L_D_LOG_COMMANDE insert then fails too (an over-long Commande from configuration), Import returns
+    // the mapper rejection reason (RequiredFieldMissing, LineNumber 2) and the File-level
+    // PersistenceError (LineNumber 0) as one list re-sorted by LineNumber - the File-level entry first -
+    // not in the order Kape22Persister.PersistenceFailure produced them.
+    [SkippableFact]
+    [Trait("AC", "FR6-4")]
+    public void Import_MapperRejectionThenLogRowInsertFails_ErrorsAreSortedByLineNumber_AcFr6_4()
+    {
+        Ready();
+
+        ImportResult result = Processor(commande: new string('P', 100))
+            .Import(ReferenceFichierName, BlankClientReferenceFichier());
+
+        Assert.False(result.Success);
+        Assert.Contains(result.Errors, error => error.Code == ErrorCode.RequiredFieldMissing);
+        Assert.Contains(result.Errors, error => error.Code == ErrorCode.PersistenceError);
+        Assert.Equal(
+            result.Errors.Select(error => error.LineNumber).OrderBy(line => line),
+            result.Errors.Select(error => error.LineNumber));
+        Assert.Equal(ErrorCode.PersistenceError, result.Errors[0].Code);
     }
 
     // AC-FR13-5: a success ImportResult - Success true, InsertedId non-null, Errors empty (Warnings may

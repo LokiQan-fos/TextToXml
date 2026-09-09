@@ -71,6 +71,7 @@ public class DoubleJournalTests
         Assert.Equal(LogLevel.Information, entry.Level);
         Assert.StartsWith("[Kape22Importer][ImportSucceeded] :", entry.Message);
         Assert.Contains(ReferenceFichierName, entry.Message);
+        Assert.Contains($"NumeroFichier={MapReferenceFichier().NumeroFichier}", entry.Message);
         Assert.Contains($"InsertedId={result.InsertedId}", entry.Message);
         Assert.Contains("OF=", entry.Message);
         Assert.Contains("Lignes=1", entry.Message);
