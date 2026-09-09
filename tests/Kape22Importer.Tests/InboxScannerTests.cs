@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using Microsoft.Extensions.Logging;
 using TextToXml;
 using TextToXml.Tests;
@@ -65,6 +66,30 @@ public class InboxScannerTests
         Assert.Equal(
             ["P60_847_682_003", "P60_847_682_002", "P60_847_682_001"],
             processor.Calls);
+    }
+
+    // AC-FR14-6: a cancelled token stops the tick between Fichiers - the one in flight finishes (never
+    // half-processed), the rest stay untouched in the inbox for the next tick.
+    [Fact]
+    [Trait("AC", "FR14-6")]
+    public void Tick_WhenTheTokenIsCancelledAfterAFichier_LeavesTheRestForTheNextTick_AcFr14_6()
+    {
+        InMemoryFileSource source = new();
+        source.Add("", "P60_847_682_001", Bytes("first"), Now.AddMinutes(-2));
+        source.Add("", "P60_847_682_002", Bytes("second"), Now.AddMinutes(-1));
+
+        using CancellationTokenSource cancellation = new();
+        FakeFichierProcessor processor = new((name, _) =>
+        {
+            cancellation.Cancel();
+            return new FichierProcessingResult { NormalizedXml = $"<file name=\"{name}\" />" };
+        });
+
+        Scanner(source, processor).RunTick(cancellation.Token);
+
+        Assert.Equal(["P60_847_682_001"], processor.Calls);
+        Assert.Contains("P60_847_682_002", source.Names(string.Empty));
+        Assert.Empty(source.Names("processing"));
     }
 
     // AC-FR12-2: the Fichier is moved into processing/ before it is read, and it is that copy the

@@ -1405,9 +1405,9 @@ portail.
 (seam statique) traite les Fichiers d'un `InMemoryFileSource` ; `ReadConfig`
 (guard `ConnectionStrings:AscoLSI` vide + liaison de la section `Import`) ; FR-8
 (`StartupCompatibilityCheck.Verify` sur le descripteur embarqué ⟺ modèle
-`AscoLsiDbContext` — wiring cross-dépôt). L'arrêt fin < 5 s entre Fichiers
-(`InboxScanner.RunTick(CancellationToken)`) est un suivi séparé (`deferred-work.md`).
-Le pipeline lui‑même
+`AscoLsiDbContext` — wiring cross-dépôt). L'arrêt coopératif entre Fichiers
+(`InboxScanner.RunTick(CancellationToken)` + `Client.override Stop()` qui annule
+un `CancellationTokenSource`) est livré (`AC-FR14-6`). Le pipeline lui‑même
 est couvert par 3.1/3.2 (lib).
 
 **Critères transverses :** CC-1, CC-2, CC-3, CC-4, CC-5, CC-7.

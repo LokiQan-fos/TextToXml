@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using Microsoft.Extensions.Logging;
 using TextToXml;
 
@@ -11,8 +12,8 @@ namespace Kape22Importer;
 // FR-12: scans Import:InboxPath through IFileSource, moves each Fichier to processing/ before it is
 // read, files successes under archive/<yyyy>/<MM>/ with their normalized XML alongside and rejects
 // under error/ with a <name>.errors.json, and purges archive/ and error/ past Import:RetentionDays.
-// The per-Fichier pipeline itself is IFichierProcessor (Story 3.2); the worker loop that calls RunTick
-// on a PeriodicTimer is Story 3.4 / 3.5.
+// The per-Fichier pipeline itself is IFichierProcessor (Story 3.2); the worker that calls RunTick on a
+// timer is GpaoImportP60.Client in MicroServices.sln (Story 3.4).
 public sealed class InboxScanner(
     IFileSource fileSource,
     IFichierProcessor processor,
@@ -36,16 +37,28 @@ public sealed class InboxScanner(
 
     // Processes every Fichier stranded in processing/ by a killed worker (AC-FR12-6), then every stable
     // Fichier in the inbox, oldest first (AC-FR12-1), each moved to processing/ before it is read
-    // (AC-FR12-2). An empty inbox is a no-op (AC-FR12-7).
-    public void RunTick()
+    // (AC-FR12-2). An empty inbox is a no-op (AC-FR12-7). A cancelled token stops the tick between two
+    // Fichiers, never mid-Fichier, so a Launcher Stop unwinds within the shutdown budget and never
+    // leaves a Fichier half-inserted (AC-FR14-6); the token is never passed into processor.Process.
+    public void RunTick(CancellationToken cancellationToken = default)
     {
         foreach (FichierEntry stranded in Ordered(fileSource.List(options.ProcessingFolder)))
         {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+
             ProcessFromProcessing(stranded.Name);
         }
 
         foreach (FichierEntry ready in Ordered(StableInboxFichiers()))
         {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+
             // AC-FR12-2: the Fichier is moved out of the inbox first; the processing/ copy is the one
             // that is read.
             fileSource.Move(InboxFolder, ready.Name, options.ProcessingFolder, ready.Name);
