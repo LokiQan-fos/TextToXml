@@ -12,10 +12,11 @@ using Xunit;
 namespace Kape22Importer.Tests;
 
 // Story 2.8 / AC-FR11-8 (D21, CC-7): the persister never hard-codes a connection string - the AscoLSI
-// connection reaches the DbContext through IConfiguration. AddAscoLsiPersistence is already covered by
-// AscoLsiConnectionConfigTests; this keeps a guard attached to the AC-FR11-8 name and re-runs the
-// literal scan now that Kape22Persister.cs exists. The "connection flows from configuration" behaviour
-// is exercised end to end by TransactionalPersistenceTests. Written test-first (CC-1). Unit-only (AR-12).
+// connection reaches the DbContext through configuration. This keeps a guard attached to the AC-FR11-8
+// name: it scans src/Kape22Importer for a literal connection string and checks the persister rejects an
+// over-long Import:InitiatingServer at construction. The "connection flows from configuration"
+// behaviour is exercised end to end by TransactionalPersistenceTests. Written test-first (CC-1).
+// Unit-only (AR-12).
 [Trait("Category", TestCategory.Unit)]
 public class PersisterConfigurationTests
 {

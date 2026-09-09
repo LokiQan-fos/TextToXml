@@ -5,16 +5,15 @@ Chaîne d'ingestion des fichiers SAP → LSI. Deux livrables :
 | Projet | Rôle |
 |---|---|
 | `src/TextToXml` | Bibliothèque .NET **pure et générique** : fichier plat largeur fixe → XML normalisé, piloté par un Descripteur XML. Zéro dépendance NuGet runtime. |
-| `src/Kape22Importer` | Microservice worker : dossier de réception → `TextToXml` → archive XML → mapping EF → `AscoLSI`, avec double journalisation. |
+| `src/Kape22Importer` | **Bibliothèque** de format P60 : descripteur, XSD, DTO, entités EF, mapping, contrôles de cohérence, scrutation du dossier de réception (`InboxScanner`) et orchestration par Fichier (`Kape22FichierProcessor`). Consommée par le worker exécutable. |
 
 Voir `_bmad-output/planning-artifacts/PRD.md` et `epics.md` pour le détail fonctionnel.
 
-> **Correction de cap (2026‑09‑09, `sprint-change-proposal-2026-09-09.md`).** À
-> partir de la Story 3.0, `src/Kape22Importer` devient une **bibliothèque** et le
-> worker exécutable est une classe `Client : Publisher` mince enregistrée dans le
-> `Launcher` de `MicroServices.sln` (prérequis : `MicroServices.sln` aligné sur
-> `net10.0` / EF Core 10.0.x). Ce README sera mis à jour avec la nouvelle
-> structure lors de cette story.
+> **Correction de cap (2026‑09‑09, `sprint-change-proposal-2026-09-09.md`).**
+> `src/Kape22Importer` est une **bibliothèque** (Story 3.0). Le worker exécutable
+> est une classe `Client : Publisher` mince à enregistrer dans le `Launcher` de
+> `MicroServices.sln` (objectif différé — voir `deferred-work.md` ; prérequis :
+> `Launcher` de `MicroServices.sln` aligné sur `net10.0`).
 
 ## Prérequis
 

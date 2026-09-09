@@ -20,9 +20,17 @@ public class SolutionStructureTests
         new(StringComparer.OrdinalIgnoreCase) { "System.Text.Encoding.CodePages" };
 
     // The PackageReferences Kape22Importer may declare beyond the shared framework (AR-1, AC-FR16-1).
-    // EF Core SqlServer joined the list in Story 2.1 as a sanctioned dependency (PRD NFR-8, AR-8).
+    // EF Core SqlServer joined the list in Story 2.1 as a sanctioned dependency (PRD NFR-8, AR-8). The
+    // two Microsoft.Extensions.*.Abstractions packages entered in Story 3.0 when the project became a
+    // library: the code takes IConfiguration and ILogger<T> parameters that the host SDK used to
+    // supply implicitly.
     private static readonly HashSet<string> AllowedImporterPackages =
-        new(StringComparer.OrdinalIgnoreCase) { "Microsoft.EntityFrameworkCore.SqlServer", "Microsoft.Extensions.Hosting" };
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            "Microsoft.EntityFrameworkCore.SqlServer",
+            "Microsoft.Extensions.Configuration.Abstractions",
+            "Microsoft.Extensions.Logging.Abstractions",
+        };
 
     [Fact]
     public void TextToXml_UsesTheClassLibrarySdk()
@@ -31,9 +39,11 @@ public class SolutionStructureTests
     }
 
     [Fact]
-    public void Kape22Importer_UsesTheWorkerSdk()
+    public void Kape22Importer_UsesTheClassLibrarySdk()
     {
-        Assert.Equal("Microsoft.NET.Sdk.Worker", SdkOf("src/Kape22Importer/Kape22Importer.csproj"));
+        // Story 3.0: the importer is a library consumed by the portal Launcher's Client worker, not a
+        // standalone host, so it carries the plain class-library SDK.
+        Assert.Equal("Microsoft.NET.Sdk", SdkOf("src/Kape22Importer/Kape22Importer.csproj"));
     }
 
     [Fact]
@@ -92,6 +102,14 @@ public class SolutionStructureTests
             .ToArray();
 
         Assert.True(forbidden.Length == 0, $"Kape22Importer declared an unexpected package: {string.Join(", ", forbidden)}.");
+    }
+
+    [Fact]
+    public void Kape22Importer_DeclaresNoFrameworkReference()
+    {
+        // Story 3.0: the importer is a plain library. A <FrameworkReference> (Microsoft.AspNetCore.App,
+        // Microsoft.WindowsDesktop.App) would drag a shared framework the format component has no use for.
+        Assert.Empty(ElementValues("src/Kape22Importer/Kape22Importer.csproj", "FrameworkReference"));
     }
 
     [Fact]

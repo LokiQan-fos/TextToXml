@@ -7,7 +7,8 @@ namespace Kape22Importer.Persistence;
 
 // Database-first context over the AscoLSI target tables (AR-8). No migration is ever generated: the
 // schema is owned by the database and mirrored for tests by scripts/schema/01-ascolsi-tables.sql.
-// The connection string is supplied by configuration through AddAscoLsiPersistence (NFR-5, CC-7).
+// The consumer builds the context per Fichier with a UseSqlServer options object whose connection
+// string comes from configuration, never a literal (NFR-5, CC-7).
 public class AscoLsiDbContext(DbContextOptions<AscoLsiDbContext> options) : DbContext(options)
 {
     public DbSet<L_D_KAPE22> Kape22Rows => Set<L_D_KAPE22>();

@@ -574,3 +574,13 @@ review 1.7 note.
 - **No CI workflow** — the `SolutionStructureTests` build gate and the `Category=Unit` / `Category=Integration` split only guard anything if a pipeline runs them on push. Fold into Story 2.1 (which already needs a Docker-capable runner, AR-12) or a dedicated CI story. Ties to risk R-1.
 - **`Kape22Importer.Tests` has no executing test** — no DI smoke test that `Host.CreateApplicationBuilder` composes and `Worker` is registered as an `IHostedService`. Add when the worker is built out in Épic 3.
 - **Worker template dead code** — `Program.cs` / `Worker.cs` are the unmodified `dotnet new worker` scaffold (`Task.Delay(1000)` sample loop, no `OperationCanceledException` handling on shutdown). Replace in Épic 3 (FR-12 / FR-13 orchestration).
+
+## Deferred from: bmad-build Story 3.0 multi-goal split (2026-09-09)
+
+- source_spec: none
+  summary: Créer le projet `Client : Publisher` (Kape22/ImportP60) dans `MicroServices.sln` et l'enregistrer dans le Launcher (`WorkerRegistry.Factories` + `workers.json`), en `ProjectReference` cross-dépôt vers la lib `Kape22Importer` + `MicroService.csproj`.
+  evidence: Objectif B de la Story 3.0, scindé du run bmad-build 2026-09-09. Vit dans un autre dépôt (`MicroServices.sln`, SVN) dont la copie de travail porte du travail voisin non commité (intégration OrdresFabricationSync) ; dépend de l'objectif A (conversion lib) et fusionne naturellement dans la Story 3.4 (boucle `Client.Actions`).
+
+- source_spec: `spec-3-0-repositionnement-structurel-lib.md`
+  summary: Le fail-fast sur chaîne de connexion `AscoLSI` manquante/vide a disparu avec `AddAscoLsiPersistence` (Story 3.0) — le `Client` doit valider `ConnectionStrings:AscoLSI` au démarrage (message clair) avant `CreateAsync`, sinon l'échec ne surviendra qu'à la première requête EF.
+  evidence: `AddAscoLsiPersistence` jetait `InvalidOperationException` sur valeur null/vide (test `AddAscoLsiPersistence_ThrowsWhenTheConnectionStringIsMissing`, supprimé avec le fichier). Responsabilité déplacée vers le `Client` (objectif B / Story 3.4) ; le modèle `OrdresFabricationSync` ne fait pas ce fail-fast non plus (`configuration["SourceContext"] ?? string.Empty`).
