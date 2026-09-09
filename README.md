@@ -5,7 +5,7 @@ Chaîne d'ingestion des fichiers SAP → LSI. Deux livrables :
 | Projet | Rôle |
 |---|---|
 | `src/TextToXml` | Bibliothèque .NET **pure et générique** : fichier plat largeur fixe → XML normalisé, piloté par un Descripteur XML. Zéro dépendance NuGet runtime. |
-| `src/Kape22Importer` | **Bibliothèque** de format P60 : descripteur, XSD, DTO, entités EF, mapping, contrôles de cohérence, scrutation du dossier de réception (`InboxScanner`) et orchestration par Fichier (`Kape22FichierProcessor`). Consommée par le worker exécutable. |
+| `src/Kape22Importer` | **Bibliothèque** de format P60 : descripteur, XSD, DTO, entités EF, mapping (`Kape22Mapper`), contrôles de cohérence, scrutation du dossier de réception (`InboxScanner`), orchestration par Fichier (`Kape22FichierProcessor` : archive XML → EF → `AscoLSI`, avec double journalisation) et persistance transactionnelle (`Kape22Persister`). Destinée à être consommée par le worker exécutable (différé — voir ci-dessous). |
 
 Voir `_bmad-output/planning-artifacts/PRD.md` et `epics.md` pour le détail fonctionnel.
 

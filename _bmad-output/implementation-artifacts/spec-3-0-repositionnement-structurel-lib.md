@@ -195,3 +195,21 @@ statique (`StartupCompatibilityCheck.Verify`) — rien à faire de ce côté.
 
 - Suppressions : `Program.cs`, `Worker.cs`, `StartupServiceCollectionExtensions.cs`, `StartupCompatibilityHostedService.cs`, `Persistence/PersistenceServiceCollectionExtensions.cs`, `Properties/launchSettings.json`, `appsettings.Development.json`, et les tests `StartupWiringTests` / `AscoLsiConnectionConfigTests` (sujets caducs).
 - `PersisterConfigurationTests.cs:14` — commentaire d'en-tête corrigé (citait des symboles supprimés).
+
+## Review Findings
+
+Code review 2026-09-09 (adversarial Tech Lead pass, 4 layers). Build `-warnaserror`
+vert (0 warning), `Category=Unit` verte (480/480), `git grep` des symboles supprimés
+propre, CC-2/CC-3/CC-4 sans violation dure (ordre alphabétique intact, aucun
+commentaire trailing, anglais, pas de liste numérotée). Revue refusée sur les 6
+écarts ci-dessous ; **tous corrigés et revérifiés le 2026-09-09** (build + 480 tests
+verts).
+
+- [x] [Review][Patch] Item `<None Include="appsettings.json" />` hors périmètre, redondant avec le glob `None` par défaut du SDK, commentaire fragmentaire (« The default Import section values. ») — 3 lignes supprimées, comportement build identique (vérifié : pas d'`.exe`, fichier non copié). Le Code Map du spec liste exhaustivement les modifs csproj sans cet item. [src/Kape22Importer/Kape22Importer.csproj]
+- [x] [Review][Patch] Bloc `Logging:LogLevel` mort dans `appsettings.json` (dont `Microsoft.Hosting.Lifetime`) — `appsettings.Development.json` a été supprimé pour cette raison exacte ; nettoyage incohérent. Bloc retiré, `Import` conservé. [src/Kape22Importer/appsettings.json]
+- [x] [Review][Patch] Commentaire imprécis : « appsettings.Test.json » alors que le test unitaire AC-FR12-8 `ImportOptions_BindEveryValueFromShippedAppsettings` lit `src/Kape22Importer/appsettings.json`. Commentaire réécrit (rôle de chaque paquet). [tests/Kape22Importer.Tests/Kape22Importer.Tests.csproj:14]
+- [x] [Review][Patch] README : « Consommée par le worker exécutable. » affirmé comme fait présent alors que la note suivante dit le worker différé/inexistant ; cible EF → `AscoLSI` + double journalisation restaurées, `Kape22Persister` nommé. [README.md:8]
+- [x] [Review][Patch] deferred-work.md : entrées « `Kape22Importer.Tests` has no executing test » et « Worker template dead code — `Program.cs` / `Worker.cs` » barrées `~~…~~ **RÉSOLU 2026-09-09 (Story 3.0)**`. [_bmad-output/implementation-artifacts/deferred-work.md]
+- [x] [Review][Patch] deferred-work.md : bullet symétrique ajouté pour le portage du gate FR-8 (`StartupCompatibilityCheck.Verify`, plus aucun appelant de prod ici) vers le `Client`, renvoyant à spec-3-4. [_bmad-output/implementation-artifacts/deferred-work.md]
+- [x] [Review][Defer] Garde de non-régression sur les paquets *résolus* de `Kape22Importer` (pas seulement l'allowlist du `.csproj` littéral) — une réintroduction transitive de `Microsoft.Extensions.Hosting` via `PortalSharedLibrary` passerait tous les tests. Pré-existant (l'allowlist csproj-only précède cette story). [tests/TextToXml.Tests/SolutionStructureTests.cs]
+- [x] [Review][Defer] Assertion automatisée « sortie = bibliothèque, pas d'`.exe` » (`OutputType`) absente ; `Kape22Importer_UsesTheClassLibrarySdk` ne teste que l'attribut SDK. [tests/TextToXml.Tests/SolutionStructureTests.cs:108]

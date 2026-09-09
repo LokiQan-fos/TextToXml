@@ -14,8 +14,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- The default Import section values. Not built or copied; the host Client and ImportOptionsTests read this file by path (AC-FR12-8, CC-7). -->
-    <None Include="appsettings.json" />
     <!-- The P60 Descripteur is embedded so it is read from the assembly at runtime, never from disk (AR-5). -->
     <EmbeddedResource Include="..\..\Templates\P60.xml" LogicalName="Kape22Importer.Templates.P60.xml" />
     <!-- The static P60 schema is embedded too: Step 2 validates the normalized XML against it before deserialization (AR-3, AC-FR7-1). -->

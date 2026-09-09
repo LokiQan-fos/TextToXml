@@ -11,7 +11,7 @@
     <!-- Backs the Category=Unit orchestration tests (Kape22FichierProcessorTests); the transaction and column-length assertions stay on SQL Server (AR-12). -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
-    <!-- Story 3.0: the importer library dropped its host dependency, so these tests build IConfiguration themselves (appsettings.Test.json, in-memory collections, env vars, typed binding). -->
+    <!-- Story 3.0: the importer library dropped its host dependency, so these tests build IConfiguration themselves. Json reads the shipped src/Kape22Importer/appsettings.json in the AC-FR12-8 Unit test and appsettings.Test.json in the AR-12 fixture; EnvironmentVariables and Binder back that fixture and the typed ImportOptions binding. -->
     <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
     <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" />

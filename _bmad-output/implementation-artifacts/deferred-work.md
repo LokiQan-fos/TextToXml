@@ -572,8 +572,8 @@ review 1.7 note.
 
 - **`.editorconfig` absent** — house style (English comments per `CLAUDE.md`, naming, redundant `using` directives despite `ImplicitUsings`) is unenforced. Add a repo `.editorconfig` as a dedicated hygiene task.
 - **No CI workflow** — the `SolutionStructureTests` build gate and the `Category=Unit` / `Category=Integration` split only guard anything if a pipeline runs them on push. Fold into Story 2.1 (which already needs a Docker-capable runner, AR-12) or a dedicated CI story. Ties to risk R-1.
-- **`Kape22Importer.Tests` has no executing test** — no DI smoke test that `Host.CreateApplicationBuilder` composes and `Worker` is registered as an `IHostedService`. Add when the worker is built out in Épic 3.
-- **Worker template dead code** — `Program.cs` / `Worker.cs` are the unmodified `dotnet new worker` scaffold (`Task.Delay(1000)` sample loop, no `OperationCanceledException` handling on shutdown). Replace in Épic 3 (FR-12 / FR-13 orchestration).
+- ~~**`Kape22Importer.Tests` has no executing test** — no DI smoke test that `Host.CreateApplicationBuilder` composes and `Worker` is registered as an `IHostedService`.~~ **RÉSOLU 2026-09-09 (Story 3.0)** : le host a disparu (lib pure) ; `Kape22Importer.Tests` exécute 288 tests.
+- ~~**Worker template dead code** — `Program.cs` / `Worker.cs` are the unmodified `dotnet new worker` scaffold (`Task.Delay(1000)` sample loop, no `OperationCanceledException` handling on shutdown). Replace in Épic 3 (FR-12 / FR-13 orchestration).~~ **RÉSOLU 2026-09-09 (Story 3.0)** : `Program.cs` / `Worker.cs` supprimés (`git rm`).
 
 ## Deferred from: bmad-build Story 3.0 multi-goal split (2026-09-09)
 
@@ -585,6 +585,10 @@ review 1.7 note.
   summary: Le fail-fast sur chaîne de connexion `AscoLSI` manquante/vide a disparu avec `AddAscoLsiPersistence` (Story 3.0) — le `Client` doit valider `ConnectionStrings:AscoLSI` au démarrage (message clair) avant `CreateAsync`, sinon l'échec ne surviendra qu'à la première requête EF.
   evidence: `AddAscoLsiPersistence` jetait `InvalidOperationException` sur valeur null/vide (test `AddAscoLsiPersistence_ThrowsWhenTheConnectionStringIsMissing`, supprimé avec le fichier). Responsabilité déplacée vers le `Client` (objectif B / Story 3.4) ; le modèle `OrdresFabricationSync` ne fait pas ce fail-fast non plus (`configuration["SourceContext"] ?? string.Empty`).
 
+- source_spec: `spec-3-0-repositionnement-structurel-lib.md`
+  summary: Le gate FR-8 (`StartupCompatibilityCheck.Verify`) n'a plus **aucun** appelant de production dans `TextToXml.sln` depuis la suppression de `StartupCompatibilityHostedService` (Story 3.0) — le `Client` doit appeler `Verify(context.Model, EmbeddedDescriptor.Xml)` dans `CreateAsync()` avant `Start()` ; échec → `LogError` + la boucle ne démarre pas (défaut de déploiement).
+  evidence: `StartupCompatibilityHostedService` enregistré avant le `Worker` garantissait l'exécution du gate au démarrage de l'hôte (test `StartupWiringTests`, supprimé avec le fichier). `Verify` reste inchangé et testé Unit (AC-FR8-1..4, `StartupCompatibilityTests`). Câblage spécifié dans `spec-3-4-gpao-importp60-client-worker.md` (`GpaoImportP60.Client.CreateAsync`) ; jumeau du fail-fast `ConnectionStrings:AscoLSI` ci-dessus.
+
 - source_spec: `spec-3-4-gpao-importp60-client-worker.md`
   summary: ~~Ajouter un `CancellationToken` à `InboxScanner.RunTick`~~ **RÉSOLU 2026-09-09**.
   evidence: `InboxScanner.RunTick(CancellationToken cancellationToken = default)` vérifie le jeton en tête de chaque itération des deux boucles (`processing/` stranded puis inbox) et `return` (jamais passé à `processor.Process`) — test `Tick_WhenTheTokenIsCancelledAfterAFichier_LeavesTheRestForTheNextTick_AcFr14_6` (`Kape22Importer.Tests`). Côté SVN : `GpaoImportP60.Client` détient un `CancellationTokenSource _cancellation`, `override Stop()` l'annule avant `base.Stop()`, `override Dispose()` le libère, `RunTickCore` prend le jeton et le passe à `RunTick`. Test `RunTickCore_WithAnAlreadyCancelledToken_ProcessesNothing`.
@@ -592,3 +596,13 @@ review 1.7 note.
 - source_spec: `spec-3-4-gpao-importp60-client-worker.md`
   summary: Ré-entrance du timer de `MicroService.Publish.Publisher` : `Start()` arme un `System.Threading.Timer` périodique dont le callback `async void` n'attend pas la fin de l'invocation précédente d'`Execute` ; un tick d'import plus long que `Frequency` peut chevaucher le suivant, deux `InboxScanner.RunTick()` courant sur la même inbox (l'un des `Move` échoue alors).
   evidence: Constaté à la revue du spec 3.4 mais **pré-existant** — même exposition sur `OrdresFabricationSync.Client` / `ImportFiles` / tous les workers `Publisher`. Contenu en partie par le try/catch par Fichier d'`InboxScanner` + le déplacement vers `processing/`. Correctif = un garde de non-ré-entrance (`SemaphoreSlim(1,0)` ou flag `_running`) dans `Publisher.Start`'s callback, côté `MicroService` (hors périmètre worker P60, touche tous les workers).
+
+## Deferred from: code review of story-3-0 (2026-09-09)
+
+- source_spec: `spec-3-0-repositionnement-structurel-lib.md`
+  summary: `SolutionStructureTests` ne garde `Kape22Importer` que via une allowlist sur le `.csproj` littéral, pas via les paquets *résolus* (`project.assets.json`) comme pour `TextToXml`. Une réintroduction transitive de `Microsoft.Extensions.Hosting` (ou de la pile `Microsoft.Extensions.Configuration.*`) via `PortalSharedLibrary` passerait tous les tests.
+  evidence: Constaté à la revue de la Story 3.0. Pré-existant : l'allowlist csproj-only date de la Story 2.1. La Story 3.0 a retiré la référence directe `Hosting` mais le `git grep` manuel du spec est le seul filet contre un retour transitif. Correctif = porter l'assertion sur les paquets résolus (comme `ResolvedPackagesOf` côté `TextToXml`).
+
+- source_spec: `spec-3-0-repositionnement-structurel-lib.md`
+  summary: Aucune assertion automatisée ne vérifie que `Kape22Importer` produit une bibliothèque et non un exécutable (`OutputType` == `Library`, absence d'`.exe`). `Kape22Importer_UsesTheClassLibrarySdk` ne teste que l'attribut `Sdk` du `.csproj` ; un futur `<OutputType>Exe</OutputType>` passerait tous les tests.
+  evidence: AC du spec-3-0 (« produit une DLL … pas d'`.exe` ») + commande de vérif `dotnet build -getProperty:OutputType` non automatisées. Correctif = assertion `OutputType` / absence d'`Exe` à côté de `Kape22Importer_DeclaresNoFrameworkReference` (`SolutionStructureTests.cs:108`).
