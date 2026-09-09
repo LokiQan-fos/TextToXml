@@ -9,6 +9,13 @@ Chaîne d'ingestion des fichiers SAP → LSI. Deux livrables :
 
 Voir `_bmad-output/planning-artifacts/PRD.md` et `epics.md` pour le détail fonctionnel.
 
+> **Correction de cap (2026‑09‑09, `sprint-change-proposal-2026-09-09.md`).** À
+> partir de la Story 3.0, `src/Kape22Importer` devient une **bibliothèque** et le
+> worker exécutable est une classe `Client : Publisher` mince enregistrée dans le
+> `Launcher` de `MicroServices.sln` (prérequis : `MicroServices.sln` aligné sur
+> `net10.0` / EF Core 10.0.x). Ce README sera mis à jour avec la nouvelle
+> structure lors de cette story.
+
 ## Prérequis
 
 - SDK **.NET 10.0** (`net10.0`). La version plancher est épinglée par `global.json`

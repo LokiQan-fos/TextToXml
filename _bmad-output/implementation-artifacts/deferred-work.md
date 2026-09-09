@@ -1,5 +1,31 @@
 # Deferred Work
 
+## Correction of course: Story 3.4 rejected — Launcher alignment (2026-09-09)
+
+Story 3.4 (as implemented 2026-09-08/09) was rejected in adversarial review: it rebuilt, standalone
+and disconnected, the whole supervision stack the portal `Launcher` (`MicroServices.sln`) already
+owns. User decision (Option A): `Kape22Importer` becomes a **library**; the worker is a thin
+`class Client : Publisher` registered in the `Launcher`. See
+`_bmad-output/planning-artifacts/sprint-change-proposal-2026-09-09.md`.
+
+- **3.4 working tree rolled back** (nothing was committed). Only survivor from that branch: the
+  `Microsoft.Extensions.Hosting` CPM entry stays for now (still used while `Kape22Importer` is a
+  Worker project); its removal moves into **Story 3.0** (library conversion).
+- **`AddDbContextFactory` / DI composition root abandoned** — there is no host for the worker any
+  more. The `Client` builds its `AscoLsiDbContext` per tick by hand
+  (`new DbContextOptionsBuilder<>().UseSqlServer(cs)`), like `OrdresFabricationSync.Client`.
+  `Kape22FichierProcessor` keeps its `Func<AscoLsiDbContext>` seam (Story 3.2).
+- **Logging seam revisited (Story 3.3)** — `Kape22FichierProcessor` no longer takes an `ILogger`
+  wired by a `Program.cs` Serilog sink. The `Client` routes the journal to `AbstractService`'s
+  shared Serilog `Logger` (`SharedLogger`), via `Serilog.Extensions.Logging` bridge or a small
+  `IImportJournal` seam. Decided in Story 3.0 / 3.4.
+- **`scripts/schema/02-mqtt-tables.sql`** — `dbo.WorkerSettings` block removed (Launcher-owned).
+  `PersistenceSmokeTests` / `SqlServerIntegrationFixture` updated accordingly.
+- **Still relevant, moves to Story 3.0 hygiene**: `IConfiguration` + `ImportOptions` overlap in
+  `Kape22Persister` (see "Deferred from: code review of Story 3.2 / epics.md" below).
+- **Still Story 3.5**: coarse per-tick failure handling (which failures leave the Fichier in
+  `processing/` vs `error/`).
+
 ## Resolved by: epics.md reconciliation, retro Épic 2 action A-3 / item-10 (2026-09-08)
 
 The four `AC` that crossed the Épic 2 → Épic 3 boundary through deferred-work notes now have an
@@ -17,9 +43,11 @@ below:
 - **Skip-doublon explicit signal** — **Story 3.3** adds an explicit `ImportResult` discriminator
   (`AlreadyImported` flag or `Outcome` enum) rather than the structural
   `Success && InsertedId == null && Errors.Count == 0` check.
-- **AddDbContext vs AddDbContextFactory + persister lifetime (F-11)** — settled for **Story 3.4**:
-  `AddDbContextFactory<AscoLsiDbContext>` (singleton factory), `Kape22Persister` built per Fichier in
-  the orchestrator, never DI-registered.
+- **AddDbContext vs AddDbContextFactory + persister lifetime (F-11)** — requalified by the 2026-09-09
+  correction of course (see top section): no DI container / host for the worker. The `Client` builds
+  its `AscoLsiDbContext` per tick by hand; `Kape22FichierProcessor` keeps its `Func<AscoLsiDbContext>`
+  seam; `Kape22Persister` built per Fichier in the orchestrator. `AddDbContextFactory` /
+  `AddKape22Startup` dropped.
 
 ## Resolved by: code review patches of Story 3.2 (2026-09-08)
 

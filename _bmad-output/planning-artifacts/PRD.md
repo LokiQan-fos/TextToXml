@@ -92,7 +92,7 @@ part ailleurs.*
 
 | # | Décision | Source |
 |---|---|---|
-| D1 | Fichiers pris dans **`D:\Site-FTP\Reception\GPAO`** (serveur `AFS017`), chemin en **configuration** (`Import:InboxPath`). Accès système de fichiers / partage, pas de protocole FTP. Cible d'évolution : MQTT — sans toucher `TextToXml`. | utilisateur |
+| D1 | Fichiers pris dans **`D:\Site-FTP\Reception\GPAO`** (serveur `AFS017`), chemin en **configuration** (`Import:InboxPath`). Accès système de fichiers / partage, pas de protocole FTP pour l'**ingestion**. Le worker se connecte néanmoins au **broker MQTT dès la v1** pour son cycle de vie (`AbstractService`/`Publisher` : `ConnectWithRetryAsync` au démarrage, publication d'un message de statut), comme tous les workers du portail — le broker fait partie de l'infra requise. Cible d'évolution : MQTT aussi pour l'**ingestion** des Fichiers, sans toucher `TextToXml`. | utilisateur (rév. correction‑de‑cap 2026‑09‑09) |
 | D2 | Encodage d'entrée **`Windows-1252`**, figé. | utilisateur |
 | D3 | Fichier P60 = **3 Lignes** (entête / message / pied) → **1 ligne** `L_D_KAPE22`. Blocs par **position** ; `Segment` @9/3 (`000`/`EOF`/`999`) = contrôle. | utilisateur |
 | D4 | Champ `Date` de l'entête = **numéro du jour dans l'année**, interprété dans l'**année courante**, **heure de Paris** (`245` = 2 septembre). | utilisateur |
@@ -100,7 +100,7 @@ part ailleurs.*
 | D6 | **Typage : le template est directeur.** Les `datatype` du descripteur `P60.xml` sont **dérivés du type de la colonne** `L_D_KAPE22` : colonne `int` → `datatype="int"`, sinon `"string"`. **P60 : 0 `datetime`** (Champs `DateEnfournementFourN` non utilisés, D14), 0 `decimal`, ~30 `int`, le reste `string`. Table figée Annexe A. | données `sys.columns` (Annexe C) |
 | D7 | **Pas de déduplication** de fichiers. Un fichier redéposé est **réimporté** (nouvelle ligne, `Id` identity). La sûreté de reprise vient du dossier **`processing/`** (FR‑12), pas d'une clé. | utilisateur |
 | D8 | **Journalisation double**, à chaque fichier : (a) `MQTTnetServices.dbo.Logs` — Serilog sink MSSqlServer, format `[Kape22Importer][<Event>] : <texte>`, comme les workers existants ; (b) `AscoLSI.dbo.L_D_LOG_COMMANDE` — 1 ligne : `Commande="P60"`, `Message` = `"<NumeroFichier> — OK"` ou `"<NumeroFichier> — REJETÉ : <résumé des erreurs de mapping>"`, `OF` = `OF` **brut** du bloc message, `User` = **`Import:InitiatingServer`** (serveur initiateur du traitement), `Date` = horodatage local, `NumLingot=0`, `Trace=1`. Écrite **seulement si l'`OF` est lisible** (D15). | utilisateur + schémas réels (Annexe C) |
-| D9 | Enregistrement Launcher via `MQTTnetServices.dbo.WorkerSettings` (`WorkerName`, `IsActive`), comme les autres workers. | schéma réel |
+| D9 | Le worker s'intègre au **`Launcher` existant** (`MicroServices.sln`) comme classe in‑process `Client : Publisher` : **une ligne** dans `Launcher/WorkerRegistry.cs` (`Factories`, enveloppée dans `WorkerAdapter<Client>`) + une entrée `Launcher/workers.json` (`{Name, Type, ConfigPath}`). La table `MQTTnetServices.dbo.WorkerSettings` (`WorkerName`, `IsActive`) est **détenue par le Launcher** (il l'auto‑crée, lit `IsActive` au démarrage, l'écrit sur bascule) ; **le worker n'y touche jamais**. Le `WorkerStatus` vu du dashboard est fourni par `WorkerAdapter` (`IsRunning = Client.IsConnected`), pas par le worker. | schéma réel + modèle `Launcher` (correction‑de‑cap 2026‑09‑09) |
 | D10 | **1 XSD statique, écrit à la main, par format** (`P60.xsd`), versionné, décrivant le **XML normalisé**. Le **DTO C# (`Kape22File`) est généré** de ce XSD (`xsd.exe /classes`). Le XML normalisé est **validé contre le XSD avant désérialisation**. **Pas** de méta‑schéma des descripteurs (`commande.xsd`) : chaque format a son propre XSD, ça suffit. | utilisateur |
 | D11 | Le **XML normalisé est conservé** (`archive/<yyyy>/<MM>/<nom>.xml`, ou à côté du fichier en `error/`) pour consultation des données champ par champ. | utilisateur |
 | D12 | **Objectif central** : tout fichier refusé produit une **raison lisible par l'exploitant** — logs ServicesMicroScope (`MQTTnetServices.Logs`) + `Message` de `L_D_LOG_COMMANDE` + XML conservé. Pas d'écran dédié. | utilisateur |
@@ -111,7 +111,7 @@ part ailleurs.*
 | D17 | Champs `int` : **toujours non signés** ; un signe `-` ou un caractère non numérique → `InvalidInteger` (rejet). Valeur cadrée à droite, zéros de tête retirés ; vide/espaces → `NULL` si colonne nullable, `RequiredFieldMissing` si `NOT NULL`. | utilisateur (Q14a) + défaut |
 | D18 | `Footer.Records` compte **3** = entête + message + pied. | utilisateur (Q17) |
 | D19 | Octet non décodable en `Windows-1252` → **rejet** (`UndecodableInput`). | utilisateur (Q16) |
-| D20 | Solution **`TextToXml.sln` autonome** dans ce dépôt (`TextToXml` lib + `Kape22Importer` worker + tests), référence `PortalSharedLibrary` pour l'identité/log. | utilisateur (Q18a) |
+| D20 | **`TextToXml.sln`** (ce dépôt) = `TextToXml` (lib pure, Épic 1) + **`Kape22Importer` (bibliothèque** de format P60 : descripteur, `P60.xsd`, DTO `Kape22File`, entité + `AscoLsiDbContext`, `Kape22Mapper`, `Kape22Persister`, `InboxScanner`, `Kape22FichierProcessor`) + projets de tests. **Le worker exécutable** est une classe **`Client : Publisher, IPublisher, IService`** mince ajoutée à **`MicroServices.sln`** (à côté de `Laminoir/OrdresFabricationSync`), en `ProjectReference` cross‑dépôt vers la lib `Kape22Importer` + `MicroService.csproj`, enregistrée dans `Launcher`. `PortalSharedLibrary` référencé pour l'identité/log. **Prérequis bloquant** : `MicroServices.sln` (aujourd'hui `net9.0;net10.0` + EF Core 9.0.9) aligné sur **`net10.0` + EF Core 10.0.x**. | utilisateur (Q18a ; rév. correction‑de‑cap 2026‑09‑09) |
 | D21 | Chaîne(s) de connexion : compte **`sa`** existant (comme les autres workers), lu depuis la configuration, jamais en dur. | utilisateur (Q12) |
 | D22 | Avant l'`INSERT` `L_D_KAPE22`, le worker vérifie qu'aucune ligne `L_D_LOG_COMMANDE` `… — OK` n'existe déjà pour ce `NumeroFichier` + `OF` (garde‑fou anti‑doublon sur crash post‑commit). Si trouvée → fichier déplacé en `archive/`, log `Warning`, pas de ré‑insertion. | utilisateur (Q21) |
 | D23 | Chevauchements de tranches entre Champs (ex. `Segment` et `NumeroFichier` du message, `Position=9`) : **acceptés** par `TextToXml` (Champs = tranches indépendantes, aucune erreur de layout). | données (`P60.xml` corrigé) |
@@ -670,11 +670,17 @@ schéma miroir `L_D_KAPE22` + `L_D_LOG_COMMANDE`)* :
 
 ### 4.3 Microservice `Kape22Importer`
 
-**Description :** worker .NET (`net10.0`) hébergé et supervisé par le **Launcher**
-existant, sur le pattern `BackgroundService` + `PeriodicTimer` déjà en place dans
-`FactoryScope` (`FileImportBackgroundService`). Il orchestre uniquement : dossier
-de réception → `TextToXml` → archive XML → `Kape22Mapper` → EF → déplacement
-fichier → double log.
+**Description :** classe **`Client : Publisher, IPublisher, IService`** in‑process
+au **Launcher** existant (`MicroServices.sln`), sur le modèle
+`Laminoir/OrdresFabricationSync/Client.cs` : ctor `Client(IConfiguration)`,
+`CreateAsync()` qui se connecte au broker puis démarre la boucle timer de
+`Publisher` (`Frequency` = intervalle de polling, `Execute` = un tick). Elle
+réutilise la bibliothèque `Kape22Importer` (Épic 2 + seams 3.1/3.2) et orchestre
+uniquement : dossier de réception → `TextToXml` → archive XML → `Kape22Mapper` →
+EF → déplacement fichier → double log. Le Launcher fournit l'hôte HTTP, le
+`WorkerStatus` (via `WorkerAdapter`), la table `WorkerSettings`, la pause
+`IsActive`, l'auth `X-Launcher-Api-Key` et le logging `MQTTnetServices.Logs`
+(`AbstractService.LogInformation` → `SharedLogger`).
 
 **Exigences fonctionnelles :**
 
@@ -754,11 +760,18 @@ Deux cibles (§0bis D8), à **chaque** fichier :
 - `AC-FR14-4` : `L_D_LOG_COMMANDE.User` = valeur de `Import:InitiatingServer`
   (config) ; `OF` = valeur brute trimée du bloc message ; `NumLingot=0`,
   `Trace=1`.
-- `AC-FR14-5` : le worker expose au Launcher un `WorkerStatus` (`IsRunning`,
-  `IsActive`, `LastStartedAt`, `LastError`) — même contrat que
-  `ServicesMicroScope.LauncherApiClient` ; s'enregistre dans `WorkerSettings`.
-- `AC-FR14-6` : `Stop` du Launcher pendant un tick → le Fichier en cours finit ou
-  reste dans `processing/` (jamais à moitié inséré) ; arrêt propre < 5 s.
+- `AC-FR14-5` : le worker est **enregistré dans le `Launcher`**
+  (`WorkerRegistry.Factories` + `workers.json`) comme `Client : Publisher`. Le
+  Launcher le supervise via `WorkerAdapter<Client>` — `IsRunning` (=
+  `Client.IsConnected`), `IsActive`, `LastStartedAt`, `LastError` exposés par
+  `GET /workers` du Launcher — et gère seul la table `WorkerSettings`. Le worker
+  **n'implémente ni `WorkerStatus` ni endpoint HTTP** ; il n'a aucune dépendance
+  ASP.NET Core.
+- `AC-FR14-6` : `WorkerAdapter.StopAsync` (→ `Client.Stop()` +
+  `Client.Disconnect()`) pendant un tick → via une **annulation coopérative**
+  dans `Client.Actions()` (jeton vérifié entre Fichiers, jamais mi‑Fichier), le
+  Fichier en cours finit ou reste dans `processing/` (jamais à moitié inséré) ;
+  arrêt propre < 5 s.
 - `AC-FR14-7` : `Logs` indisponible n'empêche pas l'insertion `L_D_KAPE22` (log
   best‑effort) ; `L_D_LOG_COMMANDE` fait partie de la transaction de succès
   (`AC-FR11-3`).
@@ -818,6 +831,10 @@ jamais modifiée : **Étape 1 = 0 ligne de code** (le descripteur `<format>.xml`
 - **Cibles** : `net10.0`, `Microsoft.EntityFrameworkCore` 10.0.x + `Serilog` +
   `Serilog.Sinks.MSSqlServer` (aligné sur les workers existants). `TextToXml` :
   **zéro dépendance runtime** hors BCL (`System.Xml`, `System.Text.Encoding.CodePages`).
+  Le worker est supervisé par le `Launcher` (`MicroServices.sln`, `net10.0`) ;
+  `Serilog` + `Serilog.Sinks.MSSqlServer` proviennent de `AbstractService` /
+  `SharedLogger` (cache un `Logger` par (chaîne, table)) — **jamais câblés par le
+  worker** ni par un `Program.cs`.
 - **Observabilité** : chaque `ImportResult` traçable du nom de fichier à l'`Id`
   inséré ou à la liste d'erreurs, via `MQTTnetServices.Logs`, `L_D_LOG_COMMANDE`
   et les fichiers `*.errors.json`.

@@ -36,9 +36,10 @@ public sealed class SqlServerIntegrationFixture
         AscoLsiConnectionString = configuration.GetConnectionString("AscoLSI") ?? string.Empty;
         MqttConnectionString = configuration.GetConnectionString("MQTTnetServices") ?? string.Empty;
 
-        // Story 2.1 AC: the harness creates all four tables, and AscoLSI + MQTTnetServices live on the
-        // same instance, so both connection strings are required. A partial configuration skips rather
-        // than reporting a half-applied schema as ready.
+        // Story 2.1 AC: the harness creates its tables (L_D_KAPE22, L_D_LOG_COMMANDE, MQTTnetServices
+        // dbo.Logs), and AscoLSI + MQTTnetServices live on the same instance, so both connection
+        // strings are required. A partial configuration skips rather than reporting a half-applied
+        // schema as ready.
         if (string.IsNullOrWhiteSpace(AscoLsiConnectionString) || string.IsNullOrWhiteSpace(MqttConnectionString))
         {
             SkipReason =

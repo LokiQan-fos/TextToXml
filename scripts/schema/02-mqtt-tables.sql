@@ -5,9 +5,12 @@
 -- AscoLSI and MQTTnetServices are on the same SQL Server instance, reached
 -- with distinct connection strings.
 -- This file is generated, not written from memory (risk R-3).
--- Scope: only the tables the integration tests touch. The target database is
--- chosen by the test fixture connection string (for example
--- MQTTnetServices_Test); this script does not issue USE.
+-- Scope: only dbo.Logs, the one table the integration tests touch (Story 3.3
+-- round-trip). The target database is chosen by the test fixture connection
+-- string (for example MQTTnetServices_Test); this script does not issue USE.
+-- dbo.WorkerSettings is intentionally not created here: it is owned and
+-- auto-created by the portal Launcher (MicroServices.sln), and the importer
+-- (a library since the 2026-09-09 correction of course) never touches it.
 -- Logs matches the Serilog Serilog.Sinks.MSSqlServer layout used by the other
 -- portal workers; every text column is NVARCHAR(MAX) in the source.
 
@@ -28,18 +31,6 @@ BEGIN
         [Exception] NVARCHAR(MAX) NULL,
         [Properties] NVARCHAR(MAX) NULL,
         CONSTRAINT PK_Logs PRIMARY KEY CLUSTERED ([Id])
-    );
-END;
-GO
-
--- Launcher registration table. The primary key is WorkerName; there is no Id.
-IF OBJECT_ID(N'dbo.WorkerSettings', N'U') IS NULL
-BEGIN
-    CREATE TABLE dbo.WorkerSettings
-    (
-        [WorkerName] NVARCHAR(100) NOT NULL,
-        [IsActive] BIT NOT NULL,
-        CONSTRAINT PK_WorkerSettings PRIMARY KEY CLUSTERED ([WorkerName])
     );
 END;
 GO

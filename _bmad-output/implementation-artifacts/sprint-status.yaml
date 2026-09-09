@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 16:00
-last_updated: 09-09-2026 12:00
+last_updated: 09-09-2026 18:00
 project: TextToXml
 project_key: NOKEY
 tracking_system: file-system
@@ -58,6 +58,12 @@ development_status:
   epic-2-retrospective: done
 
   epic-3: in-progress
+  # Correction of course 2026-09-09 (sprint-change-proposal-2026-09-09.md): Story 3.4 rejected
+  # in review (duplicated Launcher infra). Kape22Importer -> library; worker = Client:Publisher
+  # registered in MicroServices.sln/Launcher. 3.1/3.2 reused as-is; 3.3 revisited (logging seam);
+  # 3.0 added (structural); 3.4/3.5/3.6 rewritten. PRD/epics/scripts/deferred-work edits pending
+  # (architecture pass + bmad-build).
+  3-0-repositionnement-structurel-lib-client-launcher: backlog
   3-1-scrutation-du-dossier-de-réception-cycle-de-vie-du-fichier: done
   3-2-orchestration-par-fichier: done
   3-3-double-journalisation-mqttnetservices-logs-l_d_log_commande: done
@@ -173,3 +179,15 @@ action_items:
     owner: "SM"
     status: done
     ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-09-07.md"
+  - id: "epic-3-correct-course-2026-09-09-launcher-alignment"
+    epic: 3
+    action: "Story 3.4 rejetee en revue (infra Launcher dupliquee). Option A: Kape22Importer
+      devient une lib, worker = Client:Publisher dans MicroServices.sln/Launcher. Rollback
+      arbre 3.4 non commite (garder seulement la suppression de l entree CPM Microsoft.Extensions.Hosting
+      dans Directory.Packages.props); amendements PRD (D1/D9/D20, 4.3, FR-14) + AR-1/2/7/9/13;
+      re-plan Epic 3: Story 3.0 nouvelle, 3.3 revisitee, 3.4/3.5/3.6 reecrites; scripts/schema/02-mqtt-tables.sql
+      (retrait WorkerSettings); deferred-work.md. Prerequis: bump MicroServices.sln net10.0/EF10.
+      Passe bmad-architecture avant impl, puis bmad-build test-first."
+    owner: "PM + Architecte"
+    status: open
+    ref: "_bmad-output/planning-artifacts/sprint-change-proposal-2026-09-09.md"

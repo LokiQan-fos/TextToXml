@@ -20,19 +20,19 @@ namespace Kape22Importer.Tests;
 public class PersistenceSmokeTests(SqlServerIntegrationFixture fixture)
 {
     [SkippableFact]
-    public void SchemaApplies_CreatesExactlyTheFourHarnessTables()
+    public void SchemaApplies_CreatesExactlyTheHarnessTables()
     {
         Skip.IfNot(fixture.Available, fixture.SkipReason ?? "SQL Server test instance unavailable.");
 
-        // Story 2.1 AC: the harness creates only these four tables and nothing else from the real
-        // database.
+        // Story 2.1 AC: the harness creates only these tables and nothing else from the real
+        // database. dbo.WorkerSettings is Launcher-owned (2026-09-09 correction of course) and is
+        // no longer part of the importer harness.
         Assert.True(TableExists(fixture.AscoLsiConnectionString, "L_D_KAPE22"));
         Assert.True(TableExists(fixture.AscoLsiConnectionString, "L_D_LOG_COMMANDE"));
         Assert.True(TableExists(fixture.MqttConnectionString, "Logs"));
-        Assert.True(TableExists(fixture.MqttConnectionString, "WorkerSettings"));
 
         Assert.Equal(2, UserTableCount(fixture.AscoLsiConnectionString));
-        Assert.Equal(2, UserTableCount(fixture.MqttConnectionString));
+        Assert.Equal(1, UserTableCount(fixture.MqttConnectionString));
     }
 
     [SkippableFact]

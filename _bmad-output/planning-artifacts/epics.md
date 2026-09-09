@@ -83,11 +83,17 @@ distingués ici : **`AC-FR5-12a`** (round‑trip vers un `record` générique, S
 Dérivées des décisions d'architecture du PRD (§0, §0bis) — **pas de document
 Architecture séparé, pas de starter template**.
 
-- **AR-1** — Un **microservice / projet .NET par format**. `TextToXml` est le
-  **seul** code partagé. `Kape22Importer` est le gabarit des suivants (§0, D24, FR-16).
-- **AR-2** — Solution **`TextToXml.sln` autonome** dans ce dépôt : projet `TextToXml`
-  (lib) + `Kape22Importer` (worker) + projets de tests. Référence
-  `PortalSharedLibrary` pour l'identité/log (D20).
+- **AR-1** — Par format : une **bibliothèque** .NET (`Kape22Importer` : descripteur,
+  XSD, DTO, entité, mapper, persister, `InboxScanner`, `Kape22FichierProcessor`)
+  **plus** une classe **`Client : Publisher`** mince enregistrée dans le `Launcher`
+  (`MicroServices.sln`). `TextToXml` est le **seul** code partagé côté Étape 1.
+  `Kape22Importer` + son `Client` sont le gabarit des formats suivants (§0, D24, FR-16).
+- **AR-2** — **`TextToXml.sln`** (ce dépôt) : `TextToXml` (lib) + `Kape22Importer`
+  (**lib** format P60) + projets de tests ; référence `PortalSharedLibrary` (D20).
+  Le `Client` exécutable vit dans **`MicroServices.sln`** (`ProjectReference`
+  cross‑dépôt vers la lib `Kape22Importer` + `MicroService.csproj`). **Prérequis** :
+  `MicroServices.sln` aligné sur `net10.0` + EF Core 10.0.x avant l'implémentation
+  de la Story 3.4.
 - **AR-3** — **1 XSD statique écrit à la main par format** (`P60.xsd`), versionné,
   décrivant le **XML normalisé**. **Pas** de méta‑schéma des descripteurs
   (`commande.xsd`) (D10).
@@ -100,15 +106,21 @@ Architecture séparé, pas de starter template**.
 - **AR-6** — Accès **système de fichiers / partage** (`D:\Site-FTP\Reception\GPAO`
   sur `AFS017`), pas de protocole FTP. Chemin en configuration (`Import:InboxPath`).
   Cible d'évolution : MQTT, sans toucher `TextToXml` (D1).
-- **AR-7** — Worker sur pattern **`BackgroundService` + `PeriodicTimer`** déjà en
-  place dans `FactoryScope` (`FileImportBackgroundService`). Abstraction
-  **`IFileSource`** (`DirectoryFileSource` en prod, impl. mémoire en test) (§4.3, FR-12).
+- **AR-7** — Worker = classe **`Client : Publisher, IPublisher, IService`** pilotée
+  par le timer de `Publisher` (`Frequency` = intervalle de polling, `Execute` = un
+  tick appelant `InboxScanner.RunTick` + `PurgeRetention`), modèle
+  `Laminoir/OrdresFabricationSync/Client.cs`. Abstraction **`IFileSource`**
+  (`DirectoryFileSource` en prod, impl. mémoire en test) **inchangée** (§4.3, FR-12).
 - **AR-8** — Base **database‑first** : `AscoLsiDbContext` fige les tables
   `L_D_KAPE22` (92 colonnes) + `L_D_LOG_COMMANDE` d'après Annexe C. **Aucune
   migration**, `Id` identity (D8, D9, Annexe C).
-- **AR-9** — Enregistrement Launcher via `MQTTnetServices.dbo.WorkerSettings`
-  (`WorkerName`, `IsActive`) ; contrat `WorkerStatus` identique à
-  `ServicesMicroScope.LauncherApiClient` (D9, FR-14).
+- **AR-9** — Enregistrement = **une ligne** dans `Launcher/WorkerRegistry.cs`
+  (`Factories`, enveloppée dans `WorkerAdapter<Client>`) + une entrée
+  `Launcher/workers.json`. Le Launcher fournit : l'hôte HTTP unique, `WorkerAdapter`
+  (qui **est** le `WorkerStatus` : `IsRunning = Client.IsConnected`, `IsActive`,
+  `LastStartedAt`, `LastError`), la table `WorkerSettings` (**Launcher‑owned**,
+  auto‑créée), la pause `IsActive`, l'auth `X-Launcher-Api-Key`. Le worker
+  **ne touche pas** `WorkerSettings` et **n'expose aucun HTTP** (D9, FR-14).
 - **AR-10** — Encodage d'entrée **`Windows-1252` figé** ; décodeur **strict** ;
   la lib enregistre elle‑même `CodePagesEncodingProvider` (D2, D19, FR-2).
 - **AR-11** — Jeu de fixtures : les 10 fichiers `P60/` + variantes fautives
@@ -154,6 +166,18 @@ Architecture séparé, pas de starter template**.
     Linux `mcr.microsoft.com/mssql/server` **si** le runner est Linux, **ou**
     instance SQL Server native sur runner Windows. Les mêmes `scripts/schema/`
     servent dans les deux cas. **Aucune dépendance Docker en développement.**
+
+- **AR-13** — **Frontière cross‑solution** (correction de cap 2026‑09‑09). La lib
+  `Kape22Importer` ne référence que `TextToXml` + `PortalSharedLibrary` (garde
+  `AC-FR16-1` inchangée). Seule la classe `Client` référence `MicroService.csproj`
+  (broker, `AbstractService`/`Publisher`, `SharedLogger`) — c'est le **7ᵉ point de
+  variation** d'un format (voir `AC-FR16-2` amendé). `Client` est hors périmètre de
+  `TextToXml.Tests` ; ses tests vivent dans `MicroServices.sln`
+  (`OrdresFabricationSync.Tests` comme modèle : provider EF InMemory, pas de broker
+  réel). Le bump `MicroServices.sln` → `net10.0` / EF Core 10.0.x est un prérequis
+  d'infra suivi hors de ce sprint (passe archi + tests de non‑régression sur les
+  workers en prod : `ImportFiles`, `CopyDataToDb`, `ConvertAndSave`,
+  `OrdresFabricationSync`).
 
 ### UX Design Requirements
 
@@ -678,10 +702,12 @@ So that ajouter un format = 0 ligne de code dans `TextToXml`.
 **When** je le passe en revue + test d'architecture
 **Then** il ne contient **aucune** constante littérale propre à P60 (`"EOF"`,
   `"Segment"`, position `9`, longueurs de Champs…) ; seul `Windows-1252` est figé
-  (AC-FR16-4) ; les seuls `ProjectReference` de `Kape22Importer` vers du code
-  partagé sont `TextToXml` + `PortalSharedLibrary` (AC-FR16-1) ; les points de
+  (AC-FR16-4) ; les seuls `ProjectReference` de la **lib** `Kape22Importer` vers du
+  code partagé sont `TextToXml` + `PortalSharedLibrary` (AC-FR16-1) ; les points de
   variation d'un format sont **exactement** `<format>.xml`, `<format>.xsd`, DTO,
-  entité + `DbContext`, table de mapping, `appsettings` (AC-FR16-2)
+  entité + `DbContext`, table de mapping, `appsettings`/`<worker>.json`, **classe
+  `Client`** (AC-FR16-2 ; classe `Client` ajoutée à la correction de cap
+  2026‑09‑09 — voir AR-13)
 
 **Tests xUnit (TDD — écrits en premier, CC-1) :** `AC-FR1-9`, `AC-FR5-13`,
 `AC-FR16-1`, `AC-FR16-2`, `AC-FR16-3`, `AC-FR16-4`, `CTR-1`, `CTR-2`, `CTR-3`
@@ -1060,9 +1086,18 @@ d'intégration sur SQL Server local.
 
 ## Épic 3 : `Kape22Importer` — worker, orchestration & exploitation
 
-Le worker `BackgroundService` + `PeriodicTimer` qui orchestre dossier → `TextToXml`
-→ archive → `Kape22Mapper` → EF → déplacement → double log, supervisé par le
-Launcher.
+Le worker qui orchestre dossier → `TextToXml` → archive → `Kape22Mapper` → EF →
+déplacement → double log, supervisé par le Launcher.
+
+**Correction de cap (2026‑09‑09).** L'intégration Launcher est réalisée en
+s'alignant sur le modèle réel du portail (`MicroServices.sln`) : `Kape22Importer`
+devient une **bibliothèque** et le worker est une classe **`Client : Publisher`**
+enregistrée dans le `Launcher` (pilotée par le timer de `Publisher`, pas
+`BackgroundService`). Les Stories 3.1 / 3.2 (livrées) sont réutilisées telles
+quelles. Une **Story 3.0** porte le repositionnement structurel ; 3.3 (livrée) est
+**revisitée** pour le seam de journalisation ; **3.4 / 3.5 / 3.6 sont réécrites**
+contre le modèle `WorkerAdapter`/`Client`. Voir
+`sprint-change-proposal-2026-09-09.md`.
 
 ### AC reportés d'Épic 2 — réconciliation (retro Épic 2 action A-3 / item-10, 2026-09-08)
 
@@ -1077,13 +1112,78 @@ sa story porteuse :
 | **AC-FR12-3** (`ImportResult.XmlArchivePath`) | Champ posé et rempli par `Kape22FichierProcessor.Import` ; le XML physique est écrit par `InboxScanner.Archive`. | **Story 3.2** | **fait** — résiduel : `InboxScanner` ne consomme pas encore le champ (décision seam `IFichierProcessor` → Story 3.3) |
 | **Signal explicite de skip‑doublon** (D22 / `AC-FR11-6`) | Aujourd'hui structurel (`Success == true && InsertedId == null && Errors.Count == 0`). La journalisation « déjà importé, ignoré » en a besoin. | **Story 3.3** : ajouter un discriminant explicite sur `ImportResult` (drapeau `AlreadyImported` ou enum `Outcome`) plutôt que la détection structurelle. | à faire |
 
-**AddDbContext vs AddDbContextFactory + durée de vie du persister (F-11) :** tranché
-pour la **Story 3.4** (composition DI / worker) → `AddDbContextFactory<AscoLsiDbContext>`
-(fabrique singleton). Le worker est un `BackgroundService` singleton qui a besoin d'un
-contexte court‑vécu par Fichier ; `Kape22FichierProcessor` reçoit
-`Func<AscoLsiDbContext> newContext = () => factory.CreateDbContext()` (le seam existe
-déjà depuis la Story 3.2). Le `Kape22Persister` est construit par Fichier dans
-l'orchestrateur, jamais enregistré en DI.
+**AddDbContext vs AddDbContextFactory + durée de vie du persister (F-11) :**
+**requalifié (correction de cap 2026‑09‑09).** Il n'y a plus de conteneur DI ni
+d'hôte pour le worker. Le `Client` construit ses contextes **à la main par tick**
+(`new AscoLsiDbContext(new DbContextOptionsBuilder<…>().UseSqlServer(cs).Options)`),
+comme `OrdresFabricationSync.Client`. `Kape22FichierProcessor` garde son seam
+`Func<AscoLsiDbContext> newContext` (Story 3.2) ; `Kape22Persister` est construit
+par Fichier dans l'orchestrateur. Le point « fabrique singleton »
+(`AddDbContextFactory` / `AddKape22Startup`) est **abandonné**.
+
+### Story 3.0 : Repositionnement structurel (lib + `Client` Launcher)
+
+*(Ajoutée à la correction de cap 2026‑09‑09.)*
+
+As a mainteneur du portail,
+I want `Kape22Importer` transformé en bibliothèque et un `Client : Publisher`
+mince enregistré dans le `Launcher`,
+So that le worker P60 est supervisé exactement comme les autres workers du
+portail, sans infra dupliquée.
+
+**Prérequis :** `MicroServices.sln` aligné sur `net10.0` + EF Core 10.0.x
+(suivi AR-13).
+
+**Acceptance Criteria:**
+
+**Given** le projet `src/Kape22Importer`
+**When** je le convertis
+**Then** son SDK passe de `Microsoft.NET.Sdk.Worker` à `Microsoft.NET.Sdk`
+  (bibliothèque) ; `Program.cs` est **supprimé** ; aucune référence
+  `Microsoft.AspNetCore.App` ni `Microsoft.Extensions.Hosting` ; il expose
+  `InboxScanner`, `IFileSource`/`DirectoryFileSource`, `IFichierProcessor`,
+  `Kape22FichierProcessor`, `Kape22Mapper`, `Kape22Persister`, `AscoLsiDbContext`,
+  `ImportOptions` en API publique (ou `InternalsVisibleTo` le `Client`)
+**And** `AddKape22Startup` / `StartupCompatibilityHostedService` /
+  `*ServiceCollectionExtensions` (host) sont **supprimés** ; la vérification FR-8
+  est exposée en méthode statique appelable (`StartupCompatibilityCheck.Verify(...)`)
+**And** la lib ne référence que `TextToXml` + `PortalSharedLibrary` (`AC-FR16-1`
+  reste vert)
+
+**Given** `MicroServices.sln`
+**When** j'ajoute le worker P60
+**Then** un projet `Kape22/ImportP60` (nom à confirmer) contient
+  `Client : Publisher, IPublisher, IService` : ctor `Client(IConfiguration)` (lit
+  `Import:*`), `CreateAsync()` (`ConnectWithRetryAsync` puis `Start()`),
+  `Frequency` = `Import:PollingInterval`, `Execute` = un tick (FR-8 au premier tick
+  / dans `CreateAsync`, puis `InboxScanner.RunTick(ct)` + `PurgeRetention()`)
+**And** il référence la lib `Kape22Importer` (`ProjectReference` cross‑dépôt) +
+  `MicroService.csproj`
+**And** `Launcher/WorkerRegistry.cs` gagne **une** entrée
+  `Factories["Kape22ImportP60"]` (enveloppe `WorkerAdapter<Client>`) et
+  `Launcher/workers.json` **une** entrée
+  `{ "Name": "Kape22ImportP60", "Type": "Kape22ImportP60", "ConfigPath": "Kape22ImportP60.json" }`
+**And** `Kape22ImportP60.json` porte `Import:*` (chemins, `PollingInterval`,
+  `InitiatingServer`, `RetentionDays`) + les chaînes `AscoLSI` / `MQTTnetServices`
+  — **jamais en dur** (CC-7)
+
+**Given** le harnais de tests
+**When** je build `TextToXml.sln`
+**Then** `Kape22Importer.Tests` compile contre la lib (plus de `Program`/host) ;
+  les tests supprimés en 3.4 (`WorkerStatusProviderTests`, `WorkerShutdownTests`,
+  `WorkerCompositionTests`, `WorkerControlTests`, `WorkerSettingsRegistrationTests`,
+  `MqttSchemaModelParityTests`) ne sont **pas** recréés
+
+**Tests xUnit (TDD, CC-1) :** test « `Kape22Importer` est une lib sans dépendance
+host/ASP.NET » ; test « `AC-FR16-1` ProjectReferences lib == {TextToXml,
+PortalSharedLibrary} » (existant, reste vert) ; côté `MicroServices.sln` :
+`ClientCompositionTests` (le `Client` construit son graphe depuis une
+`IConfiguration` en mémoire, sans broker).
+
+**Critères transverses :** CC-2, CC-3, CC-4, CC-5, CC-7. *(CC-1 partiel : story
+surtout structurelle ; la logique `Client.Actions` est test‑first.)*
+
+---
 
 ### Story 3.1 : Scrutation du dossier de réception & cycle de vie du Fichier
 
@@ -1237,46 +1337,82 @@ le harnais SQL Server local de la Story 2.1 (AR-12).
 **Critères transverses :** CC-1, CC-2, CC-3, CC-4, CC-5, CC-7. **AR-12** : tests
 d'intégration sur SQL Server local.
 
+**Revisite (correction de cap 2026‑09‑09).** Le fond livré (`L_D_LOG_COMMANDE`,
+discriminant skip‑doublon, tri `AC-FR6-4` sur `ImportResult`) est **conservé**.
+Change : `Kape22FichierProcessor` ne prend plus `ILogger<Kape22FichierProcessor>`
+câblé par un `Program.cs` `AddSerilog(...WriteTo.MSSqlServer)`. Le `Client` route
+le journal vers le `Logger` Serilog partagé d'`AbstractService`
+(`SharedLogger.GetDefault()`), soit via un pont `Serilog.Extensions.Logging`
+(`new SerilogLoggerFactory(Logger).CreateLogger<…>()`), soit via un petit seam
+`IImportJournal` implémenté par le `Client` sur
+`AbstractService.LogInformation/LogWarning/LogError`. Décision de forme dans la
+Story 3.0 / 3.4. `DoubleJournalIntegrationTests` (round‑trip
+`Serilog.Sinks.MSSqlServer`) **reste**.
+
 ---
 
-### Story 3.4 : Intégration Launcher & arrêt propre
+### Story 3.4 : Boucle worker `Client` & arrêt propre
+
+*(Réécrite à la correction de cap 2026‑09‑09 — l'ex‑3.4 « expose un `WorkerStatus`
++ endpoints + `AddDbContextFactory` » est abandonnée : le `WorkerStatusProvider` /
+`WorkerControl` / « skip tick si pausé » disparaissent — une désactivation
+Launcher **arrête** le `Client` via `WorkerAdapter.SetActiveAsync`.)*
 
 As a exploitation LSI,
-I want que le worker s'enregistre auprès du Launcher, expose son `WorkerStatus`
-et s'arrête proprement en moins de 5 s sans jamais laisser d'insertion à moitié
-faite,
-So that il est supervisable et recyclable comme les autres workers du portail.
+I want que la classe `Client` exécute le pipeline d'import à chaque tick et
+s'arrête proprement en < 5 s sans laisser d'insertion à moitié faite,
+So that le worker P60 est supervisable et recyclable comme les autres workers du
+portail.
 
 **Acceptance Criteria:**
 
-**Given** le Launcher
-**When** il interroge le worker
-**Then** le worker expose un `WorkerStatus` (`IsRunning`, `IsActive`,
-  `LastStartedAt`, `LastError`) — même contrat que
-  `ServicesMicroScope.LauncherApiClient` — et s'enregistre dans
-  `MQTTnetServices.dbo.WorkerSettings` (`WorkerName`, `IsActive`) (AC-FR14-5, AR-9)
+**Given** `Client.CreateAsync()`
+**When** le worker démarre
+**Then** `ConnectWithRetryAsync` (broker) puis, **avant** `Start()`,
+  `StartupCompatibilityCheck.Verify(descripteur embarqué, AscoLsiDbContext)`
+  (FR-8) ; un échec de compatibilité → `LogError` + le worker **ne démarre pas sa
+  boucle** (défaut de déploiement, `AC-FR8-1..4`) ; compatible → `Start()` arme le
+  timer de `Publisher` (`Frequency` = `Import:PollingInterval`)
 
-**Given** un `Stop` du Launcher pendant un tick
+**Given** un tick (`Execute` = `Client.Actions`)
+**When** il s'exécute
+**Then** il construit par tick : `Func<AscoLsiDbContext>`
+  (`new DbContextOptionsBuilder<…>().UseSqlServer(cs)`),
+  `DirectoryFileSource(Import:InboxPath)`, `Kape22FichierProcessor`, `InboxScanner` ;
+  appelle `scanner.RunTick(cancellationToken)` puis `scanner.PurgeRetention()` ;
+  publie un message de statut MQTT (comme `OrdresFabricationSync`)
+**And** une exception **par Fichier** est capturée dans `Actions` / `InboxScanner`
+  (log `ERROR`, Fichier en `error/` ou laissé en `processing/` selon la panne —
+  détail Story 3.5), la boucle **ne s'arrête pas** (contourne le
+  `catch → Stop()` du timer de `Publisher`)
+
+**Given** un `WorkerAdapter.StopAsync` du Launcher (→ `Client.Stop()` +
+  `Client.Disconnect()`) pendant un tick
 **When** le worker s'arrête
-**Then** le Fichier en cours finit ou reste dans `processing/` (jamais à moitié
-  inséré) ; arrêt propre **< 5 s** (AC-FR14-6, NFR-9)
+**Then** le `Client` détient un `CancellationTokenSource` annulé par `Stop()` ;
+  `Actions` vérifie le jeton **entre Fichiers** (jamais mi‑Fichier) → le Fichier
+  en cours finit ou reste dans `processing/`, jamais à moitié inséré ; le timer
+  est disposé ; arrêt propre **< 5 s** (`AC-FR14-6`, NFR-9)
 
-**Given** la composition DI de l'hôte
-**When** le worker s'initialise
-**Then** la persistance est enregistrée via `AddDbContextFactory<AscoLsiDbContext>`
-  (fabrique singleton) ; `Kape22FichierProcessor` reçoit
-  `Func<AscoLsiDbContext> = () => factory.CreateDbContext()` ; `Kape22Persister`
-  est construit par Fichier, jamais en DI (réconciliation A-3 / F-11).
+**Given** le Launcher `GET /workers`
+**When** il interroge la flotte
+**Then** `WorkerAdapter<Client>` remonte `IsRunning` (= `Client.IsConnected`),
+  `IsActive`, `LastStartedAt`, `LastError` — aucun code de statut côté worker
+  (`AC-FR14-5`, réalisé par la Story 3.0 + vérifié ici)
 
-**Tests xUnit (TDD — écrits en premier, CC-1) :** `AC-FR14-5`, `AC-FR14-6`, plus
-un test de composition (l'hôte résout `IFichierProcessor` et une fabrique de
-contexte fraîche par appel).
+**Tests xUnit (TDD — écrits en premier, CC-1)** — dans `MicroServices.sln`
+(`Kape22ImportP60.Tests`, modèle `OrdresFabricationSync.Tests`) : `AC-FR14-6` (un
+`Stop()` pendant un tick long simulé rend la main dans le budget, Fichier en cours
+terminé ou en `processing/`) ; `AC-FR14-5` (via `WorkerAdapter<Client>` avec un
+client stubé : `IsRunning`/`LastError` reflètent l'état) ; FR-8 (`CreateAsync` sur
+un `AscoLsiDbContext` incompatible ne démarre pas la boucle). Le pipeline lui‑même
+est couvert par 3.1/3.2 (lib).
 
 **Critères transverses :** CC-1, CC-2, CC-3, CC-4, CC-5, CC-7.
 
 ---
 
-### Story 3.5 : Robustesse de la boucle worker
+### Story 3.5 : Robustesse de la boucle `Client`
 
 As a exploitant,
 I want que la boucle survive à une exception imprévue, à une source de fichiers
@@ -1309,6 +1445,18 @@ So that le service tourne sans surveillance permanente.
 SQL Server local de la Story 2.1 — la panne est simulée par une chaîne de
 connexion pointant un hôte/port mort (ou un toggle de la fixture), pas par
 l'arrêt d'un conteneur (AR-12).
+
+**Réancrage (correction de cap 2026‑09‑09).** La « boucle » est `Client.Actions`
+armée par le timer de `Publisher`. Le callback du timer de `Publisher` appelle
+`Stop()` sur exception non capturée → `Actions` **doit** capturer ses propres
+exceptions par Fichier (modèle `OrdresFabricationSync.Client.Actions` : `try/catch`
+autour de chaque unité de travail, `LogError`, on continue). `AC-FR15-1` :
+`try/catch` dans `InboxScanner`/`Actions`. `AC-FR15-2` : `DirectoryFileSource`
+lève → capturé, `LogWarning`, retry. `AC-FR15-3` : `Kape22Persister` traduit
+`DbException` → `PersistenceError`, Fichiers **laissés en `processing/`**. `AC-FR15-4` :
+reprise via `processing/` + garde‑fou D22 ; le `Client` est reconstruit à chaque
+`CreateAsync` du `WorkerAdapter`. Tests `AC-FR15-1/2` en `Category=Unit` sur
+`InboxScanner` (lib) + un test `Actions` (`MicroServices.sln`).
 
 **Critères transverses :** CC-1, CC-2, CC-3, CC-4, CC-5, CC-7.
 
@@ -1363,6 +1511,16 @@ So that la v1 est acceptable pour la mise en production.
 harnais SQL Server local Story 2.1) ; test `*.errors.json` lisible (SM‑3) ;
 tests de perf (NFR‑1/2 — la mesure < 200 ms exclut le temps de connexion /
 d'application du schéma).
+
+**Réancrage (correction de cap 2026‑09‑09).** L'agrégateur `AC → [Trait]`
+(`AcTraitCoverageTests`, SM‑1) est **inchangé** (déjà en place, retro Épic 1).
+**SM‑2 (E2E 10 fichiers)** est piloté au niveau **bibliothèque** : `InboxScanner`
+(in‑memory `IFileSource` ou `DirectoryFileSource` sur dossier temp) +
+`Kape22FichierProcessor` réel + SQL Server local (commit réel + reset). **NFR‑1/2**
+mesurés sur le pipeline lib (hors broker/HTTP). Un test « fumée » niveau `Client`
+(`MicroServices.sln`) — `CreateAsync` (broker fake/embarqué) → un tick → une ligne
+insérée — remplace le `WebApplicationFactory<Program>` de l'ex‑3.4 (abandonné,
+plus de `Program`).
 
 **Critères transverses :** CC-1, CC-2, CC-3, CC-4, CC-5, CC-7. **AR-12** : E2E
 sur SQL Server local.
