@@ -584,3 +584,11 @@ review 1.7 note.
 - source_spec: `spec-3-0-repositionnement-structurel-lib.md`
   summary: Le fail-fast sur chaîne de connexion `AscoLSI` manquante/vide a disparu avec `AddAscoLsiPersistence` (Story 3.0) — le `Client` doit valider `ConnectionStrings:AscoLSI` au démarrage (message clair) avant `CreateAsync`, sinon l'échec ne surviendra qu'à la première requête EF.
   evidence: `AddAscoLsiPersistence` jetait `InvalidOperationException` sur valeur null/vide (test `AddAscoLsiPersistence_ThrowsWhenTheConnectionStringIsMissing`, supprimé avec le fichier). Responsabilité déplacée vers le `Client` (objectif B / Story 3.4) ; le modèle `OrdresFabricationSync` ne fait pas ce fail-fast non plus (`configuration["SourceContext"] ?? string.Empty`).
+
+- source_spec: `spec-3-4-gpao-importp60-client-worker.md`
+  summary: Ajouter un `CancellationToken` à `InboxScanner.RunTick` (vérifié entre Fichiers, jamais passé à `processor.Process`) + son test `AC-FR14-6`, pour un arrêt strict < 5 s même avec un gros backlog dans l'inbox (NFR-9).
+  evidence: Scindé du spec 3.4 (dépassement de taille + traversée de 2 dépôts). Le worker `GpaoImportP60` livré avec arrêt grossier : `Stop()` dispose le timer (aucun nouveau tick) et le tick en cours se termine — comme `OrdresFabricationSync.Client` dont `Actions` n'est pas interruptible mi-sync. Le raffinement (interruption entre Fichiers) vit dans `TextToXml.sln` (git), commit séparé, ~4 lignes + 1 test.
+
+- source_spec: `spec-3-4-gpao-importp60-client-worker.md`
+  summary: Ré-entrance du timer de `MicroService.Publish.Publisher` : `Start()` arme un `System.Threading.Timer` périodique dont le callback `async void` n'attend pas la fin de l'invocation précédente d'`Execute` ; un tick d'import plus long que `Frequency` peut chevaucher le suivant, deux `InboxScanner.RunTick()` courant sur la même inbox (l'un des `Move` échoue alors).
+  evidence: Constaté à la revue du spec 3.4 mais **pré-existant** — même exposition sur `OrdresFabricationSync.Client` / `ImportFiles` / tous les workers `Publisher`. Contenu en partie par le try/catch par Fichier d'`InboxScanner` + le déplacement vers `processing/`. Correctif = un garde de non-ré-entrance (`SemaphoreSlim(1,0)` ou flag `_running`) dans `Publisher.Start`'s callback, côté `MicroService` (hors périmètre worker P60, touche tous les workers).

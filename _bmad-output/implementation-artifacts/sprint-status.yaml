@@ -67,7 +67,7 @@ development_status:
   3-1-scrutation-du-dossier-de-réception-cycle-de-vie-du-fichier: done
   3-2-orchestration-par-fichier: done
   3-3-double-journalisation-mqttnetservices-logs-l_d_log_commande: done
-  3-4-intégration-launcher-arrêt-propre: backlog
+  3-4-intégration-launcher-arrêt-propre: review
   3-5-robustesse-de-la-boucle-worker: backlog
   3-6-validation-de-bout-en-bout-harnais-de-couverture-sm-1-2-3: backlog
   epic-3-retrospective: optional

@@ -1152,7 +1152,7 @@ portail, sans infra dupliquée.
 
 **Given** `MicroServices.sln`
 **When** j'ajoute le worker P60
-**Then** un projet `Kape22/ImportP60` (nom à confirmer) contient
+**Then** un projet `GPAO/ImportP60` (`GpaoImportP60`) contient
   `Client : Publisher, IPublisher, IService` : ctor `Client(IConfiguration)` (lit
   `Import:*`), `CreateAsync()` (`ConnectWithRetryAsync` puis `Start()`),
   `Frequency` = `Import:PollingInterval`, `Execute` = un tick (FR-8 au premier tick
@@ -1160,10 +1160,10 @@ portail, sans infra dupliquée.
 **And** il référence la lib `Kape22Importer` (`ProjectReference` cross‑dépôt) +
   `MicroService.csproj`
 **And** `Launcher/WorkerRegistry.cs` gagne **une** entrée
-  `Factories["Kape22ImportP60"]` (enveloppe `WorkerAdapter<Client>`) et
+  `Factories["GpaoImportP60"]` (enveloppe `WorkerAdapter<GpaoImportP60.Client>`) et
   `Launcher/workers.json` **une** entrée
-  `{ "Name": "Kape22ImportP60", "Type": "Kape22ImportP60", "ConfigPath": "Kape22ImportP60.json" }`
-**And** `Kape22ImportP60.json` porte `Import:*` (chemins, `PollingInterval`,
+  `{ "Name": "GpaoImportP60", "Type": "GpaoImportP60", "ConfigPath": "GpaoImportP60.json" }`
+**And** `GpaoImportP60.json` porte `Import:*` (chemins, `PollingInterval`,
   `InitiatingServer`, `RetentionDays`) + les chaînes `AscoLSI` / `MQTTnetServices`
   — **jamais en dur** (CC-7)
 
@@ -1401,11 +1401,13 @@ portail.
   (`AC-FR14-5`, réalisé par la Story 3.0 + vérifié ici)
 
 **Tests xUnit (TDD — écrits en premier, CC-1)** — dans `MicroServices.sln`
-(`Kape22ImportP60.Tests`, modèle `OrdresFabricationSync.Tests`) : `AC-FR14-6` (un
-`Stop()` pendant un tick long simulé rend la main dans le budget, Fichier en cours
-terminé ou en `processing/`) ; `AC-FR14-5` (via `WorkerAdapter<Client>` avec un
-client stubé : `IsRunning`/`LastError` reflètent l'état) ; FR-8 (`CreateAsync` sur
-un `AscoLsiDbContext` incompatible ne démarre pas la boucle). Le pipeline lui‑même
+(`GpaoImportP60.Tests`, modèle `OrdresFabricationSync.Tests`) : `RunTickCore`
+(seam statique) traite les Fichiers d'un `InMemoryFileSource` ; `ReadConfig`
+(guard `ConnectionStrings:AscoLSI` vide + liaison de la section `Import`) ; FR-8
+(`StartupCompatibilityCheck.Verify` sur le descripteur embarqué ⟺ modèle
+`AscoLsiDbContext` — wiring cross-dépôt). L'arrêt fin < 5 s entre Fichiers
+(`InboxScanner.RunTick(CancellationToken)`) est un suivi séparé (`deferred-work.md`).
+Le pipeline lui‑même
 est couvert par 3.1/3.2 (lib).
 
 **Critères transverses :** CC-1, CC-2, CC-3, CC-4, CC-5, CC-7.
