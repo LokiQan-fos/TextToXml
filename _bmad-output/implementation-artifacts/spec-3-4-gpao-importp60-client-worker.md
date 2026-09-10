@@ -3,7 +3,7 @@ title: 'Story 3.4 — worker GpaoImportP60 (Client Launcher)'
 type: 'feature'
 created: '2026-09-09'
 status: 'done'
-review_loop_iteration: 0
+review_loop_iteration: 1
 baseline_commit: 'eeb84f96f9dbfe329d156e06983e7653400958e0'
 context:
   - _bmad-output/implementation-artifacts/epic-3-context.md
@@ -11,6 +11,11 @@ context:
 ---
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
+
+<!-- Renegotiated 2026-09-09 (code review D1, ratified by the user): the cooperative stop between -->
+<!-- Fichiers is delivered in this story, not deferred. InboxScanner.RunTick takes a -->
+<!-- CancellationToken and Client wires it from an override Stop(). The paragraphs below are amended -->
+<!-- to match; epics.md l.1408-1411 and PRD AC-FR14-6 already reflect it. -->
 
 ## Intent
 
@@ -22,10 +27,11 @@ de la Story 3.3 (`ILogger` → `SharedLogger`).
 **Approach:** Ajouter à `MicroServices.sln` un worker mince
 **`class Client : Publisher, IPublisher, IService`** (projet `GpaoImportP60`,
 dossier de solution `GPAO`, modèle `Laminoir/OrdresFabricationSync`) et l'enregistrer
-dans le `Launcher` (`WorkerRegistry` + `workers.json`). L'interruption fine
-entre Fichiers (`InboxScanner.RunTick(CancellationToken)`) est un suivi séparé
-(`deferred-work.md`) : ici `Stop()` dispose le timer (aucun nouveau tick) et le
-tick en cours se termine, comme `OrdresFabricationSync.Client`.
+dans le `Launcher` (`WorkerRegistry` + `workers.json`). L'arrêt coopératif entre
+Fichiers est livré : `InboxScanner.RunTick(CancellationToken)` vérifie le jeton
+entre deux Fichiers (jamais mi‑Fichier, jamais passé à `processor.Process`), et
+`Client.override Stop()` annule un `CancellationTokenSource` puis attend le tick
+en vol dans le budget d'arrêt avant de disposer le timer.
 
 ## Boundaries & Constraints
 
@@ -38,7 +44,8 @@ tick en cours se termine, comme `OrdresFabricationSync.Client`.
 - Le `Client` réutilise la lib telle quelle : `InboxScanner`,
   `Kape22FichierProcessor`, `DirectoryFileSource`, `ImportOptions`,
   `AscoLsiDbContext`, `StartupCompatibilityCheck.Verify`, `EmbeddedDescriptor.Xml`.
-  Aucune modif de la lib.
+  Seule modif de lib autorisée (renégociée 2026‑09‑09) : `InboxScanner.RunTick`
+  gagne un `CancellationToken` optionnel vérifié entre Fichiers.
 - Modèle `OrdresFabricationSync` respecté : `Actions` **ne lève jamais** (corps
   dans un `try/catch` → `LogError`, on continue) ; sinon le callback du timer de
   `Publisher` appelle `Stop()` et tue le worker.
@@ -63,7 +70,8 @@ tick en cours se termine, comme `OrdresFabricationSync.Client`.
 - Pas d'abstraction `IImportJournal` — le pont `ILogger` est
   `Serilog.Extensions.Logging` (`new SerilogLoggerFactory(Logger)`).
 - Ne pas commiter la copie SVN de `MicroServices.sln` (l'utilisateur commite).
-- Ne pas modifier `InboxScanner` (l'interruption fine est différée).
+- Ne pas modifier `InboxScanner` au‑delà du `CancellationToken` de `RunTick`
+  (renégocié 2026‑09‑09) : le reste de la lib reste intouché.
 
 ## I/O & Edge-Case Matrix
 
@@ -73,7 +81,7 @@ tick en cours se termine, comme `OrdresFabricationSync.Client`.
 | FR‑8 incompatible | modèle `AscoLsiDbContext` / descripteur incompatibles | `LogError` (event dédié), la boucle **ne démarre pas**, `IsConnected` reste vrai | `StartupCompatibilityException` capturée dans `CreateAsync` |
 | Tick nominal | 3 Fichiers dans l'inbox | `RunTickCore` : `InboxScanner.RunTick()` + `PurgeRetention()` ; puis `Publish()` d'un message de statut | exception par Fichier déjà contenue dans `InboxScanner.ProcessFromProcessing` |
 | Exception inattendue dans `Actions` | `DirectoryFileSource` lève (dossier injoignable) | capturée dans `Actions`, `LogError`, le worker **continue** (timer non tué) | `try/catch` autour du corps de `Actions` |
-| `Stop()` du Launcher | `WorkerAdapter.StopAsync` → `Client.Stop()` | `base.Stop()` dispose le timer → aucun nouveau tick ; un tick en vol se termine ; pas de demi‑insertion (garanti par la transaction de `Kape22Persister`) | — |
+| `Stop()` du Launcher | `WorkerAdapter.StopAsync` → `Client.Stop()` | `Stop()` annule le jeton (le tick s'arrête entre deux Fichiers), attend le tick en vol (budget `< 5 s`), puis `base.Stop()` dispose le timer ; pas de demi‑insertion (garanti par la transaction de `Kape22Persister`) | — |
 | Config connexion vide | `ConnectionStrings:AscoLSI` absent/vide | `InvalidOperationException` au message explicite, à la construction du `Client` | pas d'échec différé opaque |
 
 </frozen-after-approval>
@@ -185,21 +193,25 @@ tick en cours se termine, comme `OrdresFabricationSync.Client`.
 
 ## Design Notes
 
-- **`RunTickCore` `internal static`** : `Client.Actions` est une coquille non
-  testable (broker, timer). Toute la logique testable est extraite dans une
-  méthode statique prenant ses dépendances en paramètres — comme
-  `OrdresFabricationSync.Client.SyncCoreAsync`. Le pipeline lui‑même
-  (`InboxScanner` / `Kape22FichierProcessor`) est déjà couvert dans TextToXml.sln.
+- **Seams `internal static`** : `Client.Actions` / `CreateAsync` sont des coquilles
+  non testables (broker, timer, sink SQL). La logique testable est extraite en
+  méthodes statiques prenant leurs dépendances en paramètres — comme
+  `OrdresFabricationSync.Client.SyncCoreAsync` : `RunTickCore` (scan + purge isolés,
+  jeton d'annulation, `onError`), `IsDescriptorCompatible` (décision de la porte
+  FR‑8), `ReadConfig` (gardes de config). Le pipeline lui‑même (`InboxScanner` /
+  `Kape22FichierProcessor`) est déjà couvert dans TextToXml.sln.
 - **Pont Serilog** : `InboxScanner` / `Kape22FichierProcessor` prennent `ILogger<T>` ;
   `AbstractService.Logger` est un `Serilog.Core.Logger`.
   `new SerilogLoggerFactory(Logger).CreateLogger<T>()` (`Serilog.Extensions.Logging`)
   route le journal vers `MQTTnetServices.Logs` sans câbler de sink (revisite 3.3).
-- **Arrêt (grossier, assumé)** : `Publisher.Stop()` dispose le `_timer` → aucun
-  nouveau tick. Un `Execute` en cours court jusqu'au bout (pas d'annulation
-  coopérative — comme `OrdresFabricationSync`). L'atomicité par Fichier est
-  garantie par la transaction de `Kape22Persister` : jamais de demi‑insertion,
-  même tué. L'interruption fine entre Fichiers est différée (`deferred-work.md`,
-  `spec-3-4-...`).
+- **Arrêt coopératif** (renégocié 2026‑09‑09) : `Client.Stop()` annule un
+  `CancellationTokenSource` ; `InboxScanner.RunTick` vérifie le jeton entre deux
+  Fichiers (jamais mi‑Fichier, jamais passé à `processor.Process`) et `RunTickCore`
+  saute la purge de rétention si le jeton est annulé. `Stop()` attend ensuite le
+  tick en vol (`ShutdownBudget` = 4 s) avant `base.Stop()`, qui dispose le `_timer`.
+  L'atomicité par Fichier reste garantie par la transaction de `Kape22Persister` :
+  jamais de demi‑insertion, même tué. Reste différé (`deferred-work.md`) : rendre
+  `PurgeRetention` elle‑même interruptible ; la ré‑entrance du timer de `Publisher`.
 - **Cross‑repo** : `GpaoImportP60` → `Kape22Importer.csproj` par chemin relatif ;
   EF Core 10 arrive transitivement (la lib est net10/EF10). Aucun conflit avec
   `OrdresFabricationSync` (EF 9) — assemblies séparées.
@@ -235,3 +247,76 @@ tick en cours se termine, comme `OrdresFabricationSync.Client`.
 **Doc (TextToXml.sln, git)**
 
 - `epics.md` Stories 3.0/3.4 : `Kape22ImportP60` → `GpaoImportP60`. `deferred-work.md` : arrêt fin `InboxScanner.RunTick(CancellationToken)` + ré‑entrance du timer de `Publisher` (pré‑existant).
+
+## Review Findings
+
+Adversarial code review 2026-09-09 (`/bmad-code-review`, 4-layer fan-out: blind-hunter,
+edge-case-hunter, verification-gap, acceptance-auditor). Scope: SVN r530+r531
+(`GPAO/ImportP60/**`, `Launcher/**`) + git `8eb735c` (`InboxScanner.cs` cooperative token).
+Verdict: **review refused, then all findings applied** (user chose "apply every patch",
+2026-09-09). CC-2/CC-3/CC-4/CC-6/CC-7 were clean from the start; the blocking gaps
+(AC↔test traceability, frozen-spec breach, `Actions` can throw) are fixed.
+`MicroServices.sln` build 0 warning, `dotnet test` green (MicroService 33 · GpaoImportP60 9 ·
+CopyDataToDb 13 · OrdresFabricationSync 33 · Launcher.Tests 2). Commits pending: SVN by the
+user; TextToXml git doc-only.
+
+### Decision-needed — resolved 2026-09-09 (all → patch, applied)
+
+- [x] [Review][Patch] **(D1 — ratify)** Frozen `<frozen-after-approval>` block breached by the
+  delivered cooperative cancellation. **Applied:** frozen block amended (Approach, `Always`
+  lib-reuse clause, `Never` clause, Design Notes "Arrêt coopératif") with a dated renegotiation
+  note; matches `epics.md` l.1408-1411 and PRD `AC-FR14-6`.
+- [x] [Review][Patch] **(D2 — add test)** `AC-FR14-5` had no `[Trait("AC","FR14-5")]` test.
+  **Applied:** new `Launcher.Tests` project (added to `MicroServices.sln`), `WorkerRegistry.Factories`
+  made `internal` + `InternalsVisibleTo`. `WorkerRegistryTests` asserts `GpaoImportP60` resolves to
+  `WorkerAdapter<GpaoImportP60.Client>` exposing `IsRunning`/`IsActive`/`LastStartedAt`/`LastError`,
+  and that `workers.json` lists it. 2 tests, `[Trait("AC","FR14-5")]`.
+- [x] [Review][Patch] **(D3 — enforce budget)** NFR-9 "< 5 s" not enforced. **Applied:** `Actions`
+  stores its running tick as `_tick` (`Task.Run` over the synchronous body); `Client.override Stop()`
+  cancels then `await Task.WhenAny(_tick, Task.Delay(ShutdownBudget))` (4 s) before `base.Stop()`.
+  `RunTickCore_WithACancelledToken_ProcessesNothingAndSkipsPurge_AcFr14_6` covers the seam.
+
+### Patch — applied 2026-09-09
+
+- [x] [Review][Patch] `Actions`: `PayLoad` / `await Publish()` moved so the tick body is a guarded
+  task; the guarded body never throws (`RunTickCore` wraps scan and purge each in try/catch →
+  `onError`). *Always: Actions ne lève jamais* holds. [`GPAO/ImportP60/Client.cs`]
+- [x] [Review][Patch] `RunTickCore`: `if (cancellationToken.IsCancellationRequested) return;`
+  between `RunTick` and `PurgeRetention` — a cancelled Stop skips the purge sweep.
+- [x] [Review][Patch] `RunTickCore`: scan and purge each isolated in their own try/catch → a scan
+  that throws no longer skips that tick's purge; neither escapes to the Publisher timer callback.
+- [x] [Review][Patch] `Client` ctor `Frequency`: `>= TimeSpan.FromSeconds(1) ? (int)…TotalSeconds : 30`
+  — a sub-second interval falls back to 30 instead of arming the timer at a zero period; comment fixed.
+- [x] [Review][Patch] `ReadConfig`: throws `InvalidOperationException` with a clear message when
+  `Import:InboxPath` is empty, next to the `AscoLSI` guard. New test
+  `ReadConfig_WhenInboxPathIsMissing_ThrowsWithAClearMessage`.
+- [x] [Review][Patch] Testable seams extracted from `Client`: `IsDescriptorCompatible` (FR-8 gate
+  decision → `AC-FR8-1` / `AC-FR8-4` tests exercise the Client's branch, not just the library
+  function); `RunTickCore` gains `onError` so the "never throws" contract is tested
+  (`RunTickCore_WhenTheFileSourceThrows_ReportsToOnErrorAndDoesNotEscape`).
+- [x] [Review][Patch] `RunTickCore_ArchivesEveryInboxFichier` → renamed
+  `RunTickCore_ArchivesEveryStableInboxFichier`, `[Trait("AC","FR13-1")]` dropped (it is a wiring
+  smoke test), comment corrected.
+- [x] [Review][Patch] CC-5: worker test names now cite their AC (`…_AcFr14_6`, `…_AcFr8_1`,
+  `…_AcFr8_4`, `…_AcFr14_5`); the config-guard tests carry a header comment naming the FR-11-8 /
+  FR-12-8 contracts they re-verify and no longer wrongly tag those other-story ACs.
+
+### Deferred (pre-existing or design-acknowledged)
+
+- [x] [Review][Defer] FR-8 tests build the model with `UseInMemoryDatabase` while production
+  `CreateAsync` uses `UseSqlServer`; the `IModel` differs (column types, nullability) — exactly
+  what FR-8 checks. Exhaustive `AC-FR8-1..3` are in `Kape22Importer.Tests` (AR-12 harness) by
+  spec. — deferred, spec-sanctioned split.
+- [x] [Review][Defer] Non-`StartupCompatibilityException` faults from `NewAscoLsiContext()` /
+  `Verify` in `CreateAsync` (e.g. malformed connection string) escape the catch; caught by
+  `WorkerAdapter.StartAsync` (LastError + rethrow), not a clean `LogError + return`. — deferred.
+- [x] [Review][Defer] `Dispose()` does not `Cancel()`; disposal not via `Stop()` tears down
+  mid-tick without signalling. `WorkerAdapter.StopAsync` always calls `Stop()` first in practice.
+  — deferred, low risk.
+- [x] [Review][Defer] `WorkerService` (standalone `dotnet run` host): `RetryHelper` rebuilds a
+  `Client` per attempt without disposing the previous; `StopAsync` never `Dispose()`s. Impact
+  limited to `dotnet run`; inherited from the `OrdresFabricationSync` model. — deferred.
+- [x] [Review][Defer] `IsRunning` (=`IsConnected`) stays true after the FR-8-incompatible /
+  broker-never-connected branch, with `WorkerAdapter.LastError` null: dashboard green, worker
+  silently idle. The I/O matrix accepts "IsConnected reste vrai"; the null `LastError` is an
+  observability follow-up. — deferred.

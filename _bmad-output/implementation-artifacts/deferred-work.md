@@ -1,5 +1,28 @@
 # Deferred Work
 
+## Deferred from: code review of spec-3-4-gpao-importp60-client-worker (2026-09-09)
+
+- FR-8 tests build the model with `UseInMemoryDatabase` while production `CreateAsync` uses
+  `UseSqlServer`; the EF `IModel` differs (column types, nullability) — exactly what FR-8 checks.
+  Exhaustive `AC-FR8-1..3` live in `Kape22Importer.Tests` on the AR-12 SQL Server harness by spec;
+  the worker-level FR-8 tests are wiring smoke only.
+- Non-`StartupCompatibilityException` faults from `NewAscoLsiContext()` / `StartupCompatibilityCheck.Verify`
+  inside `Client.CreateAsync` (malformed connection string, provider error) escape the `catch`;
+  they are caught by `WorkerAdapter.StartAsync` (sets `LastError`, rethrows) rather than the
+  intended "deployment fault → LogError + return without starting the loop".
+- `Client.Dispose()` does not `Cancel()` the `CancellationTokenSource`; any disposal path not
+  routed through `Stop()` first tears down mid-tick without signalling cancellation. In practice
+  `WorkerAdapter.StopAsync` always calls `Stop()` before `Dispose()`.
+- `GpaoImportP60.WorkerService` (standalone `dotnet run` host only): `RetryHelper.RetryAsync`
+  constructs a fresh `Client` per attempt without disposing the previous one; `StopAsync` calls
+  `Stop()` + `Disconnect()` but never `Dispose()`. Inherited from the `OrdresFabricationSync`
+  model; the Launcher drives `Client` directly so production is unaffected.
+- `WorkerAdapter.IsRunning` (= `Client.IsConnected`) stays true after `CreateAsync` returns on the
+  FR-8-incompatible or broker-never-connected branch, with `WorkerAdapter.LastError` null — the
+  dashboard shows the worker running while it processes nothing. The spec I/O matrix accepts
+  "IsConnected reste vrai"; surfacing the idle state (LastError / a dedicated status) is a
+  follow-up.
+
 ## Correction of course: Story 3.4 rejected — Launcher alignment (2026-09-09)
 
 Story 3.4 (as implemented 2026-09-08/09) was rejected in adversarial review: it rebuilt, standalone
