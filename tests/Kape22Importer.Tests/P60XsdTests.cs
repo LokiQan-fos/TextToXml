@@ -154,17 +154,17 @@ public class P60XsdTests
     }
 
     // AC-FR7-1: a normalized XML that does not conform to P60.xsd yields a single
-    // {Block:File, Code:PersistenceError} citing the schema error, and no DTO.
+    // {Block:File, Code:SchemaInvalid} citing the schema error, and no DTO.
     [Fact]
     [Trait("AC", "FR7-1")]
-    public void P60Deserializer_NonConformantXml_YieldsFileLevelPersistenceError_AcFr7_1()
+    public void P60Deserializer_NonConformantXml_YieldsFileLevelSchemaInvalid_AcFr7_1()
     {
         P60DeserializeResult result = P60Deserializer.Deserialize(NonConformantNormalizedXml());
 
         Assert.Null(result.File);
         ConversionError error = Assert.Single(result.Errors);
         Assert.Equal(Block.File, error.Block);
-        Assert.Equal(ErrorCode.PersistenceError, error.Code);
+        Assert.Equal(ErrorCode.SchemaInvalid, error.Code);
         Assert.False(string.IsNullOrWhiteSpace(error.Message));
     }
 

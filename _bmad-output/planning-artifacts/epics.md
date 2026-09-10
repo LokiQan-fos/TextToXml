@@ -868,7 +868,7 @@ So that toute dérive entre descripteur, XML et DTO est attrapée tôt.
 **Given** le XML normalisé d'un Fichier valide
 **When** `Kape22Importer` le traite
 **Then** il est **validé contre `P60.xsd`** (`XmlReader` + schéma) — un XML non
-  conforme → `{Block:File, Code:PersistenceError}` citant l'erreur de schéma
+  conforme → `{Block:File, Code:SchemaInvalid}` citant l'erreur de schéma
   (filet — ne doit pas arriver si Étape 1 a réussi) (AC-FR7-1, AC-FR5-14)
 **And** un XML conforme se **désérialise** en `Kape22File` (`XmlSerializer`) sans
   perte : round‑trip `int?`/`string` conservé, un Champ typé omis → propriété
@@ -1453,9 +1453,12 @@ armée par le timer de `Publisher`. Le callback du timer de `Publisher` appelle
 `Stop()` sur exception non capturée → `Actions` **doit** capturer ses propres
 exceptions par Fichier (modèle `OrdresFabricationSync.Client.Actions` : `try/catch`
 autour de chaque unité de travail, `LogError`, on continue). `AC-FR15-1` :
-`try/catch` dans `InboxScanner`/`Actions`. `AC-FR15-2` : `DirectoryFileSource`
-lève → capturé, `LogWarning`, retry. `AC-FR15-3` : `Kape22Persister` traduit
-`DbException` → `PersistenceError`, Fichiers **laissés en `processing/`**. `AC-FR15-4` :
+`try/catch` dans `InboxScanner`/`Actions` ; l'exception imprévue devient un
+résultat `{Block:File, Code:UnexpectedFailure}` → `error/`. `AC-FR15-2` :
+`DirectoryFileSource` lève → capturé, `LogWarning`, retry. `AC-FR15-3` :
+`Kape22Persister` traduit `DbException` → `PersistenceError` (seul émetteur de ce
+code — une non‑conformité schéma est `SchemaInvalid`, une exception imprévue
+`UnexpectedFailure`), Fichiers **laissés en `processing/`**, jamais `error/`. `AC-FR15-4` :
 reprise via `processing/` + garde‑fou D22 ; le `Client` est reconstruit à chaque
 `CreateAsync` du `WorkerAdapter`. Tests `AC-FR15-1/2` en `Category=Unit` sur
 `InboxScanner` (lib) + un test `Actions` (`MicroServices.sln`).

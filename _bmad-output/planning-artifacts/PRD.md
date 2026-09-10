@@ -288,11 +288,23 @@ Termes à utiliser **à l'identique** dans les FR, UJ, tests et code.
   - *`Errors` (bloquant)* — Structure (Étape 1) : `EmptyFile`, `UndecodableInput`,
     `LayoutInvalid`, `WrongBlockCount`, `LineTooShort` ; Typage (Étape 1) :
     `InvalidInteger`, `InvalidDecimal`, `InvalidDate` ; Étape 2 :
-    `RequiredFieldMissing`, `PersistenceError`.
+    `SchemaInvalid`, `RequiredFieldMissing`, `PersistenceError` ; niveau
+    orchestrateur (Épic 3) : `UnexpectedFailure`.
   - *`Warnings` (contrôle, non bloquant — §0bis D16)* : `SegmentMismatch`,
     `InterBlockMismatch`, `FileNameMismatch`.
   - *(Compatibilité template ↔ colonne — type, longueur — vérifiée **au démarrage**
     du worker, pas via `ErrorCode` : FR‑8.)*
+  - `SchemaInvalid` (Étape 2, `File`) — le XML normalisé ne respecte pas `P60.xsd`
+    ou n'est pas un document bien formé ; gate d'entrée de l'Étape 2, émis par
+    `P60Deserializer` (AC‑FR7‑1). *Filet — ne doit pas arriver si l'Étape 1 a
+    réussi.* Remplace l'usage antérieur de `PersistenceError` pour ce cas.
+  - `PersistenceError` (Étape 2, `File`) — échec SQL capturé par `Kape22Persister`
+    (`DbException`), aucune exception ne remonte (AC‑FR11‑5). Seul émetteur de ce
+    code depuis Story 3.5.
+  - `UnexpectedFailure` (orchestrateur, `File`) — exception inattendue levée
+    pendant le traitement d'un Fichier par l'orchestrateur (`Kape22FichierProcessor`
+    / `InboxScanner`) ; loggée `ERROR`, le Fichier va en `error/`, la boucle
+    continue au Fichier suivant (AC‑FR13‑4, AC‑FR15‑1).
 
 ## 4. Fonctionnalités
 
@@ -546,7 +558,7 @@ public sealed class Kape22Mapper
 
 **Consequences (testables) :**
 - `AC-FR7-1` : le XML normalisé est **validé contre `P60.xsd` avant
-  désérialisation** ; un XML non conforme → `{Block:File, Code:PersistenceError}`
+  désérialisation** ; un XML non conforme → `{Block:File, Code:SchemaInvalid}`
   citant l'erreur de schéma *(filet — ne doit pas arriver si Étape 1 a réussi)*.
 - `AC-FR7-2` : XML valide → `Kape22File` désérialisé (`XmlSerializer`), puis
   entité `L_D_KAPE22` dont chaque propriété homonyme reçoit la valeur typée du DTO.
@@ -1167,9 +1179,11 @@ d'unicité métier ⇒ pas de dédup (§0bis D7). Les 92 colonnes sont figées d
 | `InvalidDecimal` | 1 | Ligne | `FieldId`, `RawValue` |
 | `InvalidDate` | 1 | Ligne | `FieldId`, `RawValue` |
 | `RequiredFieldMissing` | 2 | Ligne | `FieldId`, `Column` |
+| `SchemaInvalid` | 2 | File | `Message` cite la violation `P60.xsd` ou le défaut de forme XML |
 | `InterBlockMismatch` | 2 | Ligne/File | `FieldId` |
 | `FileNameMismatch` | 2 | File | `FieldId` + `RawValue` = segment du nom |
-| `PersistenceError` | 2 | File | `Message` : cause SQL / schéma résumée |
+| `PersistenceError` | 2 | File | `Message` : cause SQL résumée |
+| `UnexpectedFailure` | orch. | File | `Message` : type + message de l'exception |
 
 ## Annexe E — Templates d'exemple (hors périmètre, §0bis D24)
 

@@ -59,7 +59,7 @@ public class MapResultFileMetadataTests
         Assert.True(string.IsNullOrWhiteSpace(result.OF));
     }
 
-    // When the normalized XML cannot be deserialized at all (PersistenceError), neither field is known
+    // When the normalized XML cannot be deserialized at all (SchemaInvalid), neither field is known
     // and the persister writes nothing to L_D_LOG_COMMANDE (D15).
     [Fact]
     public void Map_DeserializationFails_LeavesNumeroFichierAndOfNull()
@@ -67,7 +67,7 @@ public class MapResultFileMetadataTests
         MapResult<L_D_KAPE22> result = Map("<file>not valid against P60.xsd</file>", ReferenceFichierName);
 
         Assert.False(result.Success);
-        Assert.Contains(result.Errors, error => error.Code == ErrorCode.PersistenceError);
+        Assert.Contains(result.Errors, error => error.Code == ErrorCode.SchemaInvalid);
         Assert.Null(result.NumeroFichier);
         Assert.Null(result.OF);
     }

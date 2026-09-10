@@ -31,8 +31,12 @@ public enum ErrorCode
     InvalidDate,
 
     // Blocking errors (Step 2).
+    SchemaInvalid,
     RequiredFieldMissing,
     PersistenceError,
+
+    // Orchestrator-level failure: an unexpected exception thrown while processing one Fichier.
+    UnexpectedFailure,
 
     // Non-blocking consistency warnings.
     SegmentMismatch,

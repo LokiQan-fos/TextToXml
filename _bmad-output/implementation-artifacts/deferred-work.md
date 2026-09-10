@@ -1,5 +1,23 @@
 # Deferred Work
 
+## Deferred from: code review of story-3.5 (2026-09-10)
+
+- source_spec: `epics.md` § Story 3.5
+  summary: Aucune borne « poison-pill / max-attempts » dans `InboxScanner`. Un Fichier qui échoue de façon déterministe (faute I/O répétée à la lecture, ou Fichier malformé pendant une longue panne `AscoLSI`) est retraité intégralement à chaque tick — `Converter` + `Kape22Mapper` + tentative DB — un `Warning` par tick, indéfiniment, indistinguable en `processing/` d'un Fichier qui retente légitimement.
+  evidence: Constaté à la re-revue Story 3.5 (couches blind-hunter + edge-case-hunter). Aucun `AC-FR15-x` ne l'exige ; `AC-FR15-3` veut au contraire un retry infini tant qu'`AscoLSI` est injoignable. Correctif éventuel = compteur de tentatives par Fichier (ou âge de première apparition) → mise en quarantaine `error/` comme poison après N ticks.
+
+- source_spec: `spec-3-4-gpao-importp60-client-worker.md`
+  summary: `InboxScanner.PurgeRetention()` a gagné un `try/catch (IOException/UnauthorizedAccessException)` par racine (Story 3.5, B4) mais toujours pas de `CancellationToken`. Un balayage récursif long sur un gros `archive/` ne peut pas être interrompu dans le budget d'arrêt que la Story 3.4 a établi pour `RunTick`.
+  evidence: Jumeau du `CancellationToken` de `RunTick` (résolu 2026-09-09). `PurgeRetention` est appelé après `RunTick` dans `Client.Actions` ; un `Stop()` du Launcher pendant la purge attend la fin du balayage.
+
+- source_spec: `epics.md` § Story 3.5
+  summary: `InboxScanner.TryStableInboxFichiers` sonde `List(inbox)` deux fois de suite sans délai ni comparaison de `LastWriteTimeUtc`. Sur le `DirectoryFileSource` réel, deux `stat` consécutifs rapportent la même taille même pour un Fichier en cours d'écriture — la porte de stabilité `AC-FR12-5` est quasi un no-op hors du cas de test in-memory (`MarkUnstableOnce`).
+  evidence: Pré-existant Story 3.1 (`StableInboxFichiers`), renommé mais sémantiquement inchangé par la Story 3.5. Correctif = un court délai inter-sondes, ou comparer aussi `LastWriteTimeUtc`.
+
+- source_spec: `epics.md` § Story 3.5
+  summary: Dans `InboxScanner.PurgeRetention`, le `fileSource.Delete` par fichier n'est pas gardé individuellement : un seul fichier verrouillé lève dans la boucle `foreach` et bloque la purge du reste de cette racine (le `catch` englobant abandonne toute la racine).
+  evidence: Constaté à la re-revue Story 3.5 (edge-case-hunter). Pré-existant Story 3.1 pour la boucle ; le `catch` par racine est neuf (B4). Correctif = `try/catch` autour du `Delete` unitaire + `continue`.
+
 ## Deferred from: code review of spec-3-4-gpao-importp60-client-worker (2026-09-09)
 
 - FR-8 tests build the model with `UseInMemoryDatabase` while production `CreateAsync` uses

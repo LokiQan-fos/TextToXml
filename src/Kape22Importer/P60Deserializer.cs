@@ -11,8 +11,8 @@ namespace Kape22Importer;
 
 // Step 2 entry gate (AC-FR7-1, AC-FR5-14, AC-FR5-12b): validate the normalized XML against the
 // embedded P60.xsd, then deserialize it into Kape22File. A schema violation is a safety net that
-// should never fire once Step 1 has succeeded, so it comes back as a single File-level
-// PersistenceError rather than an exception. Story 2.4's Kape22Mapper builds its mapping on top of this.
+// should never fire once Step 1 has succeeded, so it comes back as a single File-level SchemaInvalid
+// error rather than an exception. Story 2.4's Kape22Mapper builds its mapping on top of this.
 public static class P60Deserializer
 {
     // The embedded P60.xsd, pinned by Kape22Importer.csproj.
@@ -37,8 +37,8 @@ public static class P60Deserializer
     }
 
     // Validates the document against P60.xsd and returns the first violation as a File-level
-    // PersistenceError, or null when it conforms. Never throws: a document that is not even well formed
-    // is reported as a violation too.
+    // SchemaInvalid error, or null when it conforms. Never throws: a document that is not even well
+    // formed is reported as a violation too.
     private static ConversionError? Validate(string normalizedXml)
     {
         ConversionError? failure = null;
@@ -52,7 +52,7 @@ public static class P60Deserializer
             failure ??= new ConversionError
             {
                 Block = Block.File,
-                Code = ErrorCode.PersistenceError,
+                Code = ErrorCode.SchemaInvalid,
                 Message = $"Le XML normalisé n'est pas conforme à P60.xsd : {args.Message}",
             };
 
@@ -68,7 +68,7 @@ public static class P60Deserializer
             failure ??= new ConversionError
             {
                 Block = Block.File,
-                Code = ErrorCode.PersistenceError,
+                Code = ErrorCode.SchemaInvalid,
                 Message = $"Le XML normalisé n'est pas un document XML bien formé : {exception.Message}",
             };
         }
@@ -92,7 +92,7 @@ public static class P60Deserializer
 }
 
 // Outcome of P60Deserializer.Deserialize. On success Errors is empty and File carries the DTO; on
-// schema non-conformance Errors holds one File-level PersistenceError and File is null.
+// schema non-conformance Errors holds one File-level SchemaInvalid error and File is null.
 // Properties are declared in alphabetical order (CC-4).
 public sealed record P60DeserializeResult
 {

@@ -282,6 +282,6 @@ public class Kape22MapperTests
         Assert.Null(result.Value);
         ConversionError error = Assert.Single(result.Errors);
         Assert.Equal(Block.File, error.Block);
-        Assert.Equal(ErrorCode.PersistenceError, error.Code);
+        Assert.Equal(ErrorCode.SchemaInvalid, error.Code);
     }
 }
