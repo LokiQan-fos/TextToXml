@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 16:00
-last_updated: 09-10-2026 18:00
+last_updated: 09-11-2026 12:00
 project: TextToXml
 project_key: NOKEY
 tracking_system: file-system
@@ -69,7 +69,13 @@ development_status:
   3-3-double-journalisation-mqttnetservices-logs-l_d_log_commande: done
   3-4-intégration-launcher-arrêt-propre: done
   3-5-robustesse-de-la-boucle-worker: done
-  3-6-validation-de-bout-en-bout-harnais-de-couverture-sm-1-2-3: backlog
+  # Code review 2026-09-11: SM-1 gate extended to full per-AC catalogue (FR-7..FR-15), CC-5/log-
+  # correlation patches applied. AC-FR14-5 found already covered in Launcher.Tests/WorkerRegistryTests.cs
+  # (not GpaoImportP60.Tests). Client smoke test added in MicroServices.sln (EndToEndSmokeTests.cs),
+  # which surfaced and fixed a stale Story-3.5-related test (RunTickCoreTests). TextToXml: 192+308
+  # tests green; MicroServices.sln: GpaoImportP60.Tests 10/10, Launcher.Tests 2/2. See deferred-work.md
+  # for remaining low-severity/pre-existing items (none blocking).
+  3-6-validation-de-bout-en-bout-harnais-de-couverture-sm-1-2-3: done
   epic-3-retrospective: optional
 action_items:
   - id: "epic-1-retro-item-1-passe-hygiene-story-0-epic-2-testsupport"

@@ -1,5 +1,27 @@
 # Deferred Work
 
+## Deferred from: code review of story-3.6 (2026-09-11)
+
+- source_spec: `epics.md` § Story 3.6 "Réancrage" — **RÉSOLU 2026-09-11**.
+  summary: ~~Le test de fumée niveau `Client` (`MicroServices.sln`) et `AC-FR14-5` n'existaient ni dans ce dépôt ni dans `MicroServices.sln`~~. `AC-FR14-5` existait en fait déjà, mais ailleurs que là où je l'avais cherché la première fois : `Launcher.Tests/WorkerRegistryTests.cs` (`WorkerRegistry_RegistersGpaoImportP60AsAWorkerAdapter_AcFr14_5`), l'endroit architecturalement correct puisque `WorkerAdapter<TClient>` est générique et partagé par tous les workers. Le smoke test manquait réellement ; ajouté dans `GPAO/ImportP60.Tests/EndToEndSmokeTests.cs` (`Tick_OneReferenceFichier_InsertsOneRowThroughTheRealPipeline`) — `Client.CreateAsync` lui-même n'étant pas testable (constructeur + `CreateAsync` ouvrent un vrai sink Serilog SQL, un vrai broker et une vraie connexion SQL Server pour la porte FR-8), le test exerce `Client.RunTickCore` avec le vrai `Kape22FichierProcessor` sur EF InMemory et le fixture réel `P60_847_682_001` (lu depuis le dépôt `TextToXml` voisin).
+  evidence: Constaté à la revue de code Story 3.6 (Acceptance Auditor), confirmé par inspection directe du dépôt `MicroServices.sln`, puis corrigé. En écrivant et lançant le smoke test, un test pré-existant sans rapport (`RunTickCoreTests.RunTickCore_WhenTheFileSourceThrows_...`) s'est révélé caduc : la Story 3.5 (côté `TextToXml`) fait désormais avaler par `InboxScanner` les erreurs de listage de dossier en interne (Warning + retry, AC-FR15-2) au lieu de les laisser remonter à `onError` — corrigé et renommé `RunTickCore_WhenTheFileSourceThrows_ContainsTheFailureAndNeverCallsOnError`. `GpaoImportP60.Tests` : 10/10 verts ; `Launcher.Tests` : 2/2 verts.
+
+- source_spec: `epics.md` § Story 3.6
+  summary: `Options()`, `Configuration()`, `Now`, `InitiatingServer`, `InboxRoot`, `TenFichiers` sont copiés-collés à l'identique dans les 3 nouveaux fichiers de test (`EndToEndImportIntegrationTests`, `EndToEndPerformanceTests`, `ErrorsReportReadabilityTests`) au lieu d'être centralisés dans `TestSupport.cs` (déjà `using static` par les trois).
+  evidence: Constaté à la revue de code Story 3.6 (Blind Hunter). Non corrigé dans le patch de revue : le même motif de duplication pré-existe déjà dans `WorkerLoopRobustnessTests.cs` et `Kape22FichierProcessorTests.cs` (mêmes valeurs `Options()`/`Configuration()`/`InitiatingServer = "AFS017"`) depuis des stories antérieures — un correctif limité aux 3 nouveaux fichiers aurait été un nettoyage incohérent. Correctif = passe hygiène dédiée (façon story-0) migrant tous les appelants vers `TestSupport.Options()`/`Configuration()`/`Now`/`InboxRoot`/`TenFichiers`.
+
+- source_spec: `epics.md` § Story 3.6 (NFR-2)
+  summary: Le test NFR-2 (500 Fichiers < 30 s) ne mesure pas 500 insertions réelles : les 50 copies de chaque échantillon partagent un Header, donc le garde-fou anti-doublon D22 court-circuite l'insertion sur 490/500 Fichiers.
+  evidence: Auto-documenté dans le code par un commentaire `ponytail:` (`EndToEndPerformanceTests.cs:104-106`) avec chemin d'évolution nommé (« Swap in 500 distinct Headers if NFR-2 must time 500 real inserts »). Non bloquant ; listé ici pour visibilité au-delà du commentaire inline.
+
+- source_spec: `epics.md` § Story 3.6 (SM-2)
+  summary: La vérification d'archivage SM-2 (`EndToEndImportIntegrationTests`) ne contrôle que l'existence des fichiers archivés (`source.Exists`), pas l'égalité octet à octet avec le Fichier d'origine.
+  evidence: Constaté à la revue de code Story 3.6 (Blind Hunter). Risque limité (l'archivage est une simple copie de fichier), mais une troncature/corruption pendant le déplacement passerait inaperçue.
+
+- source_spec: `epics.md` § Story 3.6 (SM-3)
+  summary: Le commentaire de classe d'`ErrorsReportReadabilityTests` promet que chaque cause porte une colonne (« colonne »), mais le test Step-1 (`InvalidInteger`, Diametre non numérique) n'asserte jamais sur `Column`.
+  evidence: Constaté à la revue de code Story 3.6 (Blind Hunter). Reste à clarifier si une cause Step-1 doit porter `Column = null` ou une valeur, puis ajouter l'assertion correspondante.
+
 ## Deferred from: code review of story-3.5 (2026-09-10)
 
 - source_spec: `epics.md` § Story 3.5

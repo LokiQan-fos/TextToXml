@@ -13,9 +13,9 @@ namespace TextToXml.Tests;
 // assembly gets its own gate instead of only TextToXml.Tests being covered.
 public static class AcTraitCoverage
 {
-    // Trailing "_AcFr5_3", "_AcFr5_12a", "_Ctr2", "_Nfr1" on a test method name.
+    // Trailing "_AcFr5_3", "_AcFr5_12a", "_Ctr2", "_Nfr1", "_Sm2" on a test method name.
     private static readonly Regex SuffixPattern = new(
-        @"_(?:AcFr(?<fr>\d+_\d+[a-z]?)|Ctr(?<ctr>\d+)|Nfr(?<nfr>\d+))$",
+        @"_(?:AcFr(?<fr>\d+_\d+[a-z]?)|Ctr(?<ctr>\d+)|Nfr(?<nfr>\d+)|Sm(?<sm>\d+))$",
         RegexOptions.Compiled);
 
     // Returns one message per AC-named test method missing its [Trait], plus how many methods matched
@@ -56,6 +56,11 @@ public static class AcTraitCoverage
         if (match.Groups["ctr"].Success)
         {
             return ("AC", "CTR-" + match.Groups["ctr"].Value);
+        }
+
+        if (match.Groups["sm"].Success)
+        {
+            return ("AC", "SM-" + match.Groups["sm"].Value);
         }
 
         return ("NFR", match.Groups["nfr"].Value);
