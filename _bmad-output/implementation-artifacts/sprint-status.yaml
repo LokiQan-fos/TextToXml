@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 16:00
-last_updated: 09-14-2026 00:00
+last_updated: 09-14-2026 16:45
 project: TextToXml
 project_key: NOKEY
 tracking_system: file-system
@@ -47,7 +47,7 @@ development_status:
   epic-1-retrospective: done
 
   epic-2: done
-  2-1-entités-ef-database-first-harnais-de-test-docker: done
+  2-1-entités-ef-database-first-harnais-de-test-sql-server-local: done
   2-2-descripteur-p60-xml-enrichi-embarqué-en-ressource: done
   2-3-p60-xsd-statique-génération-du-dto-kape22file-validation-ava: done
   2-4-désérialisation-mapping-dto-kape22file-entité-l_d_kape22: done
@@ -58,25 +58,24 @@ development_status:
   epic-2-retrospective: done
 
   epic-3: done
-  # Correction of course 2026-09-09 (sprint-change-proposal-2026-09-09.md): Story 3.4 rejected
-  # in review (duplicated Launcher infra). Kape22Importer -> library; worker = Client:Publisher
-  # registered in MicroServices.sln/Launcher. 3.1/3.2 reused as-is; 3.3 revisited (logging seam);
-  # 3.0 added (structural); 3.4/3.5/3.6 rewritten. RESOLVED: PRD/epics/scripts/deferred-work
-  # edits landed, verified during the epic-3 retrospective (2026-09-11).
   3-0-repositionnement-structurel-lib-client-launcher: done
   3-1-scrutation-du-dossier-de-réception-cycle-de-vie-du-fichier: done
   3-2-orchestration-par-fichier: done
   3-3-double-journalisation-mqttnetservices-logs-l_d_log_commande: done
-  3-4-intégration-launcher-arrêt-propre: done
-  3-5-robustesse-de-la-boucle-worker: done
-  # Code review 2026-09-11: SM-1 gate extended to full per-AC catalogue (FR-7..FR-15), CC-5/log-
-  # correlation patches applied. AC-FR14-5 found already covered in Launcher.Tests/WorkerRegistryTests.cs
-  # (not GpaoImportP60.Tests). Client smoke test added in MicroServices.sln (EndToEndSmokeTests.cs),
-  # which surfaced and fixed a stale Story-3.5-related test (RunTickCoreTests). TextToXml: 192+308
-  # tests green; MicroServices.sln: GpaoImportP60.Tests 10/10, Launcher.Tests 2/2. See deferred-work.md
-  # for remaining low-severity/pre-existing items (none blocking).
+  3-4-boucle-worker-client-arrêt-propre: done
+  3-5-robustesse-de-la-boucle-client: done
   3-6-validation-de-bout-en-bout-harnais-de-couverture-sm-1-2-3: done
   epic-3-retrospective: done
+
+  epic-4: in-progress
+  4-1-entités-ef-database-first-extension-du-harnais-sql-pour-les: done
+  4-2-extraction-documentation-du-mapping-legacy-annexe-colonne-pa: backlog
+  4-3-mapper-of-coulée-mapping-structurel-pur: backlog
+  4-4-mapper-consignes-les-7-sectioncharge-mapping-structurel-pur: backlog
+  4-5-kape22importbundlemapper-orchestrateur-contrôles-métier-purs: backlog
+  4-6-kape22persister-remplacé-bundle-transaction-unique-contrôle: backlog
+  4-7-extension-de-la-suite-e2e-aux-10-tables-aval: backlog
+  epic-4-retrospective: optional
 action_items:
   - id: "epic-1-retro-item-1-passe-hygiene-story-0-epic-2-testsupport"
     epic: 1
@@ -206,12 +205,12 @@ action_items:
       OU volet SQLite/InMemory en Category=Unit pour la logique de branchement; inclut
       le drop/recreate des tables du harnais dans SqlServerIntegrationFixture (correctif
       F-2: echec PersistenceSmokeTests reproduit en direct, schema de test jamais
-      reinitialise). DONE 2026-09-14: option retenue = service container Linux SQL Server
-      dans ci.yml (dotnet test --filter Category=Integration ajoute) ; SqlServerIntegrationFixture
+      reinitialise). DONE 2026-09-14: option retenue = service container Linux SQL
+      Server dans ci.yml (dotnet test --filter Category=Integration ajoute) ; SqlServerIntegrationFixture
       cree desormais la base de test si absente (EnsureDatabaseExists) et purge toute
-      table utilisateur avant chaque ApplySchema (DropExistingUserTables) - correctif direct
-      F-2. PersistenceSmokeTests.SchemaApplies_CreatesExactlyTheHarnessTables verifie vert
-      en local (128/128 Integration, 0 echec)."
+      table utilisateur avant chaque ApplySchema (DropExistingUserTables) - correctif
+      direct F-2. PersistenceSmokeTests.SchemaApplies_CreatesExactlyTheHarnessTables
+      verifie vert en local (128/128 Integration, 0 echec)."
     owner: "Lead Architecte"
     status: done
     ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-09-11.md"
@@ -221,10 +220,11 @@ action_items:
       hook ou etape build refusant un chore(story-*) sans lignes AC->test dans le
       corps - 2 recidives en 2 epics (F-14 Epic 2, F-3 Epic 3, commits 7629c5b et
       249b6e9 vides). Corriger les 3 coquilles Description de Templates/P60.xml (Rmetteur->Emetteur,
-      tolerence->tolerance)". DONE 2026-09-14: etape CI ajoutee dans ci.yml (pas de hook local,
-      cf. Q-2 de la retro : un hook non installe ne protege rien) - refuse un commit chore(story-*)
-      dont le corps (hors trailer Co-Authored-By) ne mentionne ni AC-FRx-y ni "test" ; les 3
-      coquilles de Templates/P60.xml corrigees (Rmetteur -> Emetteur, tolerence -> tolerance x2)."
+      tolerence->tolerance). DONE 2026-09-14: etape CI ajoutee dans ci.yml (pas de
+      hook local, cf. Q-2 de la retro : un hook non installe ne protege rien) - refuse
+      un commit chore(story-*) dont le corps (hors trailer Co-Authored-By) ne mentionne
+      ni AC-FRx-y ni \"test\" ; les 3 coquilles de Templates/P60.xml corrigees (Rmetteur
+      -> Emetteur, tolerence -> tolerance x2)."
     owner: "SM"
     status: done
     ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-09-11.md"
@@ -232,9 +232,9 @@ action_items:
     epic: 3
     action: "Corriger le commentaire perime de AcCoverageCompletenessTests.cs (lignes
       40-43): AC-FR14-5 est couvert par Launcher.Tests.WorkerRegistryTests.WorkerRegistry_RegistersGpaoImportP60AsAWorkerAdapter_AcFr14_5
-      (MicroServices.sln); garder l exclusion KnownExceptions mais corriger sa justification".
-      DONE 2026-09-14: commentaire de AcCoverageCompletenessTests.cs reecrit, reference directe
-      au test Launcher.Tests, exclusion KnownExceptions inchangee."
+      (MicroServices.sln); garder l exclusion KnownExceptions mais corriger sa justification.
+      DONE 2026-09-14: commentaire de AcCoverageCompletenessTests.cs reecrit, reference
+      directe au test Launcher.Tests, exclusion KnownExceptions inchangee."
     owner: "Dev"
     status: done
     ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-09-11.md"
@@ -250,9 +250,9 @@ action_items:
     epic: 3
     action: "Purger Entete/Pied de CoherenceChecker.cs (reserve CC-2 mineure reconduite
       depuis l Epic 2, non traitee lors du split de Kape22Mapper) - remplacer par
-      Header/Footer ou les 6 noms de domaine sanctionnes". DONE 2026-09-14: seule occurrence
-      restante (CoherenceChecker.cs:18, "Entete"/"Pied") remplacee par "Header"/"Footer",
-      deja utilises ailleurs dans le meme fichier."
+      Header/Footer ou les 6 noms de domaine sanctionnes. DONE 2026-09-14: seule occurrence
+      restante (CoherenceChecker.cs:18, \"Entete\"/\"Pied\") remplacee par \"Header\"\
+      /\"Footer\", deja utilises ailleurs dans le meme fichier."
     owner: "Dev"
     status: done
     ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-09-11.md"

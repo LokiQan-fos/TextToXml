@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Threading.Tasks;
 using TextToXml.Tests;
 using Xunit;
 
@@ -46,9 +47,21 @@ public class GpaoImportP60WorkerEndToEndTests(SqlServerIntegrationFixture fixtur
             UseShellExecute = false,
         };
 
+        // Tells the script's own production-parity step that Kape22Importer.Tests is already built and
+        // loaded by this outer dotnet test run, so it can pass --no-build instead of racing that lock.
+        startInfo.Environment["E2E_BUILD_ALREADY_DONE"] = "1";
+
         using Process process = Process.Start(startInfo)!;
-        string output = process.StandardOutput.ReadToEnd();
-        string error = process.StandardError.ReadToEnd();
+
+        // Both streams are redirected, so they must be drained concurrently: reading stdout to
+        // completion first (as a plain sequential ReadToEnd/ReadToEnd would) blocks forever if the
+        // child fills the stderr pipe before exiting, since nothing is reading it yet and the child
+        // then blocks on that write - a documented deadlock risk of the Process API.
+        Task<string> outputTask = process.StandardOutput.ReadToEndAsync();
+        Task<string> errorTask = process.StandardError.ReadToEndAsync();
+        Task.WaitAll(outputTask, errorTask);
+        string output = outputTask.Result;
+        string error = errorTask.Result;
         process.WaitForExit();
 
         Assert.True(

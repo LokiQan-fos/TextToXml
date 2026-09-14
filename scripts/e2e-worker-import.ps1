@@ -171,10 +171,20 @@ finally {
 
 # --- 7. Optional: reuse the existing production-parity Theory, scoped to the Fichiers just run. ---
 if (-not $SkipProductionCompare) {
+    # E2E_BUILD_ALREADY_DONE=1 is set by GpaoImportP60WorkerEndToEndTests (via ProcessStartInfo.Environment)
+    # to signal that this exact project is already built and loaded by the outer testhost. Rebuilding it
+    # here would race that lock and can hang or deadlock the whole outer run instead of just this test, so
+    # --no-build is passed only in that case. In standalone usage the variable is absent, so this step
+    # builds the test project itself, matching the script's own documented standalone entry point.
+    $dotnetTestArgs = @('test', $testProject)
+    if ($env:E2E_BUILD_ALREADY_DONE -eq '1') {
+        $dotnetTestArgs += '--no-build'
+    }
+
     foreach ($fichier in $Fichiers) {
         # DisplayName carries the Theory parameter ("fichierName: ..."), FullyQualifiedName does not -
         # filtering the class by FullyQualifiedName and the Fichier by DisplayName is what actually narrows
         # to one test case; a FullyQualifiedName~ filter on the Fichier alone matches nothing.
-        dotnet test $testProject --filter "FullyQualifiedName~Kape22ProductionDataParityTests&DisplayName~$fichier" --nologo -v minimal
+        dotnet @dotnetTestArgs --filter "FullyQualifiedName~Kape22ProductionDataParityTests&DisplayName~$fichier" --nologo -v minimal
     }
 }

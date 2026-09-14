@@ -305,6 +305,27 @@ Termes à utiliser **à l'identique** dans les FR, UJ, tests et code.
     pendant le traitement d'un Fichier par l'orchestrateur (`Kape22FichierProcessor`
     / `InboxScanner`) ; loggée `ERROR`, le Fichier va en `error/`, la boucle
     continue au Fichier suivant (AC‑FR13‑4, AC‑FR15‑1).
+- **Ordre de Fabrication (OF)** — Enregistrement `L_D_ORDRE_FABRICATION` : la
+  commande client telle que codée pour le pilotage de la fabrication (laminage).
+  Dérivé de `L_D_KAPE22` (FR‑18) après l'insertion FR‑11.
+- **Coulée** — Enregistrement `L_D_COULEE` : les lingots produits par la
+  coulée qui alimentent le laminoir pour répondre à l'Ordre de Fabrication.
+  Peut être **froide** (existe déjà en base, contrôlée avant enregistrement de
+  l'OF) ou **chaude** (numéro commençant par `'0'`) — la distinction vient de
+  la consigne d'enfournement de la Section de charge Pits (FR‑20).
+- **Consignes** — Enregistrement `L_D_CONSIGNES` : une instruction de
+  production, rattachée à la Section de charge qui la porte (jamais
+  directement à l'OF), identifiée par son `TypeConsigne`/`CodeConsigne`
+  (FR‑19).
+- **Section de charge** — Famille de tables `L_D_SECTIONCHARGE_*`, une par
+  outil de production : **Chutage**, **Lingot**, **Découpe**, **Pits**
+  (enfournement four), **PoidsMétrique**, **Refroidissoirs**, **SVT**. Toutes
+  ne s'appliquent pas à tout OF — la règle d'applicabilité est documentée dans
+  l'annexe de mapping (FR‑17).
+- **Kape22ImportBundle** — Résultat du mapping étendu (FR‑18/19/20) : porte
+  `L_D_KAPE22`, l'Ordre de Fabrication, la Coulée, les Sections de charge
+  applicables et leurs Consignes, plus les métadonnées `Success`/`Errors`/
+  `Warnings`/`NumeroFichier`/`OF` de `MapResult` (FR‑21).
 
 ## 4. Fonctionnalités
 
@@ -873,6 +894,107 @@ L'agent de développement doit impérativement appliquer les règles de formatag
 - **Séparation des préoccupations :** Une séparation stricte et claire doit toujours être maintenue entre la logique C# et le code JavaScript.
 - **Framework UI :** Le rendu HTML doit s'appuyer systématiquement sur Bootstrap.
 - **Feuilles de style :** Dans les règles CSS, l'utilisation du mot-clé `!important` ne doit intervenir que lorsque cela s'avère strictement nécessaire. Les propriétés CSS doivent également respecter un classement par ordre alphabétique.  
+
+### 4.6 Dispatch transactionnel vers les tables aval GPAO (`Kape22Importer`)
+
+Après l'insertion `L_D_KAPE22` (FR-11), le worker dispatche vers les tables
+aval qui pilotent la production : **Ordre de Fabrication**, **Coulée**,
+**Consignes** et les tables **Section de charge** (une par outil). Remplace la
+procédure legacy à base de réflexion (`Ascometal.LSI.DAL`, application externe
+existante — jamais modifiée ni appelée, cf. Glossaire §3 et l'architecture
+dédiée `_bmad-output/planning-artifacts/architecture/architecture-kape22-dispatch-2026-09-14/ARCHITECTURE-SPINE.md`,
+AD-1 à AD-7).
+
+#### FR-17 : Extraction & documentation du mapping legacy
+
+**Description :** avant tout mapping explicite, le champ ou la règle de
+dérivation source dans `L_D_KAPE22` de chaque colonne des tables aval est
+documenté dans une annexe versionnée, dérivée du `MappingTemplate` XML legacy
+— jamais rédigée de mémoire (même discipline que l'Annexe B pour `L_D_KAPE22`).
+
+**Consequences (testables) :**
+- `AC-FR17-1` : chaque colonne des tables aval porte un `Statut` ∈
+  {sourcée, règle, à_clarifier}.
+- `AC-FR17-2` : une colonne `à_clarifier` ne bloque pas le mapping — elle est
+  tracée comme dette (`deferred-work.md`), pattern « `assumed, unverified` ».
+- `AC-FR17-3` : la règle décidant quelle(s) table(s) Section de charge
+  s'appliquent à quel Ordre de Fabrication est documentée explicitement.
+- `AC-FR17-4` : l'annexe est la référence unique des mappers explicites — aucun
+  mapper ne code une règle qui n'y figure pas.
+- `AC-FR17-5` : un test automatisé confronte l'annexe au modèle EF réel —
+  colonne absente ou entrée orpheline ⇒ échec ; `à_clarifier` sans entrée de
+  dette tracée ⇒ échec.
+
+#### FR-18 : Mapping explicite Ordre de Fabrication & Coulée
+
+**Description :** `L_D_KAPE22` → `L_D_ORDRE_FABRICATION` et `L_D_COULEE`,
+fonctions pures, sans réflexion, d'après l'annexe FR-17.
+
+**Consequences (testables) :**
+- `AC-FR18-1`..`AC-FR18-3` : chaque colonne documentée est renseignée par son
+  champ/règle source explicite ; aucune dépendance à `System.Reflection`,
+  aucun accès base dans ces mappers.
+- `AC-FR18-4` : une colonne `à_clarifier` est codée avec un marqueur
+  `assumed, unverified`, pas une valeur devinée.
+
+#### FR-19 : Mapping explicite Consignes & Section de charge
+
+**Description :** `L_D_KAPE22` → `L_D_CONSIGNES` et les tables Section de
+charge, fonctions pures, sans réflexion, d'après l'annexe FR-17 ; respecte la
+règle d'applicabilité par Ordre de Fabrication.
+
+**Consequences (testables) :**
+- `AC-FR19-1` : chaque table Section de charge applicable est renseignée selon
+  l'annexe.
+- `AC-FR19-2` : une table non applicable à l'Ordre de Fabrication en cours
+  n'est **pas** créée (pas de ligne par défaut).
+- `AC-FR19-3` : chaque `L_D_CONSIGNES` porte une clé étrangère explicite vers
+  sa Section de charge propriétaire — jamais de propriété de navigation EF.
+- `AC-FR19-4` : une règle `à_clarifier` est codée avec un marqueur
+  `assumed, unverified`, pas une condition devinée.
+
+#### FR-20 : Contrôles métier bloquants
+
+**Description :** avant toute écriture, les règles métier héritées du legacy
+sont vérifiées explicitement : existence de la Coulée froide, format de la
+Coulée chaude, cohérence de la répartition des lingots entre fours vs le
+nombre de demi-produits de l'Ordre de Fabrication.
+
+**Consequences (testables) :**
+- `AC-FR20-1` : le résultat du mapping porte toutes les entités structurelles
+  du dispatch (Ordre de Fabrication, Coulée, Section de charge applicables,
+  Consignes) avant tout contrôle.
+- `AC-FR20-2` : répartition lingots/fours incohérente → rejet, cause explicite.
+- `AC-FR20-3` : Coulée chaude mal formée (ne commence pas par `'0'`) → rejet,
+  cause explicite.
+- `AC-FR20-4` : absence de consigne d'enfournement → rejet, cause explicite.
+- `AC-FR20-5` : Coulée froide introuvable en base → rejet, cause explicite,
+  aucune écriture.
+
+#### FR-21 : Persistance transactionnelle étendue
+
+**Description :** `L_D_KAPE22` et les 9 tables aval commitent ou annulent
+**ensemble**, dans **une seule transaction** — aucun état intermédiaire
+committé, pour préserver la stratégie de reprise (§ Reprise ci-dessus) et le
+garde‑fou anti‑doublon (`AC-FR11-6/7`) déjà en place.
+
+**Consequences (testables)** *(intégration EF — même harnais SQL Server de
+test que FR-11, schéma étendu aux 10 tables)* :
+- `AC-FR21-1` : succès → toutes les entités non nulles du dispatch sont
+  ajoutées au même contexte, **un seul** `SaveChanges()` les commit ensemble.
+- `AC-FR21-2` : échec SQL sur ce `SaveChanges()` → rollback total, **aucune**
+  des tables (`L_D_KAPE22` incluse) ne reçoit de ligne.
+- `AC-FR21-3` : le point d'entrée de persistance est unique — pas de double
+  surface selon que le dispatch aval est concerné ou non.
+- `AC-FR21-4` : bout en bout (10 fichiers `P60/` de référence), un Fichier
+  valide produit des lignes cohérentes dans les 10 tables.
+- `AC-FR21-5` : bout en bout, une fixture fautive (Coulée absente, répartition
+  incohérente, échec SQL simulé) ne laisse **aucune** ligne dans **aucune**
+  des 10 tables, cause lisible dans `L_D_LOG_COMMANDE` + `*.errors.json`.
+
+**Feature‑specific NFRs :** hérite de la Reprise et de l'Observabilité de la
+§4.3 (le double journal `MQTTnetServices.Logs` + `L_D_LOG_COMMANDE` couvre
+aussi les causes d'échec FR-20/FR-21, sans nouveau canal).
 
 ## 5. Non‑Goals (explicites)
 

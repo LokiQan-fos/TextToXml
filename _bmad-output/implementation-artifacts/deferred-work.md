@@ -1,5 +1,43 @@
 # Deferred Work
 
+## Deferred from: code review of story-4.1 (2026-09-14)
+
+- source_spec: `epics.md` § Story 4.1
+  summary: Aucun test ne vérifie l'unicité des clés composites des 10 nouvelles tables aval (par
+  exemple deux lignes `(OF, CodeOperation)` dans une `L_D_SECTIONCHARGE_*`) ; le smoke test round-trip
+  ajouté (`PersistenceSmokeTests.SchemaApplies_AndAllTenDownstreamTablesRoundTripUnderRollback`) ne
+  relit pas non plus les valeurs insérées — il vérifie seulement qu'un unique `SaveChanges()` sur les 10
+  `Add` ne lève pas d'exception.
+  evidence: Constaté à la revue de code Story 4.1 (Blind Hunter). Non bloquant : aucun `AC` de la story
+  ne l'exige, et le smoke test existant pour `L_D_KAPE22` (Story 2.1) suit le même niveau de
+  vérification. La parité colonne-par-colonne (nom, nullabilité, type CLR, longueur) est déjà couverte
+  ailleurs (`SchemaModelParityTests`, `DownstreamColumnLengthsParityTests`).
+
+- source_spec: `epics.md` § Story 4.1
+  summary: Dérive de nommage entre tables à re-vérifier contre le schéma source réel (AFV004-LSI) :
+  `L_D_ORDRE_FABRICATION.OFOrigine` vs `L_D_SECTIONCHARGE_REFROIDISSOIRS.OFOrigin` (pas de "e" final),
+  et `Nuance` (`L_D_ORDRE_FABRICATION`/`L_D_COULEE`, longueur 7) vs `NuanceMarquage`
+  (`L_D_SECTIONCHARGE_REFROIDISSOIRS`, longueur 6).
+  evidence: Constaté à la revue de code Story 4.1 (Blind Hunter). Pourrait être une différence réelle du
+  schéma (risque R-3 : rien n'est réécrit de mémoire) ou une coquille de transcription lors du sqlcmd du
+  2026-09-14 ; ni moi ni les couches de revue n'avons d'accès direct à AFV004-LSI pour trancher. À
+  reconfirmer lors d'une prochaine session sqlcmd contre la source.
+
+- source_spec: `epics.md` § Story 4.1
+  summary: `L_D_CONSIGNES.ConsigneGPAO` (`BIT`) fait partie de la clé primaire composite
+  `(OF, CodeOperation, TypeConsigne, ConsigneGPAO)` — un booléen dans une clé métier est inhabituel.
+  evidence: Constaté à la revue de code Story 4.1 (Blind Hunter). Cohérent avec l'index réel tel que lu
+  par `sqlcmd` sur `sys.indexes` le 2026-09-14 (attesté par le commentaire d'en-tête du script), mais à
+  reconfirmer contre le schéma source plutôt que supposé correct par défaut.
+
+- source_spec: `epics.md` § Story 4.1 (hors périmètre AC, correctif groupé dans le même diff)
+  summary: Le correctif anti-deadlock de `GpaoImportP60WorkerEndToEndTests`
+  (`process.StandardOutput/StandardError.ReadToEndAsync()` + `Task.WaitAll(...)`) fonctionne mais bloque
+  un thread du pool pour la durée du process enfant ; un test `async Task` avec
+  `await Task.WhenAll(...)` + `process.WaitForExitAsync()` aurait été plus idiomatique.
+  evidence: Constaté à la revue de code Story 4.1 (Blind Hunter). Cosmétique, aucun impact fonctionnel
+  observé (`Category=Integration`, jamais exécuté en CI sans surveillance).
+
 ## Deferred from: code review of story-3.6 (2026-09-11)
 
 - source_spec: `epics.md` § Story 3.6 "Réancrage" — **RÉSOLU 2026-09-11**.

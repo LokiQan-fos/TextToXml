@@ -2,6 +2,7 @@
 stepsCompleted: [step-01-validate-prerequisites, step-02-design-epics, step-03-create-stories, step-04-final-validation]
 inputDocuments:
   - _bmad-output/planning-artifacts/PRD.md
+  - _bmad-output/planning-artifacts/architecture/architecture-kape22-dispatch-2026-09-14/ARCHITECTURE-SPINE.md
 ---
 
 # TextToXml - Epic Breakdown
@@ -55,6 +56,11 @@ distingués ici : **`AC-FR5-12a`** (round‑trip vers un `record` générique, S
 | FR-14 | Double journalisation (`MQTTnetServices.Logs` + `L_D_LOG_COMMANDE`) & intégration Launcher | `Kape22Importer` |
 | FR-15 | Robustesse de la boucle worker (exception isolée, sources injoignables, recycle) | `Kape22Importer` |
 | FR-16 | Anatomie d'un microservice de format : `TextToXml` reste 100 % générique | `TextToXml` + `Kape22Importer` |
+| FR-17 | Extraction & documentation du mapping legacy `L_D_KAPE22` → tables aval (annexe colonne-par-colonne, dérivée du `MappingTemplate` XML) | `Kape22Importer` |
+| FR-18 | Mapping explicite (sans réflexion) `L_D_KAPE22` → `L_D_ORDRE_FABRICATION` & `L_D_COULEE` | `Kape22Importer` |
+| FR-19 | Mapping explicite (sans réflexion) `L_D_KAPE22` → `L_D_CONSIGNES` & les 7 `L_D_SECTIONCHARGE_*` (Chutage, Lingot, Découpe, Pits, PoidsMétrique, Refroidissoirs, SVT), règle d'applicabilité par OF | `Kape22Importer` |
+| FR-20 | Contrôles métier bloquants avant persistance (existence coulée froide, format coulée chaude, cohérence répartition lingots/fours) | `Kape22Importer` |
+| FR-21 | Persistance transactionnelle étendue (`Kape22ImportBundle` + `Kape22Persister` remplacé) : un seul commit `L_D_KAPE22` + 9 tables aval, cause d'échec journalisée via le circuit existant (FR-14) | `Kape22Importer` |
 
 ### Contract Requirements (hors `AC-FRx-y`, issues de §0 / §4.1 / Annexe A.4)
 
@@ -179,6 +185,43 @@ Architecture séparé, pas de starter template**.
   workers en prod : `ImportFiles`, `CopyDataToDb`, `ConvertAndSave`,
   `OrdresFabricationSync`).
 
+- **AR-14** — **Transaction unique étendue** (spine `architecture-kape22-dispatch-2026-09-14`,
+  AD-1). `L_D_KAPE22`, `L_D_LOG_COMMANDE` et les 9 tables aval (`L_D_ORDRE_FABRICATION`,
+  `L_D_COULEE`, `L_D_CONSIGNES`, 7×`L_D_SECTIONCHARGE_*`) sont ajoutées au **même**
+  `DbContext` et committées par **un seul** `SaveChanges()` — aucune écriture partielle,
+  préserve NFR-7 et le garde-fou anti-doublon `AC-FR11-6/7` (FR-21).
+- **AR-15** — **Mapping explicite, sans réflexion** (AD-2). Un mapper par table cible
+  (`OrdreFabricationMapper`, `CouleeMapper`, `ConsignesMapper`,
+  `SectionCharge{Chutage,Lingot,Decoupe,Pits,PoidsMetrique,Refroidissoirs,Svt}Mapper`),
+  propriétés lues/écrites par leur nom explicite. Aucun `System.Reflection`,
+  `Activator.CreateInstance` ni table de mapping interprétée à l'exécution (FR-18, FR-19).
+- **AR-16** — **Mur d'étanchéité avec l'application legacy** (AD-3). Le code
+  `Ascometal.LSI.DAL`/`BLL` (dépôt legacy, hors `TextToXml`) est une référence de lecture
+  seule pour comprendre l'intention métier ; il n'est **jamais modifié**, **jamais référencé
+  en assembly**, **jamais appelé à l'exécution** par `Kape22Importer`. Les nouvelles
+  entités EF sont redéfinies dans `Kape22Importer.Persistence`, indépendamment des classes
+  `EntityObject` legacy.
+- **AR-17** — **Cause d'échec journalisée via le circuit existant** (AD-4). Tout échec du
+  dispatch (SQL ou métier : coulée introuvable, répartition lingots/fours incohérente,
+  section de charge manquante) devient un `ConversionError{Block:File, Code}` distinct et
+  rejoint `L_D_LOG_COMMANDE` (`"<NumeroFichier> — REJETÉ : <cause>"`, AC-FR11-4) +
+  `MQTTnetServices.Logs` (FR-14) + déplacement en `error/` (FR-12). Pas de nouveau canal.
+- **AR-18** — **Entités EF database-first, sans migration** (AD-5). Les 10 nouvelles
+  entités suivent la convention `L_D_KAPE22.cs`/AR-8 : un fichier par entité sous
+  `Persistence/`, schéma dérivé d'`AFV004-LSI` (`sys.columns`, jamais rédigé de mémoire,
+  R-3), `scripts/schema/` étendu pour que les tests AR-12 les couvrent.
+- **AR-19** — **`Kape22ImportBundle` remplace `MapResult<L_D_KAPE22>` au niveau du
+  Persister** (AD-6). Le bundle porte les mêmes métadonnées (`Success`, `Errors`,
+  `Warnings`, `NumeroFichier`, `OF`) plus les 9 entités avales nullables.
+  `Kape22Persister.Persist` est **remplacé** (pas surchargé) pour accepter le bundle ;
+  `Kape22FichierProcessor` (Story 3.2) est mis à jour dans la même story — aucune double
+  surface de persistance.
+- **AR-20** — **Liaisons inter-tables par FK explicite** (AD-7). Chaque entité du bundle
+  porte sa clé métier en colonne scalaire (`OF`, clé de la section de charge propriétaire
+  pour ses `L_D_CONSIGNES`) ; les mappers assignent ces colonnes directement, **aucune**
+  propriété de navigation EF (`ICollection<T>`, `AddRef` façon legacy) n'est utilisée pour
+  relier les entités du bundle entre elles.
+
 ### UX Design Requirements
 
 **Aucune.** v1 ne livre **ni UI ni écran dédié** (PRD §5, D12). Supervision via
@@ -210,7 +253,13 @@ microservices à UI et ne s'appliquent à aucune story v1.
 - **CC-2 — Commentaires : langue & syntaxe.** Tous les commentaires (C#, XML, SQL,
   YAML, `.csproj`, scripts) sont en **anglais**. Chaque phrase de commentaire
   commence par une **majuscule** et se termine par un **point**. Les listes
-  numérotées dans les commentaires sont **interdites**.
+  numérotées dans les commentaires sont **interdites**. **Dérogation (2026-09-14) :**
+  restent non traduits, comme des termes propres, les noms de domaine suivants —
+  `Champ`, `Ligne`, `Bloc`, `Fichier`, `Descripteur`, `Segment` (Épics 1‑3) et,
+  depuis l'Épic 4, `Ordre de Fabrication`/`OF`, `Coulee`, `Chutage`, `Decoupe`,
+  `Lingot`, `PoidsMetrique`, `Refroidissoirs` — ainsi que la citation `Annexe
+  A/B/C` pour renvoyer à une annexe PRD précise. Toute autre expression
+  française, notamment multi‑mots, doit être traduite.
 - **CC-3 — Commentaires : position & préservation.** **Aucun** commentaire en fin
   de ligne (trailing). Chaque commentaire est sur sa **propre ligne**,
   immédiatement **au‑dessus** du bloc qu'il décrit. Les commentaires existants
@@ -256,6 +305,11 @@ microservices à UI et ne s'appliquent à aucune story v1.
 | FR-14 | Épic 3 — 3.3 (`AC-FR14-1..4, 14-7, 14-8`), 3.4 (`AC-FR14-5, 14-6`) | AC-FR14-1 … AC-FR14-8 |
 | FR-15 | Épic 3 — 3.5 | AC-FR15-1 … AC-FR15-4 |
 | FR-16 | Épic 1 — 1.8 | AC-FR16-1 … AC-FR16-4 |
+| FR-17 | Épic 4 — 4.2 | AC-FR17-1 … AC-FR17-5 |
+| FR-18 | Épic 4 — 4.3 | AC-FR18-1 … AC-FR18-4 |
+| FR-19 | Épic 4 — 4.4 | AC-FR19-1 … AC-FR19-4 |
+| FR-20 | Épic 4 — 4.5 (contrôles purs), 4.6 (`AC-FR20-5`, existence coulée) | AC-FR20-1 … AC-FR20-5 |
+| FR-21 | Épic 4 — 4.6 (persister), 4.7 (E2E) | AC-FR21-1 … AC-FR21-5 |
 | CTR-1/2/3 | Épic 1 — 1.8 | contrat `decimal`/`datetime`/`convert` + round‑trip typé |
 | SM-1/2/3 | Épic 3 — 3.6 | Couverture 100 % + E2E 10 fichiers + `*.errors.json` lisible |
 
@@ -304,6 +358,7 @@ logs), **3.5** (`AC-FR15-3/4`), **3.6** (E2E 10 fichiers). Tests unitaires
 | `AscoLsiDbContext` database‑first (`L_D_KAPE22`, `L_D_LOG_COMMANDE`) + **harnais de test SQL Server local** (`scripts/schema/` générés depuis `AFV004-LSI` + double régime d'isolation, AR-12) | 2.1 |
 | `P60.xml` enrichi (`datatype`, `expectedMessageCount`) + ressource embarquée | 2.2 |
 | `P60.xsd` + génération DTO `Kape22File` + validation avant désérialisation | 2.3 |
+| `AscoLsiDbContext` étendu (10 tables aval : OF, Coulée, Consignes, 7×SectionCharge) + extension du harnais SQL Server local (AR-12, AR-18) | 4.1 |
 
 > **Fixtures fautives (Annexe A.4)** : chaque story crée **les fixtures fautives
 > dont elle a besoin** (`two_lines.txt`, `segment_mismatch.txt`,
@@ -341,6 +396,23 @@ de boucle, et validation de bout en bout (SM‑1/2/3). À l'issue de l'épic : l
 microservice tourne, chaque rejet produit une raison lisible par l'exploitant,
 `AC-FR12..15` sont verts et les 10 fichiers `P60/` insèrent 10 lignes cohérentes.
 **FRs couverts :** FR-12, FR-13, FR-14, FR-15 (+ SM-1/2/3).
+
+### Épic 4 : `Kape22Importer` — Dispatch transactionnel vers les tables aval
+Compléter le pipeline P60 après l'insertion `L_D_KAPE22` (Épic 2, FR-11) par le
+dispatch explicite — **sans réflexion** — vers `L_D_ORDRE_FABRICATION`,
+`L_D_COULEE`, `L_D_CONSIGNES` et les 7 `L_D_SECTIONCHARGE_*` (Chutage, Lingot,
+Découpe, Pits, PoidsMétrique, Refroidissoirs, SVT), en remplacement de la
+procédure legacy à base de `MappingTemplate`/réflexion (`Ascometal.LSI.DAL`,
+dépôt legacy, **jamais modifié, jamais appelé** — AD-3 du spine d'architecture).
+À l'issue de l'épic : un Fichier valide écrit **une seule transaction** couvrant
+les 10 tables ; toute violation métier ou échec SQL bloque l'ensemble, journalise
+la cause précise via le circuit existant (`L_D_LOG_COMMANDE` +
+`MQTTnetServices.Logs`) et déplace le Fichier en `error/`, sans jamais laisser de
+`L_D_KAPE22` orpheline (préserve NFR-7 et le garde-fou anti-doublon
+`AC-FR11-6/7`).
+**FRs couverts :** FR-17, FR-18, FR-19, FR-20, FR-21.
+**Architecture :** `_bmad-output/planning-artifacts/architecture/architecture-kape22-dispatch-2026-09-14/ARCHITECTURE-SPINE.md`.
+**Séquencement (7 stories) :** 4.1 → 4.2 → {4.3, 4.4} → 4.5 → 4.6 → 4.7.
 
 ---
 
@@ -1529,3 +1601,411 @@ plus de `Program`).
 
 **Critères transverses :** CC-1, CC-2, CC-3, CC-4, CC-5, CC-7. **AR-12** : E2E
 sur SQL Server local.
+
+---
+
+## Épic 4 : `Kape22Importer` — Dispatch transactionnel vers les tables aval
+
+Compléter le pipeline P60 après l'insertion `L_D_KAPE22` (Épic 2, FR-11) par le
+dispatch explicite — **sans réflexion** — vers `L_D_ORDRE_FABRICATION`,
+`L_D_COULEE`, `L_D_CONSIGNES` et les 7 `L_D_SECTIONCHARGE_*` (Chutage, Lingot,
+Découpe, Pits, PoidsMétrique, Refroidissoirs, SVT), en remplacement de la
+procédure legacy à base de `MappingTemplate`/réflexion (`Ascometal.LSI.DAL`,
+dépôt legacy — **jamais modifié, jamais appelé au runtime**, AD-3). Cadré par le
+spine `_bmad-output/planning-artifacts/architecture/architecture-kape22-dispatch-2026-09-14/ARCHITECTURE-SPINE.md`
+(AD-1 à AD-7). Toutes les tables aval commitent avec `L_D_KAPE22` dans **une
+seule transaction** (AD-1) ; tout échec — métier ou SQL — journalise sa cause
+précise via le circuit existant (FR-14) sans laisser aucune trace partielle,
+préservant NFR-7 et le garde-fou anti-doublon (`AC-FR11-6/7`).
+
+**FRs couverts :** FR-17, FR-18, FR-19, FR-20, FR-21.
+
+**Séquencement des stories (dépendance interne à l'épic, pas de dépendance vers un
+épic futur) :** 4.1 → {4.3, 4.4} → 4.5 → 4.6 ; 4.2 (infra) est un prérequis
+transverse de 4.3/4.4.
+
+### Story 4.1 : Entités EF database-first + extension du harnais SQL pour les 10 tables aval
+
+As a `Kape22Importer`,
+I want les 10 nouvelles entités (`L_D_ORDRE_FABRICATION`, `L_D_COULEE`,
+`L_D_CONSIGNES`, 7×`L_D_SECTIONCHARGE_*`) ajoutées à `AscoLsiDbContext` d'après
+le schéma réel `AFV004-LSI`, et les scripts `scripts/schema/` étendus en
+conséquence,
+So that les mappers et le Persister des stories suivantes disposent d'entités
+fidèles et d'un harnais de test SQL Server local qui les couvre (AR-12), et que
+la story suivante (4.2, extraction du mapping) ait un schéma réel contre lequel
+vérifier la complétude de son annexe.
+
+**Prérequis (levé) :** confirmer par une exécution réelle du workflow `ci.yml`
+(pas seulement en local) que `Category=Integration` passe avec le service
+container SQL Server — **confirmé** : run GitHub Actions
+[`34836094341`](https://github.com/LokiQan-fos/TextToXml/actions/runs/34836094341)
+(2026-09-14, commit `chore(e2e): add real-worker end-to-end regression
+harness`), étapes `Initialize containers` / `Test (Category=Integration)` /
+`Check commit body` toutes vertes sur runner réel. Cette story peut démarrer.
+
+**Acceptance Criteria:**
+
+**Given** cette story
+**When** je choisis la source du schéma des 10 entités
+**Then** elle vient **exclusivement** de `sys.columns` d'`AFV004-LSI` (R-3) —
+  **jamais** de l'annexe de mapping de la Story 4.2, qui n'existe pas encore et
+  documente des *règles de dérivation*, pas la *forme* des tables ; les deux
+  sources sont indépendantes, cette story ne dépend pas de la 4.2
+
+**Given** `sys.columns` d'`AFV004-LSI` pour les 10 tables cibles
+**When** je définis les entités
+**Then** chaque entité porte les colonnes réelles avec leur nullabilité et leur
+  type CLR fidèles (`int?`, `string`, `DateTime?`…), un fichier par entité sous
+  `Persistence/` (miroir de `L_D_KAPE22.cs`)
+**And** aucune migration EF n'est générée ; `Id` est `ValueGeneratedOnAdd` quand
+  la table en a un
+
+**Given** `AscoLsiDbContext`
+**When** je l'étends
+**Then** il expose un `DbSet` par nouvelle entité
+
+**Given** le harnais AR-12
+**When** la fixture d'assembly s'exécute
+**Then** `scripts/schema/01-ascolsi-tables.sql` (ou un script dédié) crée aussi
+  les 10 nouvelles tables, **généré depuis `AFV004-LSI`** avec l'en-tête de
+  provenance (serveur, base, date), jamais rédigé de mémoire (R-3)
+**And** un test « modèle `AscoLsiDbContext` ⟺ `scripts/schema/` » couvre aussi
+  ces 10 tables (extension du test existant de la Story 2.1)
+
+**Tests xUnit (TDD — écrits en premier, CC-1) :** test de forme d'entité par
+table (types CLR, nullabilité) ; test « pas de migration / `Id` identity » ;
+extension du test « modèle `AscoLsiDbContext` ⟺ `scripts/schema/` » (Story 2.1)
+aux 10 tables ; test d'intégration fumée : `scripts/schema/` s'applique sans
+erreur pour les 10 tables sous `TransactionScope` (rollback).
+
+**Critères transverses :** CC-1, CC-2, CC-3, **CC-4 (propriétés d'entité par
+ordre alphabétique)**, CC-7. *(CC-6 sans objet : worker, pas `TextToXml`.)*
+
+---
+
+### Story 4.2 : Extraction & documentation du mapping legacy (annexe colonne-par-colonne, vérifiable)
+
+As a développeur de `Kape22Importer`,
+I want une annexe documentée, dérivée du `MappingTemplate` XML legacy et des
+entités EF legacy (`OrdreFabrication`, `Consignes*`, `Couleee`), qui associe à
+chaque colonne de `L_D_ORDRE_FABRICATION`, `L_D_COULEE`, `L_D_CONSIGNES` et des 7
+`L_D_SECTIONCHARGE_*` (le schéma réel de la Story 4.1) son champ ou sa règle de
+dérivation source dans `L_D_KAPE22`, **et un test qui vérifie mécaniquement
+cette complétude**,
+So that les stories 4.3/4.4/4.5 codent des mappers explicites sans jamais
+deviner une règle de mémoire (même discipline que R-3 pour `L_D_KAPE22`), et
+qu'une colonne oubliée dans l'annexe casse la build plutôt que de passer
+inaperçue.
+
+**Prérequis (à obtenir avant de commencer, lecture seule — AD-3) :** le code
+source de `MappingTemplate` + sa configuration XML, et
+`OrdreDeFabricationManager.CompleteConsignes2`
+(`Desktop/kape22/OrdreDeFabricationManager.cs`, non encore lu) et
+`CouleeManager.cs` (déjà fourni, non encore lu en détail) — ces trois éléments
+manquent encore pour couvrir exhaustivement la règle d'applicabilité par OF des
+`L_D_SECTIONCHARGE_*`.
+
+**Format et emplacement imposés :** `_bmad-output/implementation-artifacts/annexe-mapping-dispatch-epic4.md`,
+un tableau Markdown par table cible, colonnes `| Colonne | Statut | Source / Règle |`,
+`Statut ∈ {sourcée, règle, à_clarifier}` (même trois catégories que la parité
+production Épic 2, `spec-parity-kape22-legacy-fill-rules.md`).
+
+**Acceptance Criteria:**
+
+**Given** le `MappingTemplate` XML legacy et les entités EF legacy citées
+  ci-dessus
+**When** l'annexe est produite
+**Then** elle liste, pour **chaque** colonne de `L_D_ORDRE_FABRICATION`,
+  `L_D_COULEE`, `L_D_CONSIGNES` et des 7 `L_D_SECTIONCHARGE_*`, un `Statut`
+  parmi `sourcée` (champ `L_D_KAPE22` exact cité), `règle` (dérivation exacte
+  décrite — ex. contrôle coulée froide/chaude, répartition lingots/fours), ou
+  `à_clarifier` (AC-FR17-1)
+**And** une colonne `à_clarifier` **ne bloque pas** la story : elle est notée
+  telle quelle dans l'annexe et une entrée est ajoutée à
+  `_bmad-output/implementation-artifacts/deferred-work.md` (pattern
+  `assumed, unverified` de la parité Épic 2) — la story avance sur les colonnes
+  sourcées/à règle (AC-FR17-2)
+
+**Given** les 7 tables `L_D_SECTIONCHARGE_*`
+**When** l'annexe documente leur applicabilité
+**Then** elle énonce explicitement la règle métier qui décide quelle(s)
+  table(s) concernent un OF donné (le legacy ne semble pas toujours peupler les
+  7) (AC-FR17-3)
+
+**Given** l'annexe terminée
+**When** je la publie
+**Then** elle est versionnée au chemin imposé ci-dessus et devient la
+  **référence unique** citée par les stories 4.3, 4.4 et 4.5 — aucun mapper de
+  ces stories ne code une règle absente de l'annexe (AC-FR17-4)
+
+**Given** le modèle EF des 10 tables (Story 4.1) et l'annexe produite
+**When** un test dédié parse l'annexe et la confronte au modèle EF
+**Then** il **échoue** si une colonne du modèle EF n'a **aucune** ligne dans
+  l'annexe (vrai trou — sourcée, règle ou à_clarifier, peu importe, mais
+  **présente**) ; il **échoue** aussi si une ligne de l'annexe référence une
+  table/colonne absente du modèle EF (entrée orpheline — table renommée,
+  faute de frappe) ; il **échoue** si le `Statut` d'une ligne n'est pas l'une
+  des trois valeurs autorisées (AC-FR17-5)
+**And** une colonne présente avec `Statut = à_clarifier` **passe** le test de
+  complétude (elle n'est pas un trou : elle est documentée comme dette) **à
+  condition** qu'une entrée `deferred-work.md` référence explicitement cette
+  colonne — son absence fait échouer le test sur cette ligne précise, ce qui
+  mécanise le pattern `assumed, unverified` au lieu de le laisser à la
+  discipline humaine (AC-FR17-5, réponse à V2)
+**And** une colonne `sourcée` ou `règle` passe sans condition supplémentaire
+
+**Tests xUnit (TDD — écrits en premier, CC-1) :** `AC-FR17-5`
+(`Category=Unit`, test de complétude par réflexion sur le modèle EF de la
+Story 4.1 — même famille que `SchemaModelParityTests`/`Kape22ColumnLengthsParityTests`,
+exempté du rouge→vert propre comme les tests-barrière-à-la-compilation, CC-1) ;
+un cas par branche : colonne manquante (échec), entrée orpheline (échec),
+statut invalide (échec), `à_clarifier` sans note `deferred-work.md` (échec),
+`à_clarifier` avec note (succès). Le contenu métier de l'annexe (quelle règle
+exacte pour quelle colonne, AC-FR17-1..4) reste une revue humaine, non
+automatisable.
+
+**Critères transverses :** CC-1 (le test de complétude), CC-2, CC-5.
+*(CC-3/CC-4/CC-6/CC-7 sans objet : pas de code de production.)*
+
+---
+
+### Story 4.3 : Mapper OF + Coulée (mapping structurel pur)
+
+As a `Kape22Importer`,
+I want `OrdreFabricationMapper.Map(L_D_KAPE22) -> L_D_ORDRE_FABRICATION` et
+`CouleeMapper.Map(L_D_KAPE22) -> L_D_COULEE` codés explicitement d'après
+l'annexe de la Story 4.2, sans aucun contrôle métier ni accès base,
+So that le bundle dispose de ces deux entités prêtes à être validées et
+persistées par les stories suivantes.
+
+**Acceptance Criteria:**
+
+**Given** un `L_D_KAPE22` mappé (Story 2.4/2.6) et l'annexe de la Story 4.2
+**When** j'appelle `OrdreFabricationMapper.Map`
+**Then** chaque colonne `sourcée`/`règle` de `L_D_ORDRE_FABRICATION` dans
+  l'annexe est renseignée par son champ/règle source explicite ; aucune
+  colonne n'est devinée hors de l'annexe (AC-FR18-1)
+**And** aucune dépendance à `System.Reflection`, aucune lecture base de données
+  — fonction pure (AC-FR18-2)
+
+**Given** le même `L_D_KAPE22`
+**When** j'appelle `CouleeMapper.Map`
+**Then** `L_D_COULEE` est renseignée selon l'annexe, fonction pure également
+  (AC-FR18-3)
+
+**Given** une colonne marquée `à_clarifier` dans l'annexe de la Story 4.2
+**When** le mapper correspondant est codé
+**Then** le mapper porte un commentaire `assumed, unverified` citant l'entrée
+  `deferred-work.md` correspondante plutôt que d'inventer une règle — il ne
+  bloque **pas** le reste de la story (AC-FR18-4, pattern Épic 2)
+
+**Tests xUnit (TDD — écrits en premier, CC-1) :** `AC-FR18-1` … `AC-FR18-4`, un
+test par colonne mappée d'après l'annexe (fixtures `P60/` existantes).
+
+**Critères transverses :** CC-1, CC-2, CC-3, CC-4, CC-5. *(CC-6/CC-7 sans objet :
+pas d'accès base dans ce mapper.)*
+
+---
+
+### Story 4.4 : Mapper Consignes + les 7 SectionCharge (mapping structurel pur, règle d'applicabilité)
+
+As a `Kape22Importer`,
+I want un mapper explicite par table `L_D_SECTIONCHARGE_*` (Chutage, Lingot,
+Découpe, Pits, PoidsMétrique, Refroidissoirs, SVT) et un `ConsignesMapper` qui
+produit les `L_D_CONSIGNES` rattachées à leur section de charge propriétaire
+par FK explicite, le tout d'après l'annexe de la Story 4.2,
+So that le bundle porte, pour chaque OF, exactement les sections de charge et
+consignes qui le concernent — pas plus, pas moins.
+
+**Acceptance Criteria:**
+
+**Given** un `L_D_KAPE22` mappé et l'annexe de la Story 4.2
+**When** j'appelle chacun des 7 mappers `SectionCharge*Mapper.Map`
+**Then** chaque colonne de la table correspondante est renseignée selon la
+  règle documentée dans l'annexe, fonctions pures, aucune réflexion (AC-FR19-1)
+
+**Given** la règle d'applicabilité par OF documentée dans l'annexe (Story 4.2)
+**When** une table `L_D_SECTIONCHARGE_*` ne concerne pas l'OF en cours
+**Then** le mapper correspondant renvoie `null` — le bundle laisse cet
+  emplacement vide, aucune ligne par défaut n'est créée (AC-FR19-2)
+
+**Given** un `L_D_KAPE22` mappé et les `L_D_SECTIONCHARGE_*` déjà mappées
+**When** j'appelle `ConsignesMapper.Map`
+**Then** chaque `L_D_CONSIGNES` produite porte en colonne scalaire la clé de
+  sa section de charge propriétaire (FK explicite, AD-7 — jamais de propriété
+  de navigation EF) et son `TypeConsigne`/`CodeConsigne` selon l'annexe
+  (AC-FR19-3)
+
+**Given** une colonne ou une règle d'applicabilité marquée `à_clarifier` dans
+  l'annexe de la Story 4.2
+**When** le mapper correspondant est codé
+**Then** il porte un commentaire `assumed, unverified` citant l'entrée
+  `deferred-work.md` correspondante — pas de blocage total de la story
+  (AC-FR19-4, pattern Épic 2)
+
+**Tests xUnit (TDD — écrits en premier, CC-1) :** `AC-FR19-1` … `AC-FR19-4`,
+un test par table `SectionCharge*` (mappée + non applicable → `null`), un test
+`ConsignesMapper` par section de charge propriétaire, fixtures `P60/`
+existantes.
+
+**Critères transverses :** CC-1, CC-2, CC-3, CC-4, CC-5. *(CC-6/CC-7 sans objet :
+pas d'accès base dans ces mappers.)*
+
+---
+
+### Story 4.5 : `Kape22ImportBundleMapper` (orchestrateur) + contrôles métier purs
+
+As a `Kape22Importer`,
+I want un `Kape22ImportBundleMapper` qui compose `Kape22Mapper.Map` avec les
+mappers des stories 4.3/4.4 pour produire un `Kape22ImportBundle` complet, et
+qui applique les contrôles métier **ne nécessitant aucune lecture base**
+(cohérence répartition lingots/fours, format de la coulée chaude),
+So that le bundle transmis au Persister porte déjà toutes les entités
+structurelles et les rejets purement calculables, sans dupliquer cette logique
+côté Persister.
+
+**Acceptance Criteria:**
+
+**Given** un XML normalisé valide
+**When** j'appelle `Kape22ImportBundleMapper.Map`
+**Then** le bundle porte `L_D_KAPE22`, `L_D_ORDRE_FABRICATION`, `L_D_COULEE`,
+  chaque `L_D_SECTIONCHARGE_*` applicable (ou `null`) et les `L_D_CONSIGNES`
+  associées, plus les métadonnées `Success`/`Errors`/`Warnings`/`NumeroFichier`/`OF`
+  héritées de `Kape22Mapper` (AC-FR20-1, AD-6)
+
+**Given** une `L_D_SECTIONCHARGE_REFROIDISSOIRS` mappée dont
+  `NombreLingotsFour1 + NombreLingotsFour2 ≠ NombreDemiProduit` de l'OF
+**When** le bundle est construit
+**Then** `Success = false`, une `ConversionError{Block:File, Code}` dédiée cite
+  l'OF et les deux valeurs en écart — aucune entité n'est ajoutée au contexte
+  plus tard (AC-FR20-2)
+
+**Given** une coulée « chaude » (`ConsignesEnfournementPits.CodeConsigne ≠ "1"`)
+  dont le numéro `Coulee` ne commence pas par `'0'`
+**When** le bundle est construit
+**Then** `Success = false`, une `ConversionError` dédiée cite l'OF et le numéro
+  de coulée (AC-FR20-3)
+
+**Given** un OF sans `L_D_SECTIONCHARGE_PITS` applicable (donc sans consigne
+  d'enfournement)
+**When** le bundle est construit
+**Then** `Success = false`, une `ConversionError` dédiée signale l'absence de
+  consigne d'enfournement — reproduit le rejet legacy correspondant
+  (AC-FR20-4)
+
+**Tests xUnit (TDD — écrits en premier, CC-1) :** `AC-FR20-1` … `AC-FR20-4`,
+fixtures `P60/` valides + variantes fautives dédiées (répartition incohérente,
+coulée chaude mal formée, PITS absent).
+
+**Critères transverses :** CC-1, CC-2, CC-3, CC-4, CC-5. *(CC-6/CC-7 sans objet :
+pas d'accès base dans cet orchestrateur.)*
+
+---
+
+### Story 4.6 : `Kape22Persister` remplacé (bundle, transaction unique, contrôle coulée) + `Kape22FichierProcessor` mis à jour
+
+As a `Kape22Importer`,
+I want `Kape22Persister.Persist` remplacé par une surface acceptant
+`Kape22ImportBundle`, qui exécute le contrôle d'existence de la coulée froide
+(lecture base) puis empile toutes les entités non nulles du bundle avant un
+**unique** `SaveChanges()`, et `Kape22FichierProcessor` mis à jour en
+conséquence,
+So that un Fichier réussi écrit ses 10 tables de façon atomique, et qu'un échec
+— SQL ou métier — ne laisse **aucune** trace partielle, `L_D_KAPE22` incluse.
+
+**Note de périmètre (`epic-3-retro-item-4`, attestation commit SVN) :** cette
+story ne modifie que `Kape22Importer` (`TextToXml.sln`, Git) et ne produit
+**aucun** commit `MicroServices.sln` (SVN) **si et seulement si** la signature
+`IFichierProcessor.Process(string, byte[]) -> FichierProcessingResult` et la
+forme de `FichierProcessingResult` restent **strictement identiques** en sortie
+de cette story — c'est une condition vérifiable, pas juste une hypothèse : la
+story de revue de code confirme cette égalité de signature avant de clore 4.6.
+Si l'une des deux doit changer pour porter les nouvelles causes d'échec, le
+premier commit `MicroServices.sln` qui en découle applique immédiatement la
+convention `AC → test` de l'item-4 (encore `open`).
+
+**Note de couverture (réponse à V3) :** cette story **garde sa propre preuve
+d'atomicité**, au niveau intégration (`AC-FR20-5` : rejet métier → rien
+d'ajouté ; `AC-FR21-2` : échec SQL → rien de committé), construite sur
+`TransactionalPersistenceTests` sans les 10 fichiers `P60/` réels. La Story
+4.7 ajoute la **même** preuve rejouée de bout en bout sur les fixtures
+réelles (`AC-FR21-5`) — une couverture supplémentaire, pas un déplacement :
+4.6 ne perd rien.
+
+**Acceptance Criteria:**
+
+**Given** un `Kape22ImportBundle` avec `Success = true`
+**When** `Kape22Persister.Persist(bundle)` est appelé
+**Then** le garde-fou anti-doublon (`AC-FR11-6/7`, inchangé) est vérifié en
+  premier ; s'il détecte un import déjà commité, rien n'est ajouté,
+  `AlreadyImported = true`
+
+**Given** un bundle qui franchit le garde-fou et dont la coulée est « froide »
+  (`ConsignesEnfournementPits.CodeConsigne == "1"`)
+**When** `Persist` s'exécute
+**Then** il lit `L_D_COULEE` via le contexte déjà ouvert ; si la coulée
+  n'existe pas, **aucune** entité du bundle n'est ajoutée, une ligne
+  `L_D_LOG_COMMANDE` « REJETÉ » est écrite (même mécanisme que
+  `PersistRejected` existant) et la cause cite explicitement la coulée
+  manquante (AC-FR20-5 — contrôle métier FR-20, exécuté ici pour la lecture
+  base qu'il requiert, AD-1)
+
+**Given** un bundle qui franchit tous les contrôles (garde-fou + coulée)
+**When** `Persist` s'exécute
+**Then** `L_D_KAPE22`, la ligne `L_D_LOG_COMMANDE` « OK », `L_D_ORDRE_FABRICATION`,
+  `L_D_COULEE`, chaque `L_D_SECTIONCHARGE_*` non nulle et ses `L_D_CONSIGNES`
+  associées sont ajoutées au même contexte, puis **un seul** `SaveChanges()`
+  les commit ensemble (AC-FR21-1, AD-1)
+
+**Given** ce même `SaveChanges()` unique qui échoue
+  (`DbUpdateException`/`DbException`)
+**When** `Persist` intercepte l'exception
+**Then** la transaction est déjà annulée par EF Core ; **aucune** des 11 lignes
+  potentielles n'est committée ; le résultat porte une
+  `ConversionError{Code:PersistenceError}` citant la cause SQL (extension
+  d'`AC-FR11-5` aux nouvelles tables) (AC-FR21-2)
+
+**Given** l'ancienne surface `Persist(MapResult<L_D_KAPE22>)`
+**When** je relis le code après cette story
+**Then** elle a disparu — une seule méthode `Persist` existe, prenant
+  `Kape22ImportBundle` (AC-FR21-3, AD-6) ; `Kape22FichierProcessor` (Story 3.2)
+  appelle `Kape22ImportBundleMapper.Map` puis cette unique surface
+
+**Tests xUnit (TDD — écrits en premier, CC-1) :** `AC-FR20-5`, `AC-FR21-1` …
+`AC-FR21-3`, extension des tests `TransactionalPersistenceTests`/
+`DoubleJournalIntegrationTests` existants (Story 2.8/3.3) aux nouvelles
+tables.
+
+**Critères transverses :** CC-1, CC-2, CC-3, CC-4, CC-5, CC-7.
+
+---
+
+### Story 4.7 : Extension de la suite E2E aux 10 tables aval
+
+As a `Kape22Importer`,
+I want la suite E2E (Story 3.6, 10 fichiers `P60/` de référence) étendue pour
+vérifier les 10 tables aval, succès comme échec,
+So that l'atomicité de bout en bout (AD-1) et l'absence de trace partielle sont
+prouvées sur le pipeline réel, pas seulement sur les tests unitaires du
+Persister.
+
+**Acceptance Criteria:**
+
+**Given** les 10 fichiers `P60/` de référence
+**When** je rejoue la suite E2E
+**Then** chaque Fichier valide produit des lignes cohérentes dans les 10
+  tables aval, cohérentes avec les données visibles du Fichier (AC-FR21-4)
+
+**Given** au moins une fixture fautive dédiée par cause (coulée absente,
+  répartition lingots/fours incohérente, échec SQL simulé)
+**When** je rejoue la suite E2E sur ces fixtures
+**Then** **aucune** des 10 tables ne reçoit de ligne — pas même `L_D_KAPE22` —
+  et la cause est lisible dans `L_D_LOG_COMMANDE` + `*.errors.json`
+  (AC-FR21-5)
+
+**Tests xUnit (TDD — écrits en premier, CC-1) :** `AC-FR21-4`, `AC-FR21-5`,
+extension de la suite E2E (Story 3.6) — fixtures fautives dédiées créées par
+cette story (Annexe A.4).
+
+**Critères transverses :** CC-1, CC-2, CC-3, CC-4, CC-5, CC-7.
