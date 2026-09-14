@@ -38,9 +38,9 @@ public class AcCoverageCompletenessTests
     // describes (epics.md line 988); it lives in TextToXml.Tests (FormatIsolationTests) and is itself
     // one of CC-1's named "tests-barrière-à-la-compilation".
     // FR14-5 (WorkerAdapter<Client> status reporting) is a Launcher/Client-level concern with no
-    // Kape22Importer seam to test against; epics.md specifies its xUnit test for MicroServices.sln
-    // (GpaoImportP60.Tests, Story 3.4, line 1403) - as of 2026-09-11 that test does not exist there
-    // yet (deferred-work.md, "code review of story-3.6").
+    // Kape22Importer seam to test against; it is covered in MicroServices.sln instead
+    // (Launcher.Tests.WorkerRegistryTests.WorkerRegistry_RegistersGpaoImportP60AsAWorkerAdapter_AcFr14_5),
+    // an assembly this gate cannot see, so it stays a documented exclusion rather than a gap.
     private static readonly HashSet<string> KnownExceptions = ["FR9-6", "FR14-5"];
 
     [Fact]

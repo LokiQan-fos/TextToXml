@@ -12,7 +12,7 @@
       <value Id="Date" datatype="string" Position="3" Size="3" Description="Number of the day in the year" />
       <value Id="NumeroFichier" datatype="string" Position="6" Size="3" Description="Transmission number"/>
       <value Id="Segment" datatype="string" Position="9" Size="3" Description="Segment" />
-      <value Id="Emet" datatype="string" Position="12" Size="3" Description="Rmetteur" />
+      <value Id="Emet" datatype="string" Position="12" Size="3" Description="Emetteur" />
       <value Id="Recepteur" datatype="string" Position="15" Size="3" Description="Recepteur" />
       <value Id="Filler" datatype="string" Position="18" Size="62" Description="Réserve" />
   </header>
@@ -32,8 +32,8 @@
     <value Id="Coulee" datatype="string" Position="50" Size="6" Description="Numéro de coulée" />
     <value Id="ProfilProduit" datatype="string" Position="56" Size="3" Description="profil produit" />
     <value Id="DiametreProduit" datatype="int" Position="59" Size="4" Description="diamètre produit" />
-    <value Id="ToleranceMaxSection" datatype="int" Position="63" Size="2" Description="tolérence plus Section" />
-    <value Id="ToleranceMinSection" datatype="int" Position="65" Size="2" Description="tolérence moins Section" />
+    <value Id="ToleranceMaxSection" datatype="int" Position="63" Size="2" Description="tolérance plus Section" />
+    <value Id="ToleranceMinSection" datatype="int" Position="65" Size="2" Description="tolérance moins Section" />
     <value Id="Epaisseur" datatype="int" Position="67" Size="4" Description="Epaisseur" />
     <value Id="ToleranceMaxEpaisseur" datatype="int" Position="71" Size="2" Description="tolérance plus Epaisseur" />
     <value Id="ToleranceMinEpaisseur" datatype="int" Position="73" Size="2" Description="tolérance moins Epaisseur" />

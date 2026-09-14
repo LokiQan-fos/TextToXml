@@ -119,6 +119,9 @@ public sealed class SqlServerIntegrationFixture
 
     private static void ApplySchema(string connectionString, string scriptFileName)
     {
+        EnsureDatabaseExists(connectionString);
+        DropExistingUserTables(connectionString);
+
         string path = RepoLayout.ProjectFile(Path.Combine("scripts", "schema", scriptFileName));
         string script = File.ReadAllText(path);
 
@@ -137,5 +140,51 @@ public sealed class SqlServerIntegrationFixture
             command.CommandType = CommandType.Text;
             command.ExecuteNonQuery();
         }
+    }
+
+    // A CI SQL Server service container starts with only 'master'; creating the test database here
+    // (instead of a separate CI provisioning step) keeps CI and a fresh local instance on one path.
+    private static void EnsureDatabaseExists(string connectionString)
+    {
+        SqlConnectionStringBuilder builder = new(WithShortLoginTimeout(connectionString));
+        string database = builder.InitialCatalog;
+        builder.InitialCatalog = "master";
+
+        using SqlConnection connection = new(builder.ConnectionString);
+        connection.Open();
+
+        using SqlCommand command = connection.CreateCommand();
+        command.CommandText =
+            """
+            IF DB_ID(@name) IS NULL
+            BEGIN
+                DECLARE @sql nvarchar(400) = N'CREATE DATABASE ' + QUOTENAME(@name);
+                EXEC sp_executesql @sql;
+            END
+            """;
+        command.Parameters.Add(new SqlParameter("@name", SqlDbType.NVarChar) { Value = database });
+        command.ExecuteNonQuery();
+    }
+
+    // F-2 (Epic 3 retro): a table left over from an earlier schema (dbo.WorkerSettings, pre-Story 3.0)
+    // never gets removed by the idempotent CREATE scripts, so a test instance that outlives a schema
+    // change reports the wrong table count. Dropping every non-system table before each ApplySchema
+    // guarantees the instance always matches exactly what scripts/schema/ currently describes.
+    private static void DropExistingUserTables(string connectionString)
+    {
+        using SqlConnection connection = new(WithShortLoginTimeout(connectionString));
+        connection.Open();
+
+        using SqlCommand command = connection.CreateCommand();
+        command.CommandText =
+            """
+            DECLARE @sql nvarchar(max) = N'';
+            SELECT @sql += N'DROP TABLE ' + QUOTENAME(s.name) + N'.' + QUOTENAME(t.name) + N';'
+            FROM sys.tables t
+            JOIN sys.schemas s ON t.schema_id = s.schema_id
+            WHERE t.is_ms_shipped = 0;
+            EXEC sp_executesql @sql;
+            """;
+        command.ExecuteNonQuery();
     }
 }

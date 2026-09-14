@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 16:00
-last_updated: 09-11-2026 13:15
+last_updated: 09-14-2026 00:00
 project: TextToXml
 project_key: NOKEY
 tracking_system: file-system
@@ -206,9 +206,14 @@ action_items:
       OU volet SQLite/InMemory en Category=Unit pour la logique de branchement; inclut
       le drop/recreate des tables du harnais dans SqlServerIntegrationFixture (correctif
       F-2: echec PersistenceSmokeTests reproduit en direct, schema de test jamais
-      reinitialise)"
+      reinitialise). DONE 2026-09-14: option retenue = service container Linux SQL Server
+      dans ci.yml (dotnet test --filter Category=Integration ajoute) ; SqlServerIntegrationFixture
+      cree desormais la base de test si absente (EnsureDatabaseExists) et purge toute
+      table utilisateur avant chaque ApplySchema (DropExistingUserTables) - correctif direct
+      F-2. PersistenceSmokeTests.SchemaApplies_CreatesExactlyTheHarnessTables verifie vert
+      en local (128/128 Integration, 0 echec)."
     owner: "Lead Architecte"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-09-11.md"
   - id: "epic-3-retro-item-2-garde-corps-commit-p60-typos"
     epic: 3
@@ -216,17 +221,22 @@ action_items:
       hook ou etape build refusant un chore(story-*) sans lignes AC->test dans le
       corps - 2 recidives en 2 epics (F-14 Epic 2, F-3 Epic 3, commits 7629c5b et
       249b6e9 vides). Corriger les 3 coquilles Description de Templates/P60.xml (Rmetteur->Emetteur,
-      tolerence->tolerance)"
+      tolerence->tolerance)". DONE 2026-09-14: etape CI ajoutee dans ci.yml (pas de hook local,
+      cf. Q-2 de la retro : un hook non installe ne protege rien) - refuse un commit chore(story-*)
+      dont le corps (hors trailer Co-Authored-By) ne mentionne ni AC-FRx-y ni "test" ; les 3
+      coquilles de Templates/P60.xml corrigees (Rmetteur -> Emetteur, tolerence -> tolerance x2)."
     owner: "SM"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-09-11.md"
   - id: "epic-3-retro-item-3-corriger-commentaire-fr14-5"
     epic: 3
     action: "Corriger le commentaire perime de AcCoverageCompletenessTests.cs (lignes
       40-43): AC-FR14-5 est couvert par Launcher.Tests.WorkerRegistryTests.WorkerRegistry_RegistersGpaoImportP60AsAWorkerAdapter_AcFr14_5
-      (MicroServices.sln); garder l exclusion KnownExceptions mais corriger sa justification"
+      (MicroServices.sln); garder l exclusion KnownExceptions mais corriger sa justification".
+      DONE 2026-09-14: commentaire de AcCoverageCompletenessTests.cs reecrit, reference directe
+      au test Launcher.Tests, exclusion KnownExceptions inchangee."
     owner: "Dev"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-09-11.md"
   - id: "epic-3-retro-item-4-attestation-commit-svn"
     epic: 3
@@ -240,9 +250,11 @@ action_items:
     epic: 3
     action: "Purger Entete/Pied de CoherenceChecker.cs (reserve CC-2 mineure reconduite
       depuis l Epic 2, non traitee lors du split de Kape22Mapper) - remplacer par
-      Header/Footer ou les 6 noms de domaine sanctionnes"
+      Header/Footer ou les 6 noms de domaine sanctionnes". DONE 2026-09-14: seule occurrence
+      restante (CoherenceChecker.cs:18, "Entete"/"Pied") remplacee par "Header"/"Footer",
+      deja utilises ailleurs dans le meme fichier."
     owner: "Dev"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-09-11.md"
   - id: "epic-3-retro-item-6-basculer-epic-3-done"
     epic: 3

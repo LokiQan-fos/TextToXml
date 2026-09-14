@@ -15,7 +15,7 @@ public static class CoherenceChecker
     // The Footer is the third and last Ligne of a P60 Fichier (D3).
     private const int FooterLineNumber = 3;
 
-    // Footer.Records must count exactly Entete + message + Pied (§0bis D18).
+    // Footer.Records must count exactly Header + message + Footer (§0bis D18).
     private const int ExpectedRecordCount = 3;
 
     // A P60 Fichier name decomposes as File_Emet_Recepteur_NumeroFichier: four segments, three

@@ -1,7 +1,8 @@
 # Build gate for the TextToXml solution.
-# Runs the SolutionStructureTests build gate and the Category=Unit suite on every push and PR.
-# The Category=Integration suite (AR-12) needs a reachable SQL Server test instance; the runner that
-# provides one is still an open infra decision, so only Category=Unit runs here for now.
+# Runs the SolutionStructureTests build gate and both the Category=Unit and Category=Integration
+# suites on every push and PR. Integration runs against a SQL Server service container (Epic 3 retro
+# A-1); SqlServerIntegrationFixture creates the two test databases and drops/recreates the harness
+# tables itself, so no separate provisioning step is needed here.
 name: CI
 
 on:
@@ -12,8 +13,31 @@ on:
 jobs:
   build-test:
     runs-on: ubuntu-latest
+
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: ${{ secrets.MSSQL_SA_PASSWORD }}
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd="/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P $MSSQL_SA_PASSWORD -Q 'SELECT 1'"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      KAPE22_TEST_ConnectionStrings__AscoLSI: >-
+        Server=localhost;Database=AscoLSI_Test;User Id=sa;Password=${{ secrets.MSSQL_SA_PASSWORD }};TrustServerCertificate=True
+      KAPE22_TEST_ConnectionStrings__MQTTnetServices: >-
+        Server=localhost;Database=MQTTnetServices_Test;User Id=sa;Password=${{ secrets.MSSQL_SA_PASSWORD }};TrustServerCertificate=True
+
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - name: Set up .NET
         uses: actions/setup-dotnet@v4
@@ -33,6 +57,26 @@ jobs:
           dotnet test TextToXml.sln --no-build --configuration Release
           --filter Category=Unit
           --logger "trx;LogFileName=unit.trx"
+
+      - name: Test (Category=Integration)
+        run: >
+          dotnet test TextToXml.sln --no-build --configuration Release
+          --filter Category=Integration
+          --logger "trx;LogFileName=integration.trx"
+
+      # Epic 3 retro A-2 / Epic 2 retro A-4: a chore(story-*) commit without "AC -> test" lines in its
+      # body has slipped through twice (F-14 Epic 2, F-3 Epic 3). A CI step, not a local hook, because
+      # a hook only fires on a machine that installed it.
+      - name: Check commit body (chore(story-*) needs substance, not just the subject + trailer)
+        run: |
+          subject="$(git log -1 --format=%s)"
+          if [[ "$subject" == chore\(story-* ]]; then
+            body="$(git log -1 --format=%b | grep -v '^Co-Authored-By:')"
+            if ! grep -qiE 'AC-[A-Za-z0-9-]+' <<< "$body" || ! grep -qi 'test' <<< "$body"; then
+              echo "::error::Commit '$subject' is a chore(story-*) commit whose body doesn't mention an AC (AC-FRx-y) and a test - looks like a body reduced to the Co-Authored-By trailer."
+              exit 1
+            fi
+          fi
 
       - name: Upload test results
         if: always()
