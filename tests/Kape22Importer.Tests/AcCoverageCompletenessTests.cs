@@ -30,6 +30,7 @@ public class AcCoverageCompletenessTests
         [13] = 5,
         [14] = 8,
         [15] = 4,
+        [17] = 5,
     };
 
     // ACs this assembly cannot cover by design, not by omission - each is out of Kape22Importer's own
@@ -41,7 +42,12 @@ public class AcCoverageCompletenessTests
     // Kape22Importer seam to test against; it is covered in MicroServices.sln instead
     // (Launcher.Tests.WorkerRegistryTests.WorkerRegistry_RegistersGpaoImportP60AsAWorkerAdapter_AcFr14_5),
     // an assembly this gate cannot see, so it stays a documented exclusion rather than a gap.
-    private static readonly HashSet<string> KnownExceptions = ["FR9-6", "FR14-5"];
+    // FR17-1..FR17-4 (Story 4.2 mapping annex content: sourced/rule/à_clarifier status, per-OF
+    // applicability rule, annex as single reference) are the annex's business content - epics.md states
+    // this stays a human review, non-automatable. Only AC-FR17-5 (the mechanical completeness gate) has
+    // a trait-carrying test.
+    private static readonly HashSet<string> KnownExceptions =
+        ["FR9-6", "FR14-5", "FR17-1", "FR17-2", "FR17-3", "FR17-4"];
 
     [Fact]
     [Trait("AC", "SM-1")]

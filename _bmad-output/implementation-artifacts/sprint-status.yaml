@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 16:00
-last_updated: 09-14-2026 16:45
+last_updated: 09-15-2026 00:00
 project: TextToXml
 project_key: NOKEY
 tracking_system: file-system
@@ -69,7 +69,7 @@ development_status:
 
   epic-4: in-progress
   4-1-entités-ef-database-first-extension-du-harnais-sql-pour-les: done
-  4-2-extraction-documentation-du-mapping-legacy-annexe-colonne-pa: backlog
+  4-2-extraction-documentation-du-mapping-legacy-annexe-colonne-pa: done
   4-3-mapper-of-coulée-mapping-structurel-pur: backlog
   4-4-mapper-consignes-les-7-sectioncharge-mapping-structurel-pur: backlog
   4-5-kape22importbundlemapper-orchestrateur-contrôles-métier-purs: backlog
