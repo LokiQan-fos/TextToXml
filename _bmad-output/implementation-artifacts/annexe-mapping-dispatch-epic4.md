@@ -295,7 +295,7 @@ n'a pas d'équivalent dans notre schéma.
 | NuanceMarquage | sourcée | KAPE22.NuanceMarquage |
 | OF | sourcée | KAPE22.OF |
 | OFDestination | sourcée | KAPE22.OFDestination |
-| OFInterne | sourcée | KAPE22.OFInterne |
+| OFInterne | à_clarifier | Erreur d'annexe corrigée à la Story 4.4 : aucun champ `OFInterne` n'existe sur `L_D_KAPE22` (seuls `OFDestinationInterne` et `OForiginInterne`, ni l'un ni l'autre univoque) ; voir `deferred-work.md` |
 | OFOrigin | sourcée | KAPE22.OFOrigin |
 | OxygeneInferieur | sourcée | KAPE22.OxygeneInferieur |
 | OxygeneLatent | sourcée | KAPE22.OxygeneLatent |
