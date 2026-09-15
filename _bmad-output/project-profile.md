@@ -114,4 +114,9 @@ correspondante. Jamais de règle inventée. (AC-FR17-5 mécanise ce contrôle.)
 
 ## Ledger de dette
 
-Format d'entrée :
+Vit dans `deferred-work.md`, sous un titre daté `## Deferred from: <origine> (<date>)`.
+Format d'entrée (un bloc par item déféré) :
+
+- `source_spec:` document(s) source (epics.md § Story, annexe de mapping, etc.)
+- `summary:` description factuelle du point différé
+- `evidence:` comment il a été constaté (revue de code, lecture legacy, etc.) et pourquoi il n'est pas bloquant

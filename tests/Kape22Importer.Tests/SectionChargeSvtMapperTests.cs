@@ -46,6 +46,31 @@ public class SectionChargeSvtMapperTests
         Assert.Equal(source.RangOpeSVT, entity.RangOperation);
     }
 
+    // AC-FR19-2: same rule on the other applicability field, CodeOpeSVT - RangOpeSVT alone does not
+    // make the section applicable.
+    [Fact]
+    [Trait("AC", "FR19-2")]
+    public void Map_CodeOperationEmpty_ReturnsNull_AcFr19_2()
+    {
+        MapResult<L_D_KAPE22> result = MapMutatedFichier(document =>
+            SetChamp(document, "message", "RangOpeSVT", "170"));
+        Assert.True(result.Success);
+
+        Assert.Null(SectionChargeSvtMapper.Map(result.Value!));
+    }
+
+    // AC-FR19-2: same rule on the other applicability field, RangOpeSVT.
+    [Fact]
+    [Trait("AC", "FR19-2")]
+    public void Map_RangOperationEmpty_ReturnsNull_AcFr19_2()
+    {
+        MapResult<L_D_KAPE22> result = MapMutatedFichier(document =>
+            SetChamp(document, "message", "CodeOpeSVT", "SV1"));
+        Assert.True(result.Success);
+
+        Assert.Null(SectionChargeSvtMapper.Map(result.Value!));
+    }
+
     // AC-FR19-1: every L_D_SECTIONCHARGE_SVT column is explicitly sourced above - fails if a future
     // column is added without being accounted for.
     [Fact]

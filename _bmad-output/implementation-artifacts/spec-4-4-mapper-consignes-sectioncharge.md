@@ -67,5 +67,5 @@ route: 'one-shot'
 
 **Commands:**
 - `dotnet build TextToXml.sln -warnaserror` -- expected: 0 warnings, 0 errors
-- `dotnet test TextToXml.sln --filter Category=Unit` -- expected: all pass (456 in Kape22Importer.Tests, up from 449 pre-story)
+- `dotnet test TextToXml.sln --filter Category=Unit` -- expected: all pass (460 in Kape22Importer.Tests, verified by running the suite; includes 4 tests added at code review)
 - `dotnet test TextToXml.sln --filter Category=Integration` -- expected: all pass or skip cleanly (no local SQL Server needed for this story, no DB access in these mappers)

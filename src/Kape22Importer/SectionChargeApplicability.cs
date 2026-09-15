@@ -8,5 +8,5 @@ namespace Kape22Importer;
 internal static class SectionChargeApplicability
 {
     public static bool IsApplicable(string? codeOperation, string? rangOperation) =>
-        !string.IsNullOrEmpty(codeOperation) && !string.IsNullOrEmpty(rangOperation);
+        !string.IsNullOrWhiteSpace(codeOperation) && !string.IsNullOrWhiteSpace(rangOperation);
 }

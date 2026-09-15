@@ -47,6 +47,31 @@ public class SectionChargePoidsMetriqueMapperTests
         Assert.Equal(source.RangOpePoidMetrique, entity.RangOperation);
     }
 
+    // AC-FR19-2: same rule on the other applicability field, CodeOpePoidMetrique - RangOpePoidMetrique
+    // alone does not make the section applicable.
+    [Fact]
+    [Trait("AC", "FR19-2")]
+    public void Map_CodeOperationEmpty_ReturnsNull_AcFr19_2()
+    {
+        MapResult<L_D_KAPE22> result = MapMutatedFichier(document =>
+            SetChamp(document, "message", "RangOpePoidMetrique", "160"));
+        Assert.True(result.Success);
+
+        Assert.Null(SectionChargePoidsMetriqueMapper.Map(result.Value!));
+    }
+
+    // AC-FR19-2: same rule on the other applicability field, RangOpePoidMetrique.
+    [Fact]
+    [Trait("AC", "FR19-2")]
+    public void Map_RangOperationEmpty_ReturnsNull_AcFr19_2()
+    {
+        MapResult<L_D_KAPE22> result = MapMutatedFichier(document =>
+            SetChamp(document, "message", "CodeOpePoidMetrique", "PM1"));
+        Assert.True(result.Success);
+
+        Assert.Null(SectionChargePoidsMetriqueMapper.Map(result.Value!));
+    }
+
     // AC-FR19-1: every L_D_SECTIONCHARGE_POIDSMETRIQUE column is explicitly sourced above - fails if a
     // future column is added without being accounted for.
     [Fact]
