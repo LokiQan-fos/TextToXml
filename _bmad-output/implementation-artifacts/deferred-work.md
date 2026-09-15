@@ -1,5 +1,17 @@
 # Deferred Work
 
+## Deferred from: code review of story-4.3 (2026-09-15)
+
+- source_spec: `epics.md` § Story 4.3 / `annexe-mapping-dispatch-epic4.md` § L_D_ORDRE_FABRICATION
+  summary: `OrdreFabricationMapper.Map` widens `DiametreProduit`, `Epaisseur` and `LongueurCD` from
+  `L_D_KAPE22`'s `int?` columns straight to `L_D_ORDRE_FABRICATION`'s `decimal` columns with no
+  scale/unit conversion. Whether the legacy KAPE22 ints actually encode a sub-unit (e.g. tenths of mm)
+  that the target decimal columns expect at full-unit precision is not settled by the Story 4.2 annex
+  text alone.
+  evidence: Constaté à la revue de code Story 4.3 (Edge Case Hunter, hors mandat, confirmé Acceptance
+  Auditor). Nécessite une vérification métier/legacy (référent KAPE22 ou lecture directe d'un
+  échantillon de production) plutôt qu'une décision de code seule.
+
 ## Deferred from: code review of story-4.1 (2026-09-14)
 
 - source_spec: `epics.md` § Story 4.1

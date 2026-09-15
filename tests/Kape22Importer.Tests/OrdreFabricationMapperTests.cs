@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using Kape22Importer.Persistence;
 using TextToXml.Tests;
@@ -132,6 +134,72 @@ public class OrdreFabricationMapperTests
             ? Activator.CreateInstance(property.PropertyType)
             : null;
         Assert.Equal(expectedDefault, property.GetValue(entity));
+    }
+
+    // AC-FR18-1: every L_D_ORDRE_FABRICATION column belongs to one of SourcedColumns, the rule-null-
+    // later-event InlineData, DateMaj/DateReception, or the à_clarifier InlineData above - fails if a
+    // future column is added to the entity without being added to one of those lists, the same
+    // completeness guarantee CouleeMapperTests.Map_EveryUndocumentedColumn_StaysAtClrDefault_AcFr18_4
+    // gives L_D_COULEE (adapted here since every OF column already has its own explicit assertion).
+    private static readonly string[] DocumentedColumns =
+    [
+        nameof(L_D_ORDRE_FABRICATION.AcompteSolde),
+        nameof(L_D_ORDRE_FABRICATION.ClasseDeChute),
+        nameof(L_D_ORDRE_FABRICATION.Client),
+        nameof(L_D_ORDRE_FABRICATION.CodeDemiProduit),
+        nameof(L_D_ORDRE_FABRICATION.Coulee),
+        nameof(L_D_ORDRE_FABRICATION.DateDebut),
+        nameof(L_D_ORDRE_FABRICATION.DateDebutLaminage),
+        nameof(L_D_ORDRE_FABRICATION.DateEVC),
+        nameof(L_D_ORDRE_FABRICATION.DateFin),
+        nameof(L_D_ORDRE_FABRICATION.DateFinLaminage),
+        nameof(L_D_ORDRE_FABRICATION.DateMaj),
+        nameof(L_D_ORDRE_FABRICATION.DateReception),
+        nameof(L_D_ORDRE_FABRICATION.DiametreProduit),
+        nameof(L_D_ORDRE_FABRICATION.Epaisseur),
+        nameof(L_D_ORDRE_FABRICATION.Etat),
+        nameof(L_D_ORDRE_FABRICATION.Indice),
+        nameof(L_D_ORDRE_FABRICATION.LongueurCD),
+        nameof(L_D_ORDRE_FABRICATION.MarqueCommerciale),
+        nameof(L_D_ORDRE_FABRICATION.NombreDemiProduit),
+        nameof(L_D_ORDRE_FABRICATION.NombreLingotsWagon1Four1),
+        nameof(L_D_ORDRE_FABRICATION.NombreLingotsWagon1Four2),
+        nameof(L_D_ORDRE_FABRICATION.NombreLingotsWagon2Four1),
+        nameof(L_D_ORDRE_FABRICATION.NombreLingotsWagon2Four2),
+        nameof(L_D_ORDRE_FABRICATION.Nuance),
+        nameof(L_D_ORDRE_FABRICATION.NumeroFichier),
+        nameof(L_D_ORDRE_FABRICATION.NumeroMontage),
+        nameof(L_D_ORDRE_FABRICATION.OF),
+        nameof(L_D_ORDRE_FABRICATION.OFOrigine),
+        nameof(L_D_ORDRE_FABRICATION.PoidsDemiProduitUnitaire),
+        nameof(L_D_ORDRE_FABRICATION.PoidsPesee),
+        nameof(L_D_ORDRE_FABRICATION.PoidsPrevuDemiProduit),
+        nameof(L_D_ORDRE_FABRICATION.ProfilProduit),
+        nameof(L_D_ORDRE_FABRICATION.SensLaminage),
+        nameof(L_D_ORDRE_FABRICATION.SensLaminageGPAO),
+        nameof(L_D_ORDRE_FABRICATION.SuiviDeZoneZone),
+        nameof(L_D_ORDRE_FABRICATION.TemperatureScarfing),
+        nameof(L_D_ORDRE_FABRICATION.TemperatureT03),
+        nameof(L_D_ORDRE_FABRICATION.TemperatureT07),
+        nameof(L_D_ORDRE_FABRICATION.ToleranceMaxEpaisseur),
+        nameof(L_D_ORDRE_FABRICATION.ToleranceMaxLongueur),
+        nameof(L_D_ORDRE_FABRICATION.ToleranceMaxSection),
+        nameof(L_D_ORDRE_FABRICATION.ToleranceMinEpaisseur),
+        nameof(L_D_ORDRE_FABRICATION.ToleranceMinLongueur),
+        nameof(L_D_ORDRE_FABRICATION.ToleranceMinSection),
+        nameof(L_D_ORDRE_FABRICATION.Type),
+    ];
+
+    [Fact]
+    [Trait("AC", "FR18-1")]
+    public void OrdreFabricationMapper_EveryColumnIsAccountedForByAKnownList_AcFr18_1()
+    {
+        List<string> undocumented = typeof(L_D_ORDRE_FABRICATION).GetProperties()
+            .Select(property => property.Name)
+            .Where(name => !DocumentedColumns.Contains(name))
+            .ToList();
+
+        Assert.True(undocumented.Count == 0, "Uncovered column(s): " + string.Join(", ", undocumented));
     }
 
     // AC-FR18-4: the mapper documents each guess-free à_clarifier column with the same "assumed,

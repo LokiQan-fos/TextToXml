@@ -8,6 +8,13 @@ namespace Kape22Importer;
 // function of its two inputs. Every assignment below is sourced or ruled by the Story 4.2 annex
 // (annexe-mapping-dispatch-epic4.md § L_D_ORDRE_FABRICATION); nothing here invents a rule the annex does
 // not document (AC-FR18-1).
+//
+// A "sourcée" string column whose L_D_KAPE22 field is itself null falls back to string.Empty rather than
+// propagating null onto these NOT NULL target columns - assumed, unverified, no null case observed for
+// these fields in the annex or the FR-7 production parity read (see deferred-work.md). The equivalent
+// `?? 0` fallback on the int/decimal columns (DiametreProduit, Epaisseur, LongueurCD, NombreDemiProduit,
+// the six Tolerance*) is defensive only and provably unreachable today: Kape22Mapper.DefaultForNonNullable
+// already zero-fills every blank int Champ upstream (no NULL observed in 17710 production rows).
 public static class OrdreFabricationMapper
 {
     // timeProvider defaults to the system clock in production; tests inject a fixed one (AR-12) for the

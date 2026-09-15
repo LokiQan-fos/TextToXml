@@ -31,7 +31,6 @@ public static class CouleeMapper
             // their CLR default 0 rather than a guessed enum state or count; does not block the rest of
             // the mapper (AC-FR18-4).
             EtatReception = 0,
-            NbLingotRestantARefroidir = 0,
 
             // Externe is always false for a Coulee created by a KAPE22 dispatch - true is only reached
             // through legacy administrative scenarios the P60 flow never calls (CreateDefaultFroid /
@@ -40,6 +39,8 @@ public static class CouleeMapper
 
             // IdCoulee is the OF's Coulee (KAPE22.Coulee), the annex's one renamed field for this table.
             IdCoulee = source.Coulee,
+
+            NbLingotRestantARefroidir = 0,
 
             Nuance = source.Nuance,
 
