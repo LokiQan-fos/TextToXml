@@ -46,6 +46,10 @@ internal static class TestSupport
     public static MapResult<L_D_KAPE22> MapReferenceFichier() =>
         Map(ConvertReferenceFichier(), ReferenceFichierName);
 
+    // The reference Fichier's mapped L_D_KAPE22 entity, the standard input for the Story 4.3 downstream
+    // mappers (OrdreFabricationMapper, CouleeMapper), which take an entity rather than raw XML.
+    public static L_D_KAPE22 ReferenceKape22() => MapReferenceFichier().Value!;
+
     // Converts the reference Fichier, applies a mutation to the normalized XML, then maps it.
     public static MapResult<L_D_KAPE22> MapMutatedFichier(Action<XDocument> mutate)
     {

@@ -70,7 +70,7 @@ le cas (AC-FR19-2).
 | ProfilProduit | sourcée | KAPE22.ProfilProduit |
 | SensLaminage | à_clarifier | Aucune occurrence trouvée dans les fichiers legacy lus |
 | SensLaminageGPAO | à_clarifier | Aucune occurrence trouvée dans les fichiers legacy lus |
-| SuiviDeZoneZone | sourcée | KAPE22.SuiviDeZoneZone |
+| SuiviDeZoneZone | à_clarifier | Erreur d'annexe corrigée à la Story 4.3 : aucun champ `SuiviDeZoneZone` (ni variante de casse/orthographe) n'existe sur `L_D_KAPE22` ; voir `deferred-work.md` |
 | TemperatureScarfing | règle | NULL au dispatch ; positionné ensuite par OrdreFabricationController.cs:2069 (capture de température, hors P60) |
 | TemperatureT03 | règle | NULL au dispatch ; positionné ensuite par OrdreFabricationController.cs:2080 |
 | TemperatureT07 | règle | NULL au dispatch ; positionné ensuite par OrdreFabricationController.cs:2099 |
