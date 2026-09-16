@@ -34,3 +34,39 @@ NE POSE AUCUNE QUESTION sur le scope, le spec ou le mode. Le CHECKPOINT
 step-01 reste la seule confirmation utilisateur. Si une des 3 étapes
 échoue (aucun commit chore(story-*) trouvé, aucun spec), signale-le et
 arrête — n'invente pas de valeur, ne tombe pas dans la cascade standard.
+
+APRÈS LE CHECKPOINT — À la fin de la revue.
+
+Une fois que le workflow bmad-code-review a rendu son rapport agrégé
+(verdict ACCEPTÉ ou REFUSÉ, findings classés en Decision/Patch/Defer,
+avec leurs IDs et descriptions), et AVANT de présenter le résultat à
+l'utilisateur, exécute cette étape supplémentaire :
+
+Crée le dossier _bmad-output/implementation-artifacts/reviews/story-<N>-<M>/
+(si nécessaire) et écris le rapport complet dans le fichier
+aggregated-report.md.
+
+Le fichier doit contenir, dans cet ordre :
+  1. Le verdict (ACCEPTÉ / REFUSÉ) et le nombre de findings par sévérité.
+  2. La liste des findings Decision, chacun avec son ID, sa description,
+     sa localisation fichier:ligne, et l'état "à trancher par l'humain".
+  3. La liste des findings Patch, chacun avec son ID, sa description, sa
+     localisation fichier:ligne, et l'action corrective proposée.
+  4. La liste des findings Defer, avec justification.
+  5. La liste des findings rejetés (bruit), avec justification du rejet.
+  6. Les auto-vérifications (4 lentilles lancées, diff stats).
+
+Ce fichier sera la source de vérité pour /commit-review, qui doit pouvoir
+le retrouver même dans une session neuve. Utilise un format Markdown
+lisible, avec un en-tête :
+
+  # Review report — Story <N>.<M>
+
+  Range : <oldest-sha>^..HEAD
+  Spec : <chemin>
+  Date : <date ISO>
+  Verdict : ACCEPTÉ | REFUSÉ
+  Findings : D=<n> P=<n> F=<n> R=<n>  (Decision, Patch, Defer, Rejetés)
+
+Une fois le fichier écrit, confirme son chemin absolu dans ta réponse
+à l'utilisateur, puis présente le rapport comme le workflow l'exige.
