@@ -126,6 +126,19 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
         using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
         Assert.Empty(verify.Kape22Rows.AsNoTracking());
         Assert.Empty(verify.LogCommandeRows.AsNoTracking());
+
+        // AC-FR21-1's atomicity cuts both ways here too: the rolled-back transaction also staged every
+        // downstream entity, so none of the other 9 tables kept a row either (mirrors AC-FR20-5's check).
+        Assert.Empty(verify.OrdreFabricationRows.AsNoTracking());
+        Assert.Empty(verify.CouleeRows.AsNoTracking());
+        Assert.Empty(verify.SectionChargeChutageRows.AsNoTracking());
+        Assert.Empty(verify.SectionChargeDecoupeRows.AsNoTracking());
+        Assert.Empty(verify.SectionChargeLingotRows.AsNoTracking());
+        Assert.Empty(verify.SectionChargePitsRows.AsNoTracking());
+        Assert.Empty(verify.SectionChargePoidsMetriqueRows.AsNoTracking());
+        Assert.Empty(verify.SectionChargeRefroidissoirsRows.AsNoTracking());
+        Assert.Empty(verify.SectionChargeSvtRows.AsNoTracking());
+        Assert.Empty(verify.ConsignesRows.AsNoTracking());
     }
 
     // AC-FR11-4: a rejected Fichier with a readable OF -> no L_D_KAPE22 row, exactly one
@@ -153,9 +166,9 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
     }
 
     // AC-FR11-5 / AC-FR21-2: a SQL failure on the L_D_KAPE22 insert (Client over its bounded column)
-    // comes back as {Block:File, Code:PersistenceError} with no exception escaping, and none of the
-    // up-to-11 rows staged for that one SaveChanges is left committed - not just L_D_KAPE22, every
-    // downstream entity too (AC-FR21-2 extends AC-FR11-5).
+    // comes back as {Block:File, Code:PersistenceError} with no exception escaping, and none of the rows
+    // staged for that one SaveChanges is left committed - not just L_D_KAPE22, every downstream entity
+    // too (AC-FR21-2 extends AC-FR11-5).
     [SkippableFact]
     [Trait("AC", "FR11-5")]
     [Trait("AC", "FR21-2")]
@@ -181,6 +194,14 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
         Assert.Empty(verify.LogCommandeRows.AsNoTracking());
         Assert.Empty(verify.OrdreFabricationRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
         Assert.Empty(verify.CouleeRows.AsNoTracking().Where(row => row.IdCoulee.Trim() == bundle.Kape22!.Coulee.Trim()));
+        Assert.Empty(verify.SectionChargeChutageRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Empty(verify.SectionChargeDecoupeRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Empty(verify.SectionChargeLingotRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Empty(verify.SectionChargePitsRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Empty(verify.SectionChargePoidsMetriqueRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Empty(verify.SectionChargeRefroidissoirsRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Empty(verify.SectionChargeSvtRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Empty(verify.ConsignesRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
     }
 
     // AC-FR11-6 (D22): a prior "<NumeroFichier> — OK" L_D_LOG_COMMANDE row for the same NumeroFichier +
@@ -307,6 +328,43 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
         Assert.Empty(verify.SectionChargeRefroidissoirsRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
         Assert.Empty(verify.SectionChargeSvtRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
         Assert.Empty(verify.ConsignesRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
+    }
+
+    // AC-FR20-5 / AC-FR21-1: a cold Coulee (CodeConsignePits == "1") whose L_D_COULEE row already exists
+    // is the spec's own described "expected, normal" case (several OF from the same cast) - it must
+    // succeed, not be rejected, and must not re-insert the already-present Coulee row. A mutation check
+    // confirms this is the guard the previous review left untested: narrowing Kape22Persister.cs's cold
+    // guard from `CodeConsignePits == ColdConsignePits && !couleeAlreadyExists` to just
+    // `CodeConsignePits == ColdConsignePits` (rejecting every cold order unconditionally) passed the full
+    // suite until this test was added.
+    [SkippableFact]
+    [Trait("AC", "FR20-5")]
+    [Trait("AC", "FR21-1")]
+    public void Persist_ColdCouleeAlreadyOnFile_SucceedsWithoutDuplicatingTheCouleeRow_AcFr20_5()
+    {
+        Ready();
+        Kape22ImportBundle bundle = MapMutatedBundle(d =>
+        {
+            SetChamp(d, "message", "CodeConsignePits", "1");
+            ZeroOutOfScaleDimensions(d);
+        });
+        Assert.True(bundle.Success, "the cold happy-path fixture must still pass every FR-20 control.");
+        string coulee = bundle.Kape22!.Coulee;
+
+        using (AscoLsiDbContext seed = fixture.NewAscoLsiContext())
+        {
+            seed.CouleeRows.Add(bundle.Coulee!);
+            seed.SaveChanges();
+        }
+
+        ImportResult result = Persist(bundle);
+
+        Assert.True(result.Success, string.Join("; ", result.Errors.Select(error => error.Message)));
+        Assert.NotNull(result.InsertedId);
+
+        using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
+        Assert.Single(verify.Kape22Rows.AsNoTracking());
+        Assert.Single(verify.CouleeRows.AsNoTracking().Where(row => row.IdCoulee.Trim() == coulee.Trim()));
     }
 
     // AC-FR21-1 (AD-1): a bundle that passes the guard with a hot Coulee (the existence check skipped)

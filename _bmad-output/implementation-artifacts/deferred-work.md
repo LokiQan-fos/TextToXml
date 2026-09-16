@@ -77,6 +77,14 @@
   current caller uses fixed, known-good positions from `Templates/P60.xml` against the real fixture
   files, so the gap is latent, not currently reachable.
 
+- source_spec: `tests/Kape22Importer.Tests/TestSupport.cs` (`ZeroOutOfScaleDimensions(XDocument)`)
+  summary: `ZeroOutOfScaleDimensions(XDocument)` dereferences `document.Root!.Element("message")!` with
+  no null check before probing for each Champ; an `XDocument` whose root has no `message` element throws
+  a raw `NullReferenceException` instead of a descriptive test-setup failure.
+  evidence: Raised by the Edge Case Hunter layer at a second-pass code review of Story 4.6 (2026-09-16).
+  Test-only helper, same latent/not-currently-reachable category as the `WithDetailChamp` bounds gap
+  above — every current caller passes a real post-Converter `XDocument` from a valid P60 fixture.
+
 ## Deferred from: code review of story-4.3 (2026-09-15)
 
 - source_spec: `epics.md` § Story 4.3 / `annexe-mapping-dispatch-epic4.md` § L_D_ORDRE_FABRICATION

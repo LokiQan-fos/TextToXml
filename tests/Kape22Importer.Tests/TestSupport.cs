@@ -90,6 +90,9 @@ internal static class TestSupport
     // puts fixing it out of this story's reach. Zeroing these Champs here (none of them feeds an FR-20
     // control) keeps a Kape22Persister test exercising the persister's own transactional behavior instead
     // of tripping over that unrelated, pre-existing defect - see the story report for the full finding.
+    // CC-4 exemption: this list is deliberately grouped by originating mapper and kept in the same order
+    // as OutOfScaleDimensionFields below, position-for-position, so the two lists cross-reference each
+    // other by index rather than by name - sorting this one alphabetically would desynchronize them.
     public static void ZeroOutOfScaleDimensions(XDocument document)
     {
         foreach (string champ in new[]

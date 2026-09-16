@@ -24,7 +24,7 @@ namespace Kape22Importer.Persistence;
 // "<NumeroFichier> — REJETÉ : <summary>" L_D_LOG_COMMANDE row in its own transaction when the OF is
 // readable (AC-FR11-4), nothing at all when it is not (D15).
 // A SQL failure (DbUpdateException or DbException) is caught and returned as a PersistenceError; the
-// failed SaveChanges has already rolled back its transaction, so none of the up-to-11 staged rows persist
+// failed SaveChanges has already rolled back its transaction, so none of the staged rows persist
 // (AC-FR11-5, extended by AC-FR21-2). Other exception types are not swallowed. The connection string
 // reaches the DbContext through configuration and is never hard-coded (AC-FR11-8, CC-7).
 // The DbContext lifetime and the Epic 3 host wiring are the orchestrator's concern; this type is
@@ -91,13 +91,21 @@ public sealed class Kape22Persister(AscoLsiDbContext context, IConfiguration con
             if (entity.CodeConsignePits == ColdConsignePits && !couleeAlreadyExists)
             {
                 string couleeMessage = $"OF '{of}' : la coulée '{coulee}' est introuvable dans L_D_COULEE.";
+                ConversionError couleeError = new() { Block = Block.File, Code = ErrorCode.BusinessRuleViolation, Message = couleeMessage };
                 context.LogCommandeRows.Add(BuildLogRow(of, $"{numeroFichier} — REJETÉ : {couleeMessage}"));
-                context.SaveChanges();
 
-                return new ImportResult
+                // A SaveChanges failure writing this REJETÉ row still needs to carry the missing-Coulee
+                // reason forward, the same way PersistRejected's own catch forwards bundle.Errors.
+                try
                 {
-                    Errors = [new ConversionError { Block = Block.File, Code = ErrorCode.BusinessRuleViolation, Message = couleeMessage }],
-                };
+                    context.SaveChanges();
+                }
+                catch (Exception exception) when (exception is DbUpdateException or DbException)
+                {
+                    return PersistenceFailure(exception, [couleeError]);
+                }
+
+                return new ImportResult { Errors = [couleeError] };
             }
 
             context.Kape22Rows.Add(entity);
@@ -117,8 +125,9 @@ public sealed class Kape22Persister(AscoLsiDbContext context, IConfiguration con
             AddIfPresent(context.SectionChargeSvtRows, bundle.SectionChargeSvt);
             context.ConsignesRows.AddRange(bundle.Consignes);
 
-            // AC-FR21-1/AD-1: a single SaveChanges wraps L_D_KAPE22 and every downstream entity in one
-            // transaction, so either all up to 11 rows land or none does.
+            // AC-FR21-1/AD-1: a single SaveChanges wraps L_D_KAPE22 and every downstream entity - including
+            // as many Consignes rows as the bundle carries - in one transaction, so either all of them land
+            // or none does.
             context.SaveChanges();
 
             return new ImportResult
@@ -193,7 +202,7 @@ public sealed class Kape22Persister(AscoLsiDbContext context, IConfiguration con
     };
 
     // AC-FR11-5/AC-FR21-2: the failed SaveChanges has already rolled back its transaction - none of the
-    // up-to-11 staged rows persist. Report the SQL cause as a File-level PersistenceError; no
+    // staged rows persist. Report the SQL cause as a File-level PersistenceError; no
     // DbUpdateException or DbException leaves the persister. Any priorErrors (the reasons a rejected
     // Fichier was rejected) are kept ahead of it here. The caller Kape22FichierProcessor.Import then
     // re-sorts the ImportResult by LineNumber, which moves this File-level entry (LineNumber 0) to the
