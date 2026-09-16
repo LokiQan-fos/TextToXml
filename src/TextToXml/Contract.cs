@@ -35,6 +35,12 @@ public enum ErrorCode
     RequiredFieldMissing,
     PersistenceError,
 
+    // Blocking business-rule errors (Step 3): one generic, domain-neutral code shared by every pure
+    // business control a downstream importer runs after mapping succeeds (e.g. Kape22Importer's FR-20
+    // controls) - keeps this shared enum free of P60 vocabulary (CC-6); each violation is still its own
+    // distinct ConversionError instance, distinguished by Message (AD-4).
+    BusinessRuleViolation,
+
     // Orchestrator-level failure: an unexpected exception thrown while processing one Fichier.
     UnexpectedFailure,
 

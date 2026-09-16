@@ -33,6 +33,7 @@ public class AcCoverageCompletenessTests
         [17] = 5,
         [18] = 4,
         [19] = 4,
+        [20] = 4,
     };
 
     // ACs this assembly cannot cover by design, not by omission - each is out of Kape22Importer's own
