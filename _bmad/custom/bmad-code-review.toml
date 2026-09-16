@@ -1,0 +1,90 @@
+# Customisation du skill bmad-code-review pour le projet TextToXml.
+# Reprend la quatrième lentille définie pour bmad-build afin que les deux
+# workflows produisent le même rapport agrégé sur les mêmes critères.
+
+[workflow]
+
+activation_steps_prepend = [
+  """
+  Run these three steps BEFORE step-01-gather-context.md runs. Do not ask the
+  user; execute them and set the frontmatter variables directly.
+
+  STEP 1 — Determine the story key.
+  Run: git log --format='%H %s' -100
+  Scan the output from newest to oldest. The story key is the `<N>-<M>` of the
+  first subject matching `chore(story-<N>.<M>)`. Skip subjects whose verb is
+  only administrative (`mark done`, `close review`) when a non-administrative
+  subject exists for the same key within the log window. Set `{story_key}` to
+  that key.
+
+  STEP 2 — Determine the commit range.
+  From the same git log output, collect every commit whose subject matches
+  `chore(story-<N>.<M>)` for the key chosen in STEP 1. Take the OLDEST one.
+  Set the review range to `<oldest-sha>^..HEAD`. Do NOT use `HEAD~1..HEAD` or
+  the bare `<sha>..HEAD` form — the caret is required to include the oldest
+  commit itself.
+
+  STEP 3 — Determine the spec file.
+  The story key `<N>-<M>` maps to a kebab-case slug prefix `spec-<N>-<M>-`.
+  Search `{implementation_artifacts}/` for files matching
+  `spec-<N>-<M>-*.md`. If exactly one match, use it. If multiple, take the
+  most recent by LastWriteTime. Set `{spec_file}` to the absolute path.
+  Set `{review_mode}` to `"full"` unconditionally.
+
+  After these three steps: build `{diff_output}` with `git diff <range>`
+  where `<range>` is the value computed in STEP 2. Do not ask the user for
+  scope, spec, or mode — all three are now resolved. Proceed to the
+  step-01 CHECKPOINT (which remains the only user confirmation in this
+  workflow) with:
+    - Cible : <range>
+    - Mode : full
+    - Spec : <path>
+  """,
+]
+
+persistent_facts = [
+  "file:{project-root}/_bmad-output/project-profile.md",
+]
+
+review_layers = [
+  { id = "acceptance-auditor", name = "Acceptance Auditor", instruction = """
+Launch a context-free subagent with this prompt:
+
+Read `{project-root}/_bmad-output/project-profile.md` fully before reviewing — it
+lists the project's transverse criteria (CC-x) and architecture invariants (AD-x).
+Then read the spec file referenced by the current workflow (path is passed in the
+session). Then review the diff below against the frozen spec.
+
+Audit, in order:
+
+1. Any deviation from a signature, return type, result shape, or invariant
+   declared inside the spec's `<frozen-after-approval>` block must be accompanied
+   by a dated renegotiation note in the same spec. No note → finding.
+2. Any Boundary violated: Always / Ask First / Never. An `Ask First` executed
+   without an explicit human gate, or a `Never` executed → finding.
+3. Any architecture invariant (AD-x) violated → finding.
+4. Any transverse criterion (CC-x) violated → finding, citing the CC id.
+5. Any legacy firewall breach (AD-3 if applicable) — assembly reference or
+   runtime call → finding.
+
+Report ONLY findings as a JSON array. Each finding:
+
+{
+  "location": "file:line",
+  "severity": "Decision | Patch | Defer",
+  "exigence": "AD-x | CC-x | AC-y | spec §x",
+  "description": "Factuel, une phrase.",
+  "correction": "Actionnable.",
+  "evidence": "Extrait ou référence."
+}
+
+Do not editorialize. If you see a defect outside your mandate (correctness, edge
+cases, coverage), put it under `out_of_mandate` without analysis.
+
+CONTENT:
+
+{diff_output}
+
+Do not invoke any skill. Return only the review result.
+""" }
+]

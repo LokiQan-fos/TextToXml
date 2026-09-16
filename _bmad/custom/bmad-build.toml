@@ -1,0 +1,188 @@
+# Customisation du skill bmad-build pour le projet TextToXml.
+# Ce fichier est lu par BMAD et fusionné au-dessus de la configuration installée.
+# Il n'est jamais écrasé par une réinstallation.
+
+[workflow]
+
+# Ajoute le profil projet aux faits persistants (le glob project-context.md
+# est déjà présent dans la config installée — le merge les concatène).
+persistent_facts = [
+  "file:{project-root}/_bmad-output/project-profile.md",
+]
+
+# Ajoute la quatrième lentille de revue, absente de BMAD par défaut.
+# Le merge keyed par id garantit que les trois lentilles installées
+# (blind-hunter, edge-case-hunter, verification-gap) restent actives —
+# seul acceptance-auditor est ajouté.
+review_layers = [
+  { id = "acceptance-auditor", name = "Acceptance Auditor", instruction = """
+Launch a context-free subagent with this prompt:
+
+Read `{project-root}/_bmad-output/project-profile.md` fully before reviewing — it
+lists the project's transverse criteria (CC-x) and architecture invariants (AD-x).
+Then read the spec file referenced by the current workflow (path is passed in the
+session). Then review the diff below against the frozen spec.
+
+Audit, in order:
+
+1. Any deviation from a signature, return type, result shape, or invariant
+   declared inside the spec's `<frozen-after-approval>` block must be accompanied
+   by a dated renegotiation note in the same spec. No note → finding.
+2. Any Boundary violated: Always / Ask First / Never. An `Ask First` executed
+   without an explicit human gate, or a `Never` executed → finding.
+3. Any architecture invariant (AD-x) violated → finding.
+4. Any transverse criterion (CC-x) violated → finding, citing the CC id.
+5. Any legacy firewall breach (AD-3 if applicable) — assembly reference or
+   runtime call → finding.
+
+Report ONLY findings as a JSON array. Each finding:
+
+{
+  "location": "file:line",
+  "severity": "Decision | Patch | Defer",
+  "exigence": "AD-x | CC-x | AC-y | spec §x",
+  "description": "Factuel, une phrase.",
+  "correction": "Actionnable.",
+  "evidence": "Extrait ou référence."
+}
+
+Do not editorialize. If you see a defect outside your mandate (correctness, edge
+cases, coverage), put it under `out_of_mandate` without analysis.
+
+CONTENT:
+
+{diff_output}
+
+Do not invoke any skill. Return only the review result.
+""" }
+]
+
+# Ajout post-commit : tentative de séparation en deux commits.
+# Le step-05 de bmad-build produit un seul commit fusionnant la story et les
+# patches de revue. Ce hook tente de séparer les deux pour respecter la
+# convention du projet (epic-2-retro-2026-09-07 § commits distincts).
+# En cas d'ambiguïté, le hook laisse le commit unique et demande confirmation
+# à l'utilisateur — il n'agit jamais en silence.
+on_complete = """
+Before exiting, verify whether the commit created by step-05 should be split into
+two distinct commits: the story commit and the review-patch commit.
+
+Steps:
+
+1. Read `{spec_file}` and capture its `baseline_commit` from the frontmatter.
+   If `baseline_commit` is `NO_VCS` or missing, skip the whole split — nothing
+   can be reconstructed.
+2. Run `git log -1 --format=%H` to get the current HEAD hash.
+3. Run `git diff {baseline_commit} --name-only` to list every file the story
+   touched.
+4. From your own session history, identify which of these files were modified
+   *after* the initial step-03 implementation — i.e., during step-04 (review
+   patches, bad_spec loopbacks, or direct fixes). If this set is empty, the
+   review produced no code change: leave the single commit as-is and stop.
+5. If the set is non-empty but ambiguous (you cannot distinguish with confidence
+   which changes belong to the story vs the patches), HALT and ask the user:
+   `[S] Split — I'll list the story files and the patch files for you to confirm`
+   | `[K] Keep single commit — accept the merged history`.
+6. On S (or when the set is unambiguous), execute the split:
+   - `git reset --soft HEAD^` to uncommit while keeping all changes staged.
+   - `git reset HEAD <patch-files>` to unstage the patch files only.
+   - Commit the story files: `chore(story-<N>.<M>): <title>` with the
+     `AC-FRx-y → FichierTest.NomDuTest` body per the project convention.
+   - `git add -A` to stage the patch files and any documentation updates.
+   - Commit the patches: `chore(story-<N>.<M>): apply review patches`, listing
+     each finding id and severity in the body.
+7. Report the two commit hashes, or the single hash if no split happened.
+
+If any command fails or the reset state is dirty in an unexpected way, HALT and
+report — never leave the working tree in a partial state.
+"""
+
+# Review layers for the one-shot route (step-oneshot.md).
+# The installed skill ships only blind-hunter here, hardcoded. Without this
+# override, any story routed to one-shot loses the edge-case, verification-gap
+# and acceptance-auditor lenses — which is exactly what happened to Story 4.4
+# (2026-09-15). The merge keys by id, so listing blind-hunter here also replaces
+# the installed default with an equivalent copy — harmless, keeps the list
+# self-contained.
+# CONTENT: {diff_output} is substituted at run time.
+
+[[workflow.oneshot_review_layers]]
+id = "blind-hunter"
+name = "Blind Hunter"
+instruction = """
+Launch a context-free subagent with this prompt:
+
+Conduct a review of CONTENT.
+Look for what's missing, not only what's wrong.
+Find at least ten issues to fix or improve.
+Output a Markdown list of findings only — no severity, priority, or ranking.
+If the content is empty, stop and say so.
+If you have zero findings, re-check and keep thinking; do not stop with an empty list.
+
+CONTENT:
+The changed files in the current worktree. Inspect them directly before reviewing.
+
+Do not invoke any skill. Return only the review result.
+"""
+
+[[workflow.oneshot_review_layers]]
+id = "edge-case-hunter"
+name = "Edge Case Hunter"
+instruction = """
+Launch a context-free subagent with this prompt:
+
+Read `{skill-root}/review-prompts/edge-case-hunter.md` completely and follow it as your review instructions.
+
+Review content:
+
+The changed files in the current worktree. Inspect them directly before reviewing.
+
+Do not invoke any skill. If the instruction file is unreadable, report that exact failure and stop. Return only the review result.
+"""
+
+[[workflow.oneshot_review_layers]]
+id = "verification-gap"
+name = "Verification Gap Reviewer"
+instruction = """
+Launch a context-free subagent with this prompt:
+
+Read `{skill-root}/review-prompts/verification-gap.md` completely and follow it as your review instructions.
+
+Review content:
+
+The changed files in the current worktree. Inspect them directly before reviewing.
+
+Do not invoke any skill. If the instruction file is unreadable, report that exact failure and stop. Return only the review result.
+"""
+
+[[workflow.oneshot_review_layers]]
+id = "acceptance-auditor"
+name = "Acceptance Auditor"
+instruction = """
+Launch a context-free subagent with this prompt:
+
+Read `{project-root}/_bmad-output/project-profile.md` fully before reviewing — it lists the project's transverse criteria (CC-x) and architecture invariants (AD-x). Then read the spec file at `_bmad-output/implementation-artifacts/spec-*.md` matching the current story. Then review the changed files in the current worktree against the frozen spec.
+
+Audit, in order:
+
+1. Any deviation from a signature, return type, result shape, or invariant declared inside the spec's `<frozen-after-approval>` block must be accompanied by a dated renegotiation note in the same spec. No note → finding.
+2. Any Boundary violated: Always / Ask First / Never. An `Ask First` executed without an explicit human gate, or a `Never` executed → finding.
+3. Any architecture invariant (AD-x) violated → finding.
+4. Any transverse criterion (CC-x) violated → finding, citing the CC id.
+5. Any legacy firewall breach (AD-3 if applicable) — assembly reference or runtime call → finding.
+
+Report ONLY findings as a JSON array. Each finding:
+
+{
+  "location": "file:line",
+  "severity": "Decision | Patch | Defer",
+  "exigence": "AD-x | CC-x | AC-y | spec §x",
+  "description": "Factuel, une phrase.",
+  "correction": "Actionnable.",
+  "evidence": "Extrait ou référence."
+}
+
+Do not editorialize. If you see a defect outside your mandate (correctness, edge cases, coverage), put it under `out_of_mandate` without analysis.
+
+Do not invoke any skill. Return only the review result.
+"""
