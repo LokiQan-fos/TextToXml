@@ -2,7 +2,7 @@
 title: 'Kape22ImportBundleMapper — orchestrator + pure business controls (Story 4.5)'
 type: 'feature'
 created: '2026-09-16'
-status: 'in-progress'
+status: 'done'
 review_loop_iteration: 0
 context: []
 baseline_commit: '278ce45bbe2e0fd8ae7d09298dfb8cef76f5a6ac'
@@ -80,3 +80,52 @@ The legacy hot/cold call passes a `12` size/type filter (`GetConsignes("Consigne
 - `dotnet build TextToXml.sln -warnaserror` -- expected: 0 warnings, 0 errors.
 - `dotnet test TextToXml.sln --filter Category=Unit` -- expected: all pass, including the new `Kape22ImportBundleMapperTests` and the updated completeness gate.
 - `dotnet test TextToXml.sln --filter Category=Integration` -- expected: all pass or skip cleanly (no DB access in this story).
+
+## Suggested Review Order
+
+**Orchestration entry point**
+
+- Start here: composes the upstream mapper, short-circuits on its failure, then wires in every 4.3/4.4 mapper.
+  [`Kape22ImportBundleMapper.cs:17`](../../src/Kape22Importer/Kape22ImportBundleMapper.cs#L17)
+
+- Short-circuit shape: a failed `Kape22Mapper.Map` returns a bundle with metadata only, no downstream mappers invoked.
+  [`Kape22ImportBundleMapper.cs:20`](../../src/Kape22Importer/Kape22ImportBundleMapper.cs#L20)
+
+**The 3 FR-20 business controls**
+
+- AC-FR20-2: ingot/furnace sum vs `NombreDemiProduit`; blank Champs are zero-filled upstream, not null here.
+  [`Kape22ImportBundleMapper.cs:78`](../../src/Kape22Importer/Kape22ImportBundleMapper.cs#L78)
+
+- AC-FR20-3: hot-Coulee format check, reads `CodeConsignePits` straight off `L_D_KAPE22` (see Design Notes).
+  [`Kape22ImportBundleMapper.cs:111`](../../src/Kape22Importer/Kape22ImportBundleMapper.cs#L111)
+
+- AC-FR20-4: a null `SectionChargePits` from Story 4.4's applicability rule is itself the violation.
+  [`Kape22ImportBundleMapper.cs:130`](../../src/Kape22Importer/Kape22ImportBundleMapper.cs#L130)
+
+**New carrier type and error code**
+
+- `Kape22ImportBundle`: alphabetical (CC-4), mirrors `MapResult<T>`'s metadata shape plus the 9 downstream entities.
+  [`Kape22ImportBundle.cs:14`](../../src/Kape22Importer/Kape22ImportBundle.cs#L14)
+
+- One new domain-neutral `ErrorCode` shared by all 3 controls, keeping `TextToXml` free of P60 vocabulary (CC-6).
+  [`Contract.cs:42`](../../src/TextToXml/Contract.cs#L42)
+
+**Tests and completeness gate**
+
+- Happy path: asserts every entity the bundle should carry, including the two naturally-inapplicable sections.
+  [`Kape22ImportBundleMapperTests.cs:27`](../../tests/Kape22Importer.Tests/Kape22ImportBundleMapperTests.cs#L27)
+
+- Upstream short-circuit: all 9 downstream entities stay null.
+  [`Kape22ImportBundleMapperTests.cs:62`](../../tests/Kape22Importer.Tests/Kape22ImportBundleMapperTests.cs#L62)
+
+- AC-FR20-2 mismatch, plus the zero-fill and multi-violation variants added at code review.
+  [`Kape22ImportBundleMapperTests.cs:92`](../../tests/Kape22Importer.Tests/Kape22ImportBundleMapperTests.cs#L92)
+
+- AC-FR20-3, twice: a deliberate mutation and the untouched reference fixture (already hot and malformed).
+  [`Kape22ImportBundleMapperTests.cs:167`](../../tests/Kape22Importer.Tests/Kape22ImportBundleMapperTests.cs#L167)
+
+- AC-FR20-4 missing-Pits case.
+  [`Kape22ImportBundleMapperTests.cs:206`](../../tests/Kape22Importer.Tests/Kape22ImportBundleMapperTests.cs#L206)
+
+- FR-20 registered in the AC completeness gate.
+  [`AcCoverageCompletenessTests.cs:36`](../../tests/Kape22Importer.Tests/AcCoverageCompletenessTests.cs#L36)

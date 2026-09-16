@@ -86,6 +86,8 @@ public sealed class Kape22ImportBundleMapper(TimeProvider? timeProvider = null)
             return;
         }
 
+        // A blank int Champ is always zero-filled onto L_D_KAPE22 (Kape22Mapper.DefaultForNonNullable),
+        // never left null - so Four1/Four2 are never genuinely missing here, only genuinely zero.
         int four1 = refroidissoirs.NombreLingotsFour1 ?? 0;
         int four2 = refroidissoirs.NombreLingotsFour2 ?? 0;
         int total = four1 + four2;

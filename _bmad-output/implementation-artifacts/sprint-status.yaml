@@ -72,7 +72,7 @@ development_status:
   4-2-extraction-documentation-du-mapping-legacy-annexe-colonne-pa: done
   4-3-mapper-of-coulée-mapping-structurel-pur: done
   4-4-mapper-consignes-les-7-sectioncharge-mapping-structurel-pur: done
-  4-5-kape22importbundlemapper-orchestrateur-contrôles-métier-purs: in-progress
+  4-5-kape22importbundlemapper-orchestrateur-contrôles-métier-purs: review
   4-6-kape22persister-remplacé-bundle-transaction-unique-contrôle: backlog
   4-7-extension-de-la-suite-e2e-aux-10-tables-aval: backlog
   epic-4-retrospective: optional

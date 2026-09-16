@@ -41,8 +41,16 @@ public class Kape22ImportBundleMapperTests
         Assert.Equal(plainMap.Value!.OF, bundle.Kape22.OF);
         Assert.NotNull(bundle.OrdreFabrication);
         Assert.NotNull(bundle.Coulee);
+        // The reference Fichier's PoidsMetrique/SVT sections are the natural "not applicable" fixture
+        // (CodeOpePoidMetrique/RangOpePoidMetrique and CodeOpeSVT/RangOpeSVT both blank, per Story 4.4's
+        // own mapper tests) - so those two stay null here even on this all-controls-pass happy path.
+        Assert.NotNull(bundle.SectionChargeChutage);
+        Assert.NotNull(bundle.SectionChargeDecoupe);
+        Assert.NotNull(bundle.SectionChargeLingot);
         Assert.NotNull(bundle.SectionChargePits);
+        Assert.Null(bundle.SectionChargePoidsMetrique);
         Assert.NotNull(bundle.SectionChargeRefroidissoirs);
+        Assert.Null(bundle.SectionChargeSvt);
         Assert.NotEmpty(bundle.Consignes);
     }
 
@@ -67,7 +75,13 @@ public class Kape22ImportBundleMapperTests
         Assert.Null(bundle.Kape22);
         Assert.Null(bundle.OrdreFabrication);
         Assert.Null(bundle.Coulee);
+        Assert.Null(bundle.SectionChargeChutage);
+        Assert.Null(bundle.SectionChargeDecoupe);
+        Assert.Null(bundle.SectionChargeLingot);
         Assert.Null(bundle.SectionChargePits);
+        Assert.Null(bundle.SectionChargePoidsMetrique);
+        Assert.Null(bundle.SectionChargeRefroidissoirs);
+        Assert.Null(bundle.SectionChargeSvt);
         Assert.Empty(bundle.Consignes);
     }
 
@@ -97,6 +111,51 @@ public class Kape22ImportBundleMapperTests
         // failed bundle means for persistence; this mapper never withholds the mapped data).
         Assert.NotNull(bundle.OrdreFabrication);
         Assert.NotNull(bundle.SectionChargeRefroidissoirs);
+    }
+
+    // A blank NombreLingotsFour1 Champ is zero-filled onto L_D_KAPE22 (Kape22Mapper.DefaultForNonNullable,
+    // production-parity behavior, not a gap this story introduces), so it drives AC-FR20-2's mismatch
+    // check exactly like any other explicit value rather than needing separate "missing" handling.
+    [Fact]
+    [Trait("AC", "FR20-2")]
+    public void Map_IngotFurnaceCountBlank_IsZeroFilledAndDrivesTheMismatchCheck_AcFr20_2()
+    {
+        string mutatedXml = MutatedReferenceXml(document =>
+        {
+            SetChamp(document, "message", "CodeConsignePits", "1");
+            document.Root!.Element("message")!.Element("NombreLingotsFour1")!.Remove();
+        });
+
+        Kape22ImportBundle bundle = new Kape22ImportBundleMapper(WinterClock()).Map(mutatedXml, ReferenceFichierName);
+
+        Assert.Equal(0, bundle.SectionChargeRefroidissoirs!.NombreLingotsFour1);
+        Assert.False(bundle.Success);
+        ConversionError error = Assert.Single(bundle.Errors);
+        Assert.Equal(Block.File, error.Block);
+        Assert.Equal(ErrorCode.BusinessRuleViolation, error.Code);
+        Assert.Contains(bundle.OF!, error.Message, StringComparison.Ordinal);
+    }
+
+    // Accumulate-then-freeze (see Kape22ImportBundleMapper.Map): a Fichier failing two independent FR-20
+    // controls at once reports both in a single pass instead of stopping at the first.
+    [Fact]
+    [Trait("AC", "FR20-2")]
+    public void Map_TwoControlsFailSimultaneously_ReturnsBothDedicatedViolations_AcFr20_2()
+    {
+        string mutatedXml = MutatedReferenceXml(document =>
+        {
+            SetChamp(document, "message", "CodeConsignePits", "2");
+            SetChamp(document, "message", "Coulee", "155718");
+            SetChamp(document, "message", "NombreLingotsFour1", "5");
+        });
+
+        Kape22ImportBundle bundle = new Kape22ImportBundleMapper(WinterClock()).Map(mutatedXml, ReferenceFichierName);
+
+        Assert.False(bundle.Success);
+        Assert.Equal(2, bundle.Errors.Count);
+        Assert.All(bundle.Errors, error => Assert.Equal(ErrorCode.BusinessRuleViolation, error.Code));
+        Assert.Contains(bundle.Errors, error => error.Message.Contains("155718", StringComparison.Ordinal));
+        Assert.Contains(bundle.Errors, error => error.Message.Contains("répartition des lingots", StringComparison.Ordinal));
     }
 
     // AC-FR20-3: a "hot" Coulee (CodeConsignePits != "1") whose Coulee number does not start with '0' is
