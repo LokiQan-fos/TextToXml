@@ -68,7 +68,7 @@ public class Kape22FichierProcessorIntegrationTests(SqlServerIntegrationFixture 
     {
         Ready();
 
-        ImportResult result = Processor().Import(ReferenceFichierName, ReadValidFixture(ReferenceFichierName));
+        ImportResult result = Processor().Import(ReferenceFichierName, InsertableReferenceFichier());
 
         Assert.True(result.Success);
         Assert.NotNull(result.InsertedId);
@@ -135,7 +135,7 @@ public class Kape22FichierProcessorIntegrationTests(SqlServerIntegrationFixture 
         Kape22FichierProcessor processor = Processor();
 
         ImportResult rejected = processor.Import(ReferenceFichierName, BlankClientReferenceFichier());
-        ImportResult clean = processor.Import(ReferenceFichierName, ReadValidFixture(ReferenceFichierName));
+        ImportResult clean = processor.Import(ReferenceFichierName, InsertableReferenceFichier());
 
         Assert.False(rejected.Success);
         Assert.True(clean.Success);
@@ -179,7 +179,7 @@ public class Kape22FichierProcessorIntegrationTests(SqlServerIntegrationFixture 
     {
         Ready();
 
-        ImportResult result = Processor().Import(ReferenceFichierName, ReadValidFixture(ReferenceFichierName));
+        ImportResult result = Processor().Import(ReferenceFichierName, InsertableReferenceFichier());
 
         Assert.True(result.Success);
         Assert.NotNull(result.InsertedId);

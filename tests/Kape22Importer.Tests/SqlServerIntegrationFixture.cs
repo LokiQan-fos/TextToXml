@@ -74,15 +74,31 @@ public sealed class SqlServerIntegrationFixture
     // Set when Available is false; carries the actionable reason to show in the skipped test.
     public string? SkipReason { get; }
 
-    // Commit + reset isolation regime (AR-12): empties the two AscoLSI harness tables and reseeds their
+    // Commit + reset isolation regime (AR-12): empties the AscoLSI harness tables and reseeds their
     // identity, for the Story 2.8 tests that depend on committed state between two actions (the D22
-    // anti-duplicate guard, AC-FR11-6/11-7) or that verify a transaction boundary (AC-FR11-3/11-5) and
-    // therefore cannot run under an ambient TransactionScope. Each such test calls this first.
+    // anti-duplicate guard, AC-FR11-6/11-7) or that verify a transaction boundary (AC-FR11-3/11-5/21-1/
+    // 21-2) and therefore cannot run under an ambient TransactionScope. Each such test calls this first.
+    // Story 4.6: the Story 4.1 downstream tables Kape22Persister now writes to are truncated too, so a
+    // test that reuses the reference Fichier's OF (every downstream table but L_D_COULEE is keyed on it)
+    // never collides with a row an earlier test left committed.
     public void ResetData()
     {
         ExecuteNonQuery(
             AscoLsiConnectionString,
-            "TRUNCATE TABLE dbo.L_D_KAPE22; TRUNCATE TABLE dbo.L_D_LOG_COMMANDE;");
+            """
+            TRUNCATE TABLE dbo.L_D_KAPE22;
+            TRUNCATE TABLE dbo.L_D_LOG_COMMANDE;
+            TRUNCATE TABLE dbo.L_D_CONSIGNES;
+            TRUNCATE TABLE dbo.L_D_COULEE;
+            TRUNCATE TABLE dbo.L_D_ORDRE_FABRICATION;
+            TRUNCATE TABLE dbo.L_D_SECTIONCHARGE_CHUTAGE;
+            TRUNCATE TABLE dbo.L_D_SECTIONCHARGE_DECOUPE;
+            TRUNCATE TABLE dbo.L_D_SECTIONCHARGE_LINGOT;
+            TRUNCATE TABLE dbo.L_D_SECTIONCHARGE_PITS;
+            TRUNCATE TABLE dbo.L_D_SECTIONCHARGE_POIDSMETRIQUE;
+            TRUNCATE TABLE dbo.L_D_SECTIONCHARGE_REFROIDISSOIRS;
+            TRUNCATE TABLE dbo.L_D_SECTIONCHARGE_SVT;
+            """);
     }
 
     // Empties the MQTTnetServices.Logs harness table, for the Story 3.3 tests that assert on the rows

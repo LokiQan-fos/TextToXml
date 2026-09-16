@@ -64,7 +64,7 @@ public class DoubleJournalTests
         RecordingLogger<Kape22FichierProcessor> logger = new();
 
         ImportResult result = Processor(contexts.Next, logger)
-            .Import(ReferenceFichierName, ReadValidFixture(ReferenceFichierName));
+            .Import(ReferenceFichierName, InsertableReferenceFichier());
 
         Assert.True(result.Success);
         var entry = Assert.Single(logger.Entries);
@@ -138,7 +138,7 @@ public class DoubleJournalTests
     {
         InMemoryContextFactory contexts = new();
         RecordingLogger<Kape22FichierProcessor> logger = new();
-        byte[] footerRecordsNotThree = WithText(ReadValidFixture(ReferenceFichierName), "00003", "00009");
+        byte[] footerRecordsNotThree = WithText(InsertableReferenceFichier(), "00003", "00009");
 
         ImportResult result = Processor(contexts.Next, logger)
             .Import("P60_999_682_001", footerRecordsNotThree);
@@ -167,7 +167,7 @@ public class DoubleJournalTests
         SeedOkLogRow(contexts);
 
         ImportResult result = Processor(contexts.Next, logger)
-            .Import(ReferenceFichierName, ReadValidFixture(ReferenceFichierName));
+            .Import(ReferenceFichierName, InsertableReferenceFichier());
 
         Assert.True(result.Success);
         Assert.True(result.AlreadyImported);
@@ -188,7 +188,7 @@ public class DoubleJournalTests
         RecordingLogger<Kape22FichierProcessor> logger = new() { Throw = true };
 
         ImportResult result = Processor(contexts.Next, logger)
-            .Import(ReferenceFichierName, ReadValidFixture(ReferenceFichierName));
+            .Import(ReferenceFichierName, InsertableReferenceFichier());
 
         Assert.True(result.Success);
         Assert.NotNull(result.InsertedId);
@@ -208,7 +208,7 @@ public class DoubleJournalTests
     public void Import_ConcatenatedWarnings_AreSortedByLineNumberOnTheResult_AcFr6_4()
     {
         InMemoryContextFactory contexts = new();
-        byte[] footerRecordsNotThree = WithText(ReadValidFixture(ReferenceFichierName), "00003", "00009");
+        byte[] footerRecordsNotThree = WithText(InsertableReferenceFichier(), "00003", "00009");
 
         ImportResult result = Processor(contexts.Next, new RecordingLogger<Kape22FichierProcessor>())
             .Import("P60_999_682_001", footerRecordsNotThree);

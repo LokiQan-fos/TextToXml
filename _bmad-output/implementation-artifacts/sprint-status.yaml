@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 16:00
-last_updated: 09-16-2026 00:00
+last_updated: 09-16-2026 02:00
 project: TextToXml
 project_key: NOKEY
 tracking_system: file-system
@@ -73,10 +73,22 @@ development_status:
   4-3-mapper-of-coulée-mapping-structurel-pur: done
   4-4-mapper-consignes-les-7-sectioncharge-mapping-structurel-pur: done
   4-5-kape22importbundlemapper-orchestrateur-contrôles-métier-purs: done
-  4-6-kape22persister-remplacé-bundle-transaction-unique-contrôle: backlog
+  4-6-kape22persister-remplacé-bundle-transaction-unique-contrôle: review
   4-7-extension-de-la-suite-e2e-aux-10-tables-aval: backlog
   epic-4-retrospective: optional
 action_items:
+  - id: "story-4-6-decimal-scale-defect-story-4-3-bis"
+    epic: 4
+    action: "Story 4.3-bis (nouvelle, prioritaire avant mise en production d'Epic 4) : corriger la
+      non-conversion d'echelle decimale dans OrdreFabricationMapper, SectionChargeLingotMapper,
+      SectionChargeChutageMapper, SectionChargeDecoupeMapper et SectionChargePitsMapper (Story 4.3/4.4)
+      - les entiers KAPE22 bruts sont ecrits sans mise a l'echelle dans des colonnes DECIMAL etroites
+      (ex. DECIMAL(2,1) max 9.9) et provoquent un depassement SQL des que Kape22Persister (Story 4.6,
+      AD-1) les inclut dans la transaction unique avec L_D_KAPE22. Bloque l'import de tout Fichier P60
+      reel dont les sections SectionCharge applicables portent une valeur hors echelle."
+    owner: "Dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/deferred-work.md#deferred-from-story-46-implementation-2026-09-16"
   - id: "epic-1-retro-item-1-passe-hygiene-story-0-epic-2-testsupport"
     epic: 1
     action: "Passe hygiene story-0 Epic 2: TestSupport partage (Windows1252 corrige

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using Kape22Importer.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -11,30 +12,32 @@ using static Kape22Importer.Tests.TestSupport;
 
 namespace Kape22Importer.Tests;
 
-// Story 2.8 (FR-11): Kape22Persister turns a MapResult into AscoLSI rows - atomic L_D_KAPE22 +
-// L_D_LOG_COMMANDE insert on success, a lone REJETÉ log row on a rejection with a readable OF, a
-// verified rollback and a PersistenceError (never an exception) on a SQL failure, and the D22
-// anti-duplicate guard in front of all of it. Written test-first (CC-1): red until Kape22Persister
-// ships. Integration category (AR-12): needs a reachable local SQL Server test instance, skips cleanly
-// otherwise. Every test runs in the commit + reset regime (ResetData first), never under an ambient
-// TransactionScope, because the transaction boundaries themselves are under test (AC-FR11-3/11-5) and
-// the guard needs committed state (AC-FR11-6/11-7). Vocabulary follows the PRD glossary (CC-5).
+// Story 2.8 (FR-11), extended by Story 4.6 (FR-21): Kape22Persister turns a Kape22ImportBundle into
+// AscoLSI rows - a single-transaction L_D_KAPE22 + L_D_LOG_COMMANDE + every non-null Story 4.1 downstream
+// entity insert on success, a lone REJETÉ log row on a rejection with a readable OF, a verified rollback
+// and a PersistenceError (never an exception) on a SQL failure, the D22 anti-duplicate guard in front of
+// all of it, and the AC-FR20-5 cold-Coulee existence guard between the two. Written test-first (CC-1):
+// red until Kape22Persister ships. Integration category (AR-12): needs a reachable local SQL Server test
+// instance, skips cleanly otherwise. Every test runs in the commit + reset regime (ResetData first),
+// never under an ambient TransactionScope, because the transaction boundaries themselves are under test
+// (AC-FR11-3/11-5/21-1/21-2) and the guard needs committed state (AC-FR11-6/11-7). Vocabulary follows the
+// PRD glossary (CC-5).
 [Collection(SqlServerIntegrationCollection.Name)]
 [Trait("Category", TestCategory.Integration)]
 public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
 {
     private const string InitiatingServer = "AFS017";
 
-    // AC-FR11-1: MapResult.Success == true -> exactly one L_D_KAPE22 row, and ImportResult.InsertedId is
+    // AC-FR11-1: bundle.Success == true -> exactly one L_D_KAPE22 row, and ImportResult.InsertedId is
     // the generated identity value of that row.
     [SkippableFact]
     [Trait("AC", "FR11-1")]
-    public void Persist_MapSuccess_InsertsOneKape22RowWithInsertedId_AcFr11_1()
+    public void Persist_BundleSuccess_InsertsOneKape22RowWithInsertedId_AcFr11_1()
     {
         Ready();
-        MapResult<L_D_KAPE22> map = MapReferenceFichier();
+        Kape22ImportBundle bundle = MapReferenceBundle();
 
-        ImportResult result = Persist(map);
+        ImportResult result = Persist(bundle);
 
         Assert.True(result.Success);
         Assert.NotNull(result.InsertedId);
@@ -44,16 +47,16 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
         Assert.Equal(inserted.Id, result.InsertedId);
     }
 
-    // AC-FR11-2: MapResult.Success == false -> no L_D_KAPE22 row, InsertedId == null.
+    // AC-FR11-2: bundle.Success == false -> no L_D_KAPE22 row, InsertedId == null.
     [SkippableFact]
     [Trait("AC", "FR11-2")]
-    public void Persist_MapFailure_InsertsNoKape22RowAndInsertedIdIsNull_AcFr11_2()
+    public void Persist_BundleFailure_InsertsNoKape22RowAndInsertedIdIsNull_AcFr11_2()
     {
         Ready();
-        MapResult<L_D_KAPE22> map = MapMutatedFichier(d => SetChamp(d, "message", "Client", string.Empty));
-        Assert.False(map.Success);
+        Kape22ImportBundle bundle = MapMutatedBundle(d => SetChamp(d, "message", "Client", string.Empty));
+        Assert.False(bundle.Success);
 
-        ImportResult result = Persist(map);
+        ImportResult result = Persist(bundle);
 
         Assert.False(result.Success);
         Assert.Null(result.InsertedId);
@@ -66,17 +69,17 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
     // are committed together - both rows are present afterwards.
     [SkippableFact]
     [Trait("AC", "FR11-3")]
-    public void Persist_MapSuccess_CommitsKape22AndOkLogRowTogether_AcFr11_3()
+    public void Persist_BundleSuccess_CommitsKape22AndOkLogRowTogether_AcFr11_3()
     {
         Ready();
-        MapResult<L_D_KAPE22> map = MapReferenceFichier();
+        Kape22ImportBundle bundle = MapReferenceBundle();
 
-        Persist(map);
+        Persist(bundle);
 
         using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
         Assert.Single(verify.Kape22Rows.AsNoTracking());
         L_D_LOG_COMMANDE log = Assert.Single(verify.LogCommandeRows.AsNoTracking());
-        Assert.StartsWith(map.NumeroFichier!, log.Message);
+        Assert.StartsWith(bundle.NumeroFichier!, log.Message);
         Assert.EndsWith("— OK", log.Message);
 
         // The log Date is the injected clock converted to Paris local time (WinterClock is 08:00 UTC,
@@ -89,18 +92,18 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
     // Commande "P60", NumLingot 0 and Trace true.
     [SkippableFact]
     [Trait("AC", "FR14-4")]
-    public void Persist_MapSuccess_OkLogRowCarriesTheContractFields_AcFr14_4()
+    public void Persist_BundleSuccess_OkLogRowCarriesTheContractFields_AcFr14_4()
     {
         Ready();
-        MapResult<L_D_KAPE22> map = MapReferenceFichier();
+        Kape22ImportBundle bundle = MapReferenceBundle();
 
-        Persist(map);
+        Persist(bundle);
 
         using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
         L_D_LOG_COMMANDE log = Assert.Single(verify.LogCommandeRows.AsNoTracking());
         Assert.Equal("P60", log.Commande);
         Assert.Equal(InitiatingServer, log.User);
-        Assert.Equal(map.OF, log.OF);
+        Assert.Equal(bundle.OF, log.OF);
         Assert.Equal(log.OF.Trim(), log.OF);
         Assert.Equal(0, log.NumLingot);
         Assert.True(log.Trace == true);
@@ -110,12 +113,12 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
     // L_D_KAPE22 insert of the same transaction is rolled back too - the entity itself is valid.
     [SkippableFact]
     [Trait("AC", "FR11-3")]
-    public void Persist_MapSuccess_LogRowInsertFails_RollsBackKape22Row_AcFr11_3()
+    public void Persist_BundleSuccess_LogRowInsertFails_RollsBackKape22Row_AcFr11_3()
     {
         Ready();
-        MapResult<L_D_KAPE22> map = MapReferenceFichier();
+        Kape22ImportBundle bundle = MapReferenceBundle();
 
-        ImportResult result = Persist(map, commande: new string('P', 100));
+        ImportResult result = Persist(bundle, commande: new string('P', 100));
 
         Assert.False(result.Success);
         Assert.Contains(result.Errors, error => error.Code == ErrorCode.PersistenceError);
@@ -129,14 +132,14 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
     // "<NumeroFichier> — REJETÉ : <summary>" L_D_LOG_COMMANDE row carrying the OF.
     [SkippableFact]
     [Trait("AC", "FR11-4")]
-    public void Persist_MapFailure_WithReadableOf_WritesOneRejectedLogRow_AcFr11_4()
+    public void Persist_BundleFailure_WithReadableOf_WritesOneRejectedLogRow_AcFr11_4()
     {
         Ready();
-        MapResult<L_D_KAPE22> map = MapMutatedFichier(d => SetChamp(d, "message", "Client", string.Empty));
-        Assert.False(map.Success);
-        Assert.False(string.IsNullOrWhiteSpace(map.OF));
+        Kape22ImportBundle bundle = MapMutatedBundle(d => SetChamp(d, "message", "Client", string.Empty));
+        Assert.False(bundle.Success);
+        Assert.False(string.IsNullOrWhiteSpace(bundle.OF));
 
-        ImportResult result = Persist(map);
+        ImportResult result = Persist(bundle);
 
         Assert.False(result.Success);
 
@@ -144,22 +147,30 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
         Assert.Empty(verify.Kape22Rows.AsNoTracking());
         L_D_LOG_COMMANDE log = Assert.Single(verify.LogCommandeRows.AsNoTracking());
         Assert.Equal("P60", log.Commande);
-        Assert.StartsWith(map.NumeroFichier!, log.Message);
+        Assert.StartsWith(bundle.NumeroFichier!, log.Message);
         Assert.Contains("REJETÉ", log.Message);
-        Assert.Equal(map.OF!.Trim(), log.OF.Trim());
+        Assert.Equal(bundle.OF!.Trim(), log.OF.Trim());
     }
 
-    // AC-FR11-5: a SQL failure on the L_D_KAPE22 insert (Client over its bounded column) comes back as
-    // {Block:File, Code:PersistenceError} with no exception escaping, and nothing is left committed.
+    // AC-FR11-5 / AC-FR21-2: a SQL failure on the L_D_KAPE22 insert (Client over its bounded column)
+    // comes back as {Block:File, Code:PersistenceError} with no exception escaping, and none of the
+    // up-to-11 rows staged for that one SaveChanges is left committed - not just L_D_KAPE22, every
+    // downstream entity too (AC-FR21-2 extends AC-FR11-5).
     [SkippableFact]
     [Trait("AC", "FR11-5")]
+    [Trait("AC", "FR21-2")]
     public void Persist_SqlFailure_ReturnsPersistenceErrorWithVerifiedRollback_AcFr11_5()
     {
         Ready();
-        MapResult<L_D_KAPE22> map = MapMutatedFichier(d => SetChamp(d, "message", "Client", new string('A', 50)));
-        Assert.True(map.Success, "over-long Client is only rejected by the database, not by the mapper.");
+        Kape22ImportBundle bundle = MapMutatedBundle(d =>
+        {
+            SetChamp(d, "message", "Coulee", "065718");
+            ZeroOutOfScaleDimensions(d);
+            SetChamp(d, "message", "Client", new string('A', 50));
+        });
+        Assert.True(bundle.Success, "over-long Client is only rejected by the database, not by the mapper.");
 
-        ImportResult result = Persist(map);
+        ImportResult result = Persist(bundle);
 
         Assert.False(result.Success);
         ConversionError error = Assert.Single(result.Errors, e => e.Code == ErrorCode.PersistenceError);
@@ -168,6 +179,8 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
         using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
         Assert.Empty(verify.Kape22Rows.AsNoTracking());
         Assert.Empty(verify.LogCommandeRows.AsNoTracking());
+        Assert.Empty(verify.OrdreFabricationRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Empty(verify.CouleeRows.AsNoTracking().Where(row => row.IdCoulee.Trim() == bundle.Kape22!.Coulee.Trim()));
     }
 
     // AC-FR11-6 (D22): a prior "<NumeroFichier> — OK" L_D_LOG_COMMANDE row for the same NumeroFichier +
@@ -179,10 +192,10 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
     public void Persist_PriorOkLogRowForSameKey_SkipsInsert_AcFr11_6()
     {
         Ready();
-        MapResult<L_D_KAPE22> map = MapReferenceFichier();
-        SeedOkLogRow(map.NumeroFichier!, map.OF!);
+        Kape22ImportBundle bundle = MapReferenceBundle();
+        SeedOkLogRow(bundle.NumeroFichier!, bundle.OF!);
 
-        ImportResult result = Persist(map);
+        ImportResult result = Persist(bundle);
 
         Assert.True(result.Success);
         Assert.Null(result.InsertedId);
@@ -200,10 +213,10 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
     public void Persist_SameFichierTwice_SecondCallSkips_AcFr11_6()
     {
         Ready();
-        MapResult<L_D_KAPE22> map = MapReferenceFichier();
+        Kape22ImportBundle bundle = MapReferenceBundle();
 
-        ImportResult first = Persist(map);
-        ImportResult second = Persist(map);
+        ImportResult first = Persist(bundle);
+        ImportResult second = Persist(bundle);
 
         Assert.NotNull(first.InsertedId);
         Assert.True(second.Success);
@@ -220,10 +233,10 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
     public void Persist_OnlyRejectedLogRowForKey_ImportsNormally_AcFr11_7()
     {
         Ready();
-        MapResult<L_D_KAPE22> map = MapReferenceFichier();
-        SeedLogRow(map.NumeroFichier!, map.OF!, $"{map.NumeroFichier} — REJETÉ : 1 erreur");
+        Kape22ImportBundle bundle = MapReferenceBundle();
+        SeedLogRow(bundle.NumeroFichier!, bundle.OF!, $"{bundle.NumeroFichier} — REJETÉ : 1 erreur");
 
-        ImportResult result = Persist(map);
+        ImportResult result = Persist(bundle);
 
         Assert.True(result.Success);
         Assert.NotNull(result.InsertedId);
@@ -240,13 +253,125 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
     public void Persist_UsesConfiguredConnection_AcFr11_8()
     {
         Ready();
-        MapResult<L_D_KAPE22> map = MapReferenceFichier();
+        Kape22ImportBundle bundle = MapReferenceBundle();
 
         using AscoLsiDbContext context = fixture.NewAscoLsiContext();
         Assert.Contains("AscoLSI_Test", context.Database.GetConnectionString() ?? string.Empty);
 
-        ImportResult result = new Kape22Persister(context, Configuration(), WinterClock()).Persist(map);
+        ImportResult result = new Kape22Persister(context, Configuration(), WinterClock()).Persist(bundle);
         Assert.True(result.Success);
+    }
+
+    // AC-FR20-5: a cold Coulee (CodeConsignePits == "1") whose L_D_COULEE row does not exist yet is
+    // rejected before anything is added - no L_D_KAPE22 row, no downstream entity, one REJETÉ log row
+    // citing the missing Coulee, and a BusinessRuleViolation error naming it.
+    [SkippableFact]
+    [Trait("AC", "FR20-5")]
+    public void Persist_ColdCouleeMissingFromLDCoulee_RejectsWithNoInsertsAndBusinessRuleViolation_AcFr20_5()
+    {
+        Ready();
+        Kape22ImportBundle bundle = MapMutatedBundle(d => SetChamp(d, "message", "CodeConsignePits", "1"));
+        Assert.True(bundle.Success, "the cold happy-path fixture must still pass every FR-20 control.");
+        string coulee = bundle.Kape22!.Coulee;
+
+        using (AscoLsiDbContext precondition = fixture.NewAscoLsiContext())
+        {
+            Assert.False(
+                precondition.CouleeRows.AsNoTracking().Any(row => row.IdCoulee == coulee),
+                $"test setup: L_D_COULEE must not already carry '{coulee}'.");
+        }
+
+        ImportResult result = Persist(bundle);
+
+        Assert.False(result.Success);
+        ConversionError error = Assert.Single(result.Errors);
+        Assert.Equal(Block.File, error.Block);
+        Assert.Equal(ErrorCode.BusinessRuleViolation, error.Code);
+        Assert.Contains(coulee, error.Message, StringComparison.Ordinal);
+
+        using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
+        Assert.Empty(verify.Kape22Rows.AsNoTracking());
+        Assert.Empty(verify.CouleeRows.AsNoTracking().Where(row => row.IdCoulee == coulee));
+        L_D_LOG_COMMANDE log = Assert.Single(verify.LogCommandeRows.AsNoTracking());
+        Assert.Contains("REJETÉ", log.Message);
+        Assert.Contains(coulee, log.Message, StringComparison.Ordinal);
+
+        // AC-FR21-1's atomicity cuts both ways: a cold-Coulee rejection must leave every downstream
+        // table empty too, not just L_D_KAPE22/L_D_COULEE.
+        Assert.Empty(verify.OrdreFabricationRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Empty(verify.SectionChargeChutageRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Empty(verify.SectionChargeDecoupeRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Empty(verify.SectionChargeLingotRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Empty(verify.SectionChargePitsRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Empty(verify.SectionChargePoidsMetriqueRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Empty(verify.SectionChargeRefroidissoirsRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Empty(verify.SectionChargeSvtRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Empty(verify.ConsignesRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
+    }
+
+    // AC-FR21-1 (AD-1): a bundle that passes the guard with a hot Coulee (the existence check skipped)
+    // commits L_D_KAPE22 + the OK log row + every non-null downstream entity from the bundle - Story
+    // 4.3/4.4's OrdreFabrication, Coulee and per-OF-applicable SectionCharge*/Consignes - in one
+    // SaveChanges.
+    [SkippableFact]
+    [Trait("AC", "FR21-1")]
+    public void Persist_FullSuccess_CommitsKape22AndEveryDownstreamEntityInOneSaveChanges_AcFr21_1()
+    {
+        Ready();
+        Kape22ImportBundle bundle = MapReferenceBundle();
+        Assert.True(bundle.Success);
+
+        ImportResult result = Persist(bundle);
+
+        Assert.True(result.Success);
+        Assert.NotNull(result.InsertedId);
+
+        using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
+        Assert.Single(verify.Kape22Rows.AsNoTracking());
+        Assert.Single(verify.LogCommandeRows.AsNoTracking());
+        Assert.Single(verify.OrdreFabricationRows.AsNoTracking(), row => row.OF.Trim() == bundle.OF!.Trim());
+        Assert.Single(verify.CouleeRows.AsNoTracking(), row => row.IdCoulee.Trim() == bundle.Kape22!.Coulee.Trim());
+        Assert.Equal(
+            bundle.SectionChargeChutage is null ? 0 : 1,
+            verify.SectionChargeChutageRows.AsNoTracking().Count(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Equal(
+            bundle.SectionChargeDecoupe is null ? 0 : 1,
+            verify.SectionChargeDecoupeRows.AsNoTracking().Count(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Equal(
+            bundle.SectionChargeLingot is null ? 0 : 1,
+            verify.SectionChargeLingotRows.AsNoTracking().Count(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Equal(
+            bundle.SectionChargePits is null ? 0 : 1,
+            verify.SectionChargePitsRows.AsNoTracking().Count(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Equal(
+            bundle.SectionChargePoidsMetrique is null ? 0 : 1,
+            verify.SectionChargePoidsMetriqueRows.AsNoTracking().Count(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Equal(
+            bundle.SectionChargeRefroidissoirs is null ? 0 : 1,
+            verify.SectionChargeRefroidissoirsRows.AsNoTracking().Count(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Equal(
+            bundle.SectionChargeSvt is null ? 0 : 1,
+            verify.SectionChargeSvtRows.AsNoTracking().Count(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Equal(
+            bundle.Consignes.Count,
+            verify.ConsignesRows.AsNoTracking().Count(row => row.OF.Trim() == bundle.OF!.Trim()));
+    }
+
+    // AC-FR21-3 (AD-6): Kape22Persister exposes exactly one Persist overload, taking a
+    // Kape22ImportBundle - the MapResult<L_D_KAPE22> overload this story replaces is gone. Pure
+    // reflection, no database needed.
+    [Fact]
+    [Trait("AC", "FR21-3")]
+    public void Kape22Persister_ExposesOnlyTheBundlePersistOverload_AcFr21_3()
+    {
+        MethodInfo[] persistMethods = typeof(Kape22Persister)
+            .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+            .Where(method => method.Name == nameof(Kape22Persister.Persist))
+            .ToArray();
+
+        MethodInfo method = Assert.Single(persistMethods);
+        ParameterInfo parameter = Assert.Single(method.GetParameters());
+        Assert.Equal(typeof(Kape22ImportBundle), parameter.ParameterType);
     }
 
     private void Ready()
@@ -255,10 +380,10 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
         fixture.ResetData();
     }
 
-    private ImportResult Persist(MapResult<L_D_KAPE22> map, string? initiatingServer = null, string? commande = null)
+    private ImportResult Persist(Kape22ImportBundle bundle, string? initiatingServer = null, string? commande = null)
     {
         using AscoLsiDbContext context = fixture.NewAscoLsiContext();
-        return new Kape22Persister(context, Configuration(initiatingServer ?? InitiatingServer, commande), WinterClock()).Persist(map);
+        return new Kape22Persister(context, Configuration(initiatingServer ?? InitiatingServer, commande), WinterClock()).Persist(bundle);
     }
 
     private static IConfiguration Configuration(string initiatingServer = InitiatingServer, string? commande = null) =>

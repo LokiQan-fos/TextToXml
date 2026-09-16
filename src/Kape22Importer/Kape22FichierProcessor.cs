@@ -10,13 +10,15 @@ using TextToXml;
 namespace Kape22Importer;
 
 // Story 3.2 (FR-13): the real IFichierProcessor. For one Fichier it runs a strict order - raw bytes ->
-// Converter.Convert -> (on success) capture the normalized XML -> Kape22Mapper.Map -> Kape22Persister
-// .Persist over a fresh AscoLsiDbContext - and returns an ImportResult that reflects exactly the step
-// reached (AC-FR13-1). Only a Converter failure short-circuits: no normalized XML, no MapResult, the
-// persister is never constructed (AC-FR13-2). A Mapper failure still goes through the persister (which
-// writes the REJETÉ log row for a readable OF) and keeps the normalized XML so it can ride to error/
-// next to the Fichier (AC-FR13-3). Each call builds its own context through newContext, so one
-// Fichier's transaction and EF change tracker never touch another's (AC-FR13-4).
+// Converter.Convert -> (on success) capture the normalized XML -> Kape22ImportBundleMapper.Map ->
+// Kape22Persister.Persist over a fresh AscoLsiDbContext - and returns an ImportResult that reflects
+// exactly the step reached (AC-FR13-1). Only a Converter failure short-circuits: no normalized XML, no
+// Kape22ImportBundle, the persister is never constructed (AC-FR13-2). A Mapper or FR-20 business-rule
+// failure still goes through the persister (which writes the REJETÉ log row for a readable OF) and keeps
+// the normalized XML so it can ride to error/ next to the Fichier (AC-FR13-3). Each call builds its own
+// context through newContext, so one Fichier's transaction and EF change tracker never touch another's
+// (AC-FR13-4). Story 4.6 (FR-21): Kape22ImportBundleMapper.Map replaces the bare Kape22Mapper.Map call so
+// Kape22Persister.Persist can stage the Story 4.1 downstream entities alongside L_D_KAPE22.
 // The IFichierProcessor.Process adapter narrows the ImportResult onto the Story 3.1
 // FichierProcessingResult seam that InboxScanner consumes; callers that need InsertedId or
 // XmlArchivePath (Story 3.3 double logging, Story 3.6 end-to-end) call Import directly.
@@ -60,23 +62,24 @@ public sealed class Kape22FichierProcessor(
 
         string normalizedXml = conversion.Xml!;
 
-        // The next stage maps the normalized XML onto an L_D_KAPE22 entity. A mapping failure is not
-        // short-circuited here: Kape22Persister.Persist is still called with the failed MapResult so it
+        // The next stage maps the normalized XML onto a Kape22ImportBundle (Kape22Mapper.Map plus the
+        // Story 4.3/4.4 downstream mappers and FR-20's business controls). A failure at either level is
+        // not short-circuited here: Kape22Persister.Persist is still called with the failed bundle so it
         // writes the "<NumeroFichier> — REJETÉ" L_D_LOG_COMMANDE line when the OF is readable
         // (AC-FR11-4). The normalized XML rides along on the result so InboxScanner can drop <nom>.xml
         // next to the Fichier in error/ for diagnosis (AC-FR13-3).
-        MapResult<L_D_KAPE22> map = new Kape22Mapper(timeProvider).Map(normalizedXml, fichierName);
+        Kape22ImportBundle bundle = new Kape22ImportBundleMapper(timeProvider).Map(normalizedXml, fichierName);
 
         // The Step 1 Segment warnings and the mapper's FR-10 coherence warnings, kept whichever step the
-        // Fichier reaches. A rejected MapResult drops its Warnings on the way through Kape22Persister, so
-        // they are taken from map here, not from the persister result. The concatenation is re-sorted by
-        // LineNumber so the two sources interleave correctly (AC-FR6-4 extended to ImportResult).
-        IReadOnlyList<ConversionError> warnings = SortedByLine([.. conversion.Warnings, .. map.Warnings]);
+        // Fichier reaches. A rejected bundle drops its Warnings on the way through Kape22Persister, so
+        // they are taken from bundle here, not from the persister result. The concatenation is re-sorted
+        // by LineNumber so the two sources interleave correctly (AC-FR6-4 extended to ImportResult).
+        IReadOnlyList<ConversionError> warnings = SortedByLine([.. conversion.Warnings, .. bundle.Warnings]);
 
         // The final stage persists, over a context that belongs to this Fichier alone so its transaction
         // and EF change tracker never touch another Fichier's (AC-FR13-4).
         using AscoLsiDbContext context = newContext();
-        ImportResult persisted = new Kape22Persister(context, configuration, timeProvider).Persist(map);
+        ImportResult persisted = new Kape22Persister(context, configuration, timeProvider).Persist(bundle);
 
         ImportResult result = persisted with
         {
@@ -86,7 +89,7 @@ public sealed class Kape22FichierProcessor(
             XmlArchivePath = persisted.Success ? ArchivePath(fichierName) : null,
         };
 
-        Journal(fichierName, result, map.NumeroFichier, map.OF, normalizedXml, timeProvider.GetElapsedTime(startedAt));
+        Journal(fichierName, result, bundle.NumeroFichier, bundle.OF, normalizedXml, timeProvider.GetElapsedTime(startedAt));
         return result;
     }
 

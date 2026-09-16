@@ -1,5 +1,82 @@
 # Deferred Work
 
+## Deferred from: story-4.6 implementation (2026-09-16)
+
+- source_spec: `spec-4-6-persister-bundle-single-transaction.md` / `epics.md` § Story 4.3 / § Story
+  4.4 (`annexe-mapping-dispatch-epic4.md` § L_D_ORDRE_FABRICATION, § L_D_SECTIONCHARGE_LINGOT,
+  § L_D_SECTIONCHARGE_CHUTAGE, § L_D_SECTIONCHARGE_DECOUPE, § L_D_SECTIONCHARGE_PITS) — escalates the
+  decimal-scale gap already opened by the "code review of story-4.3" entry below, and extends it past
+  `OrdreFabricationMapper` to the Story 4.4 SectionCharge* mappers.
+  summary: five mappers write raw un-rescaled KAPE22 ints straight into narrow `DECIMAL` columns with
+  no rescaling: `OrdreFabricationMapper` (`DiametreProduit DECIMAL(4,1)`, the six `Tolerance*`
+  `DECIMAL(2,1)`/`DECIMAL(4,0)`, `LongueurCD DECIMAL(5,3)`, `PoidsDemiProduitUnitaire DECIMAL(7,3)`,
+  `PoidsPrevuDemiProduit DECIMAL(6,3)`), `SectionChargeLingotMapper` (`SectionLaminage`/
+  `EpaisseurEnLaminage DECIMAL(4,1)`, four `Tolerance*1 DECIMAL(2,1)`), `SectionChargeChutageMapper`
+  (`ChutageTete`/`ChutagePied DECIMAL(3,2)`, max 9.99), `SectionChargeDecoupeMapper`
+  (`LongueurMoyenne DECIMAL(5,3)`) and `SectionChargePitsMapper` (`H2Coulee DECIMAL(2,1)`). Confirmed
+  two ways against a live SQL Server round-trip: individually diagnosing `P60_847_682_001`, `_002` and
+  `_003` (each threw the same decimal-overflow `SqlException`), and running the Story 3.6 ten-fixture
+  SM-2 suite (`EndToEndImportIntegrationTests`) unmodified against the new single-transaction
+  `Kape22Persister`, where all 10 real `P60/` samples failed to insert (0/10) before the dimension
+  Champs were zeroed out for testing (see below) — not an edge case limited to one or two fixtures.
+  Invisible before this story because `Kape22Persister` only ever inserted `L_D_KAPE22` alone;
+  Story 4.6's AD-1 single `SaveChanges()` now stages every downstream entity in the same transaction,
+  so this defect blocks the **entire** commit (including `L_D_KAPE22`) for real Fichiers.
+  evidence: Discovered running `dotnet test --filter Category=Integration` against the local SQL
+  Server harness while implementing Story 4.6 — `Kape22FichierProcessorIntegrationTests`,
+  `DoubleJournalIntegrationTests`, `EndToEndImportIntegrationTests` (Story 3.6's SM-2, already `done`)
+  and `WorkerLoopRobustnessIntegrationTests` all failed on real fixtures until patched (see below).
+  `GpaoImportP60WorkerEndToEndTests` (drives the real Launcher via `scripts/e2e-worker-import.ps1`
+  against the untouched `P60/P60_847_682_081/082` files) still fails/times out and was left red: its
+  fixtures are also relied on byte-for-byte by `Kape22ProductionDataParityTests` (production-mirroring
+  parity), so mutating them to dodge this defect would trade one false signal for another. Out of Story
+  4.6's authorized scope ("Never: no change inside OrdreFabricationMapper/.../SectionCharge*Mapper").
+  User decision (2026-09-16): defer the mapper fix to a dedicated Story 4.3-bis (widened at discovery
+  time to cover both the Story 4.3 and Story 4.4 mappers, not Story 4.3 alone); Story 4.6's own tests
+  and the pre-existing integration suites above (except `GpaoImportP60WorkerEndToEndTests`) are patched
+  to zero out the affected dimension Champs on their fixtures (`ZeroOutOfScaleDimensions`/
+  `InsertableFichier`, `tests/Kape22Importer.Tests/TestSupport.cs`, Position/Size sourced from
+  `Templates/P60.xml`) so the *transaction/persistence* behavior under test stays provable, at the cost
+  of those suites no longer proving the pipeline against real-world dimension values until the mapper
+  fix lands. Must be fixed before Epic 4 goes to production — every real P60 Fichier whose applicable
+  SectionCharge sections carry a value at or above each column's scale will fail to import until then.
+
+## Deferred from: code review of story-4.6 (2026-09-16)
+
+- source_spec: `src/Kape22Importer/Persistence/Kape22Persister.cs` (`PersistMapped`'s
+  `couleeAlreadyExists` check)
+  summary: the Coulee existence check (`context.CouleeRows.Any(...)`) and the later
+  `context.CouleeRows.Add(bundle.Coulee!)` are a classic check-then-act race: two Fichiers naming a
+  brand-new, not-yet-committed Coulee (architecturally expected — "several OF routinely dispatch from
+  the same cast") and processed close together, each on its own per-Fichier `DbContext`/transaction,
+  could both see "not exists" and both try to insert the same `IdCoulee`, producing a PK-violation
+  `PersistenceError` on an otherwise entirely valid Fichier.
+  evidence: Raised by the Blind Hunter layer at Story 4.6's code review. Not reachable under the
+  current architecture: `InboxScanner.RunTick` processes Fichiers one at a time in a single worker
+  (Story 3.2/3.5), so no two `Kape22Persister.Persist` calls run concurrently today. Same shape and same
+  non-blocking rationale as the pre-existing "Deferred from: Story 2.8" entry below ("Anti-duplicate
+  guard reads outside the write transaction... revisit if the orchestrator ever processes Fichiers
+  concurrently").
+
+- source_spec: `tests/Kape22Importer.Tests/TestSupport.cs` (`ZeroOutOfScaleDimensions(XDocument)` /
+  `OutOfScaleDimensionFields`)
+  summary: the 21 out-of-scale Champs are hand-maintained twice — once by element name for the
+  post-Converter `XDocument` mutation, once by raw `(Position, Size)` tuples for the byte-level fixture
+  mutation (cross-referenced only by a comment pointing at `Templates/P60.xml`) — with nothing verifying
+  the two lists stay in sync.
+  evidence: Raised by the Blind Hunter layer at Story 4.6's code review. Both lists are test-only
+  scaffolding for working around the Story 4.3-bis decimal-scale defect above; low risk while that defer
+  is short-lived, but a future edit to one list without the other would silently narrow test coverage.
+
+- source_spec: `tests/Kape22Importer.Tests/TestSupport.cs` (`WithDetailChamp`)
+  summary: `WithDetailChamp` indexes `lines[1]` after `Split("\r\n")` and slices `[position..(position +
+  size)]` with no bounds check; a fixture that doesn't split into at least two lines, or a
+  position/size past the Detail line's length, throws a raw `IndexOutOfRangeException`/
+  `ArgumentOutOfRangeException` instead of a descriptive failure.
+  evidence: Raised by the Edge Case Hunter layer at Story 4.6's code review. Test-only helper; every
+  current caller uses fixed, known-good positions from `Templates/P60.xml` against the real fixture
+  files, so the gap is latent, not currently reachable.
+
 ## Deferred from: code review of story-4.3 (2026-09-15)
 
 - source_spec: `epics.md` § Story 4.3 / `annexe-mapping-dispatch-epic4.md` § L_D_ORDRE_FABRICATION

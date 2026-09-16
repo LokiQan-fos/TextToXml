@@ -92,7 +92,7 @@ public class Kape22FichierProcessorTests
     {
         InMemoryContextFactory contexts = new();
 
-        ImportResult result = Processor(contexts.Next).Import(ReferenceFichierName, ReadValidFixture(ReferenceFichierName));
+        ImportResult result = Processor(contexts.Next).Import(ReferenceFichierName, InsertableReferenceFichier());
 
         Assert.True(result.Success);
         Assert.NotNull(result.InsertedId);
@@ -171,7 +171,7 @@ public class Kape22FichierProcessorTests
         Kape22FichierProcessor processor = Processor(contexts.Next);
 
         ImportResult rejected = processor.Import(ReferenceFichierName, BlankClientReferenceFichier());
-        ImportResult clean = processor.Import(ReferenceFichierName, ReadValidFixture(ReferenceFichierName));
+        ImportResult clean = processor.Import(ReferenceFichierName, InsertableReferenceFichier());
 
         Assert.False(rejected.Success);
         Assert.True(clean.Success);
@@ -191,7 +191,7 @@ public class Kape22FichierProcessorTests
     {
         InMemoryContextFactory contexts = new();
 
-        ImportResult result = Processor(contexts.Next).Import(ReferenceFichierName, ReadValidFixture(ReferenceFichierName));
+        ImportResult result = Processor(contexts.Next).Import(ReferenceFichierName, InsertableReferenceFichier());
 
         Assert.True(result.Success);
         Assert.NotNull(result.InsertedId);

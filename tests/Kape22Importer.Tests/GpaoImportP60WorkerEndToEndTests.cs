@@ -19,6 +19,13 @@ namespace Kape22Importer.Tests;
 // Launcher and its MQTT broker as OS processes bound to real ports (5050, 1883), and briefly edits the
 // SVN-tracked GpaoImportP60.json in the sibling checkout (restored by the script itself, even on
 // failure).
+//
+// Expected RED as of Story 4.6 (deferred-work.md "Deferred from: story-4.6 implementation
+// 2026-09-16"): the untouched P60_847_682_081/082 fixtures this script drops trip the pre-existing
+// Story 4.3/4.4 decimal-scale mapper defect once Kape22Persister stages every downstream entity in one
+// SaveChanges (AD-1); left unpatched here (unlike the other integration suites) because these fixtures
+// are also relied on byte-for-byte by Kape22ProductionDataParityTests. Will go green again once the
+// Story 4.3-bis mapper fix lands.
 [Collection(SqlServerIntegrationCollection.Name)]
 [Trait("Category", TestCategory.Integration)]
 public class GpaoImportP60WorkerEndToEndTests(SqlServerIntegrationFixture fixture)

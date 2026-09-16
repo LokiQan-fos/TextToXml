@@ -93,7 +93,7 @@ public class EndToEndImportIntegrationTests(SqlServerIntegrationFixture fixture)
         InMemoryFileSource source = new();
         foreach ((string name, int index) in TenFichiers.Select((name, index) => (name, index)))
         {
-            source.Add(InboxRoot, name, ReadValidFixture(name), Now.AddMinutes(-10 + index));
+            source.Add(InboxRoot, name, Content(name), Now.AddMinutes(-10 + index));
         }
 
         Scanner(source).RunTick();
@@ -107,7 +107,7 @@ public class EndToEndImportIntegrationTests(SqlServerIntegrationFixture fixture)
 
         foreach (string name in TenFichiers)
         {
-            Visible expected = Expected(name);
+            Visible expected = Expected(name, Content(name));
             L_D_KAPE22 row = Assert.Single(
                 rows,
                 candidate => candidate.NumeroFichier.Trim() == expected.NumeroFichier
@@ -135,11 +135,17 @@ public class EndToEndImportIntegrationTests(SqlServerIntegrationFixture fixture)
         Assert.Empty(source.Names(Options().ProcessingFolder));
     }
 
+    // Story 4.6 (deferred-work.md, decimal-scale defect): the bytes actually fed to the scanner for a
+    // given sample - the reference Fichier needs its Coulee corrected too (AC-FR20-3), every other
+    // sample only needs its out-of-scale dimension Champs zeroed.
+    private static byte[] Content(string fichierName) =>
+        fichierName == ReferenceFichierName ? InsertableReferenceFichier() : InsertableFichier(fichierName);
+
     // Runs one Fichier through Converter and Kape22Mapper on its own, so the end-to-end row can be
     // cross-checked against what the pipeline reads rather than against a hard-coded expectation.
-    private static Visible Expected(string fichierName)
+    private static Visible Expected(string fichierName, byte[] content)
     {
-        ConversionResult conversion = Converter.Convert(ReadValidFixture(fichierName), EmbeddedDescriptor.Xml);
+        ConversionResult conversion = Converter.Convert(content, EmbeddedDescriptor.Xml);
         Assert.True(conversion.Success, $"{fichierName} failed Step 1.");
 
         MapResult<L_D_KAPE22> map = new Kape22Mapper(new FixedClock(Now)).Map(conversion.Xml!, fichierName);

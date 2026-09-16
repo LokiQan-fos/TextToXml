@@ -83,8 +83,8 @@ public class WorkerLoopRobustnessIntegrationTests(SqlServerIntegrationFixture fi
     {
         Ready();
         InMemoryFileSource source = new();
-        source.Add("processing", "P60_847_682_001", ReadValidFixture("P60_847_682_001"), Now.AddMinutes(-5));
-        source.Add("", "P60_847_682_002", ReadValidFixture("P60_847_682_002"), Now.AddMinutes(-1));
+        source.Add("processing", "P60_847_682_001", InsertableReferenceFichier(), Now.AddMinutes(-5));
+        source.Add("", "P60_847_682_002", InsertableFichier("P60_847_682_002"), Now.AddMinutes(-1));
 
         Scanner(source).RunTick();
 
@@ -106,14 +106,14 @@ public class WorkerLoopRobustnessIntegrationTests(SqlServerIntegrationFixture fi
     {
         Ready();
         InMemoryFileSource source = new();
-        source.Add("", ReferenceFichierName, ReadValidFixture(ReferenceFichierName), Now.AddMinutes(-3));
+        source.Add("", ReferenceFichierName, InsertableReferenceFichier(), Now.AddMinutes(-3));
 
         Scanner(source).RunTick();
         Assert.True(source.Exists(ArchiveDateFolder, ReferenceFichierName), "first tick must archive the Fichier.");
 
         // The crash: the worker died after the commit but before Archive ran, so neither the Fichier nor
         // its .xml sidecar ever reached archive/ and the Fichier is still in processing/.
-        source.Add("processing", ReferenceFichierName, ReadValidFixture(ReferenceFichierName), Now.AddMinutes(-2));
+        source.Add("processing", ReferenceFichierName, InsertableReferenceFichier(), Now.AddMinutes(-2));
         source.Delete(ArchiveDateFolder, ReferenceFichierName);
         source.Delete(ArchiveDateFolder, ReferenceFichierName + ".xml");
 

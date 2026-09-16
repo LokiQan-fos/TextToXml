@@ -60,7 +60,7 @@ public class DoubleJournalIntegrationTests(SqlServerIntegrationFixture fixture)
     {
         Ready();
 
-        ImportResult result = RunWithSerilog(ReferenceFichierName, ReadValidFixture(ReferenceFichierName));
+        ImportResult result = RunWithSerilog(ReferenceFichierName, InsertableReferenceFichier());
 
         Assert.True(result.Success);
         Assert.NotNull(result.InsertedId);
@@ -126,7 +126,7 @@ public class DoubleJournalIntegrationTests(SqlServerIntegrationFixture fixture)
     public void Import_SuccessWithCoherenceWarnings_WritesTheWarningRowToMqttLogs_AcFr14_8()
     {
         Ready();
-        byte[] footerRecordsNotThree = WithText(ReadValidFixture(ReferenceFichierName), "00003", "00009");
+        byte[] footerRecordsNotThree = WithText(InsertableReferenceFichier(), "00003", "00009");
 
         ImportResult result = RunWithSerilog("P60_999_682_001", footerRecordsNotThree);
 
@@ -151,7 +151,7 @@ public class DoubleJournalIntegrationTests(SqlServerIntegrationFixture fixture)
         Ready();
         SeedOkLogRow();
 
-        ImportResult result = RunWithSerilog(ReferenceFichierName, ReadValidFixture(ReferenceFichierName));
+        ImportResult result = RunWithSerilog(ReferenceFichierName, InsertableReferenceFichier());
 
         Assert.True(result.Success);
         Assert.True(result.AlreadyImported);
