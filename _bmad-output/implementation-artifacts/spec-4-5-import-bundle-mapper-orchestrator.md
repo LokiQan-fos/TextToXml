@@ -70,6 +70,10 @@ baseline_commit: '278ce45bbe2e0fd8ae7d09298dfb8cef76f5a6ac'
 - Given a hot Coulee (`CodeConsignePits != "1"`) whose `Coulee` doesn't start with `'0'`, when the bundle is built, then `Success=false` and a dedicated error cites the OF and Coulee number (AC-FR20-3).
 - Given an OF with no applicable `L_D_SECTIONCHARGE_PITS`, when the bundle is built, then `Success=false` and a dedicated error signals the missing enfournement instruction (AC-FR20-4).
 
+### Review Findings
+
+- [x] [Review][Patch] Add missing test coverage for AC-FR20-2 when `SectionChargeRefroidissoirs` is inapplicable (null) [`Kape22ImportBundleMapper.cs:78-90`]
+
 ## Design Notes
 
 The legacy hot/cold call passes a `12` size/type filter (`GetConsignes("ConsignesEnfournementPits", 12)`, annex line 106) that isn't reproduced here — this mapper reads `L_D_KAPE22.CodeConsignePits` directly rather than filtering `L_D_CONSIGNES` rows, so the `12` argument doesn't apply; the annex already flags this link as `à_clarifier`, no new `deferred-work.md` entry needed since AC-FR20-3 doesn't depend on it.

@@ -158,6 +158,30 @@ public class Kape22ImportBundleMapperTests
         Assert.Contains(bundle.Errors, error => error.Message.Contains("répartition des lingots", StringComparison.Ordinal));
     }
 
+    // AC-FR20-2 edge case (code review 2026-09-16): SectionChargeRefroidissoirsMapper.Map returns null
+    // when the section does not concern this OF (CodeOpeRefroidissoir/RangOpeRefroidissoir blank, Story
+    // 4.4's per-OF applicability rule) - the ingot/furnace control has nothing to compare then, so it must
+    // not fire. NombreDemiProduit is forced to a value the (absent) Four1/Four2 sum could never
+    // coincidentally match, so the test would fail if the null-guard were ever dropped or inverted.
+    [Fact]
+    [Trait("AC", "FR20-2")]
+    public void Map_RefroidissoirsSectionNotApplicable_SkipsIngotFurnaceControl_AcFr20_2()
+    {
+        string mutatedXml = MutatedReferenceXml(document =>
+        {
+            SetChamp(document, "message", "CodeConsignePits", "1");
+            SetChamp(document, "message", "CodeOpeRefroidissoir", "   ");
+            SetChamp(document, "message", "RangOpeRefroidissoir", "   ");
+            SetChamp(document, "message", "NombreDemiProduit", "999");
+        });
+
+        Kape22ImportBundle bundle = new Kape22ImportBundleMapper(WinterClock()).Map(mutatedXml, ReferenceFichierName);
+
+        Assert.Null(bundle.SectionChargeRefroidissoirs);
+        Assert.True(bundle.Success);
+        Assert.Empty(bundle.Errors);
+    }
+
     // AC-FR20-3: a "hot" Coulee (CodeConsignePits != "1") whose Coulee number does not start with '0' is
     // a dedicated violation. Deliberately mutates both Champs rather than relying on the reference
     // Fichier's own coincidental values, so the test documents the rule instead of depending on fixture
