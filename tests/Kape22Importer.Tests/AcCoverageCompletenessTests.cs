@@ -34,7 +34,9 @@ public class AcCoverageCompletenessTests
         [18] = 4,
         [19] = 4,
         [20] = 5,
-        [21] = 3,
+        // FR21-1/2/3 (pre-existing) + FR21-4 (this story, EndToEndImportIntegrationTests.cs)
+        // + FR21-5 (this story, RejectionAtomicityIntegrationTests.cs) = 5.
+        [21] = 5,
     };
 
     // ACs this assembly cannot cover by design, not by omission - each is out of Kape22Importer's own

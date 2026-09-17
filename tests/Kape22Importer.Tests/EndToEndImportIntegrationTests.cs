@@ -80,12 +80,14 @@ public class EndToEndImportIntegrationTests(SqlServerIntegrationFixture fixture)
         fixture.ResetData();
     }
 
-    // SM-2: the ten samples import as ten L_D_KAPE22 rows whose visible business fields (OF, Coulee,
-    // Client, Nuance) match what the pipeline reads from each Fichier, alongside ten "— OK"
-    // L_D_LOG_COMMANDE rows. Every Fichier ends up archived with its .xml sidecar; the inbox and
-    // processing/ are empty.
+    // SM-2 / AC-FR21-4: the ten samples import as ten L_D_KAPE22 rows whose visible business fields (OF,
+    // Coulee, Client, Nuance) match what the pipeline reads from each Fichier, alongside ten "— OK"
+    // L_D_LOG_COMMANDE rows and coherent rows in every one of the 10 Story 4.1 downstream tables (AD-1
+    // atomicity, proven here at the real pipeline level rather than only at the Persister-unit level).
+    // Every Fichier ends up archived with its .xml sidecar; the inbox and processing/ are empty.
     [SkippableFact]
     [Trait("AC", "SM-2")]
+    [Trait("AC", "FR21-4")]
     public void Tick_TenSampleFichiers_InsertTenCoherentRowsAndArchiveEveryFichier_Sm2()
     {
         Ready();
@@ -107,15 +109,16 @@ public class EndToEndImportIntegrationTests(SqlServerIntegrationFixture fixture)
 
         foreach (string name in TenFichiers)
         {
-            Visible expected = Expected(name, Content(name));
+            Kape22ImportBundle expected = ExpectedBundle(name, Content(name));
+            L_D_KAPE22 entity = expected.Kape22!;
             L_D_KAPE22 row = Assert.Single(
                 rows,
-                candidate => candidate.NumeroFichier.Trim() == expected.NumeroFichier
+                candidate => candidate.NumeroFichier.Trim() == expected.NumeroFichier!.Trim()
                     && candidate.OF.Trim() == expected.OF);
 
-            Assert.Equal(expected.Client, row.Client.Trim());
-            Assert.Equal(expected.Coulee, row.Coulee.Trim());
-            Assert.Equal(expected.Nuance, row.Nuance.Trim());
+            Assert.Equal(entity.Client.Trim(), row.Client.Trim());
+            Assert.Equal(entity.Coulee.Trim(), row.Coulee.Trim());
+            Assert.Equal(entity.Nuance.Trim(), row.Nuance.Trim());
 
             // Ties this Fichier's own "— OK" row back to its NumeroFichier + OF, so a bug that logs the
             // wrong Fichier or drops one row while duplicating another cannot hide behind the count check.
@@ -123,6 +126,38 @@ public class EndToEndImportIntegrationTests(SqlServerIntegrationFixture fixture)
                 logRows,
                 candidate => candidate.OF.Trim() == expected.OF
                     && candidate.Message == expected.NumeroFichier + " — OK");
+
+            // AC-FR21-4: the 10 downstream tables each carry rows consistent with this Fichier's own
+            // bundle, matched by OF (the same "count matches bundle.X is null ? 0 : 1" pattern
+            // TransactionalPersistenceTests.Persist_FullSuccess_..._AcFr21_1 already proves at the
+            // Persister-unit level).
+            string of = expected.OF!.Trim();
+            Assert.Single(verify.OrdreFabricationRows.AsNoTracking(), candidate => candidate.OF.Trim() == of);
+            Assert.Single(verify.CouleeRows.AsNoTracking(), candidate => candidate.IdCoulee.Trim() == entity.Coulee.Trim());
+            Assert.Equal(
+                expected.SectionChargeChutage is null ? 0 : 1,
+                verify.SectionChargeChutageRows.AsNoTracking().Count(candidate => candidate.OF.Trim() == of));
+            Assert.Equal(
+                expected.SectionChargeDecoupe is null ? 0 : 1,
+                verify.SectionChargeDecoupeRows.AsNoTracking().Count(candidate => candidate.OF.Trim() == of));
+            Assert.Equal(
+                expected.SectionChargeLingot is null ? 0 : 1,
+                verify.SectionChargeLingotRows.AsNoTracking().Count(candidate => candidate.OF.Trim() == of));
+            Assert.Equal(
+                expected.SectionChargePits is null ? 0 : 1,
+                verify.SectionChargePitsRows.AsNoTracking().Count(candidate => candidate.OF.Trim() == of));
+            Assert.Equal(
+                expected.SectionChargePoidsMetrique is null ? 0 : 1,
+                verify.SectionChargePoidsMetriqueRows.AsNoTracking().Count(candidate => candidate.OF.Trim() == of));
+            Assert.Equal(
+                expected.SectionChargeRefroidissoirs is null ? 0 : 1,
+                verify.SectionChargeRefroidissoirsRows.AsNoTracking().Count(candidate => candidate.OF.Trim() == of));
+            Assert.Equal(
+                expected.SectionChargeSvt is null ? 0 : 1,
+                verify.SectionChargeSvtRows.AsNoTracking().Count(candidate => candidate.OF.Trim() == of));
+            Assert.Equal(
+                expected.Consignes.Count,
+                verify.ConsignesRows.AsNoTracking().Count(candidate => candidate.OF.Trim() == of));
         }
 
         foreach (string name in TenFichiers)
@@ -141,25 +176,16 @@ public class EndToEndImportIntegrationTests(SqlServerIntegrationFixture fixture)
     private static byte[] Content(string fichierName) =>
         fichierName == ReferenceFichierName ? InsertableReferenceFichier() : InsertableFichier(fichierName);
 
-    // Runs one Fichier through Converter and Kape22Mapper on its own, so the end-to-end row can be
-    // cross-checked against what the pipeline reads rather than against a hard-coded expectation.
-    private static Visible Expected(string fichierName, byte[] content)
+    // Runs one Fichier through Converter and Kape22ImportBundleMapper on its own (the same composition
+    // Kape22FichierProcessor.Import uses), so the end-to-end rows - L_D_KAPE22 and every downstream table
+    // - can be cross-checked against what the pipeline reads rather than against a hard-coded expectation.
+    private static Kape22ImportBundle ExpectedBundle(string fichierName, byte[] content)
     {
         ConversionResult conversion = Converter.Convert(content, EmbeddedDescriptor.Xml);
         Assert.True(conversion.Success, $"{fichierName} failed Step 1.");
 
-        MapResult<L_D_KAPE22> map = new Kape22Mapper(new FixedClock(Now)).Map(conversion.Xml!, fichierName);
-        Assert.True(map.Success, $"{fichierName} failed Step 2.");
-        L_D_KAPE22 entity = map.Value!;
-
-        return new Visible(
-            entity.Client.Trim(),
-            entity.Coulee.Trim(),
-            entity.Nuance.Trim(),
-            entity.NumeroFichier.Trim(),
-            entity.OF.Trim());
+        Kape22ImportBundle bundle = new Kape22ImportBundleMapper(new FixedClock(Now)).Map(conversion.Xml!, fichierName);
+        Assert.True(bundle.Success, $"{fichierName} failed Step 2.");
+        return bundle;
     }
-
-    // Properties are declared in alphabetical order (CC-4).
-    private sealed record Visible(string Client, string Coulee, string Nuance, string NumeroFichier, string OF);
 }

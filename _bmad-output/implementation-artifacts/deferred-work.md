@@ -1,5 +1,29 @@
 # Deferred Work
 
+## Deferred from: code review of story-4.7 (2026-09-17)
+
+- source_spec: `spec-4-7-e2e-suite-downstream-tables.md` / `tests/Kape22Importer.Tests/RejectionAtomicityIntegrationTests.cs`
+  summary: the three AC-FR21-5 rejection tests only assert `Assert.Contains("REJETÉ", log.Message)` (or, for
+  the SQL-failure case, a generic `[Kape22Importer][ImportRejected]` marker plus `ErrorCode.PersistenceError`)
+  rather than asserting the log text actually names the specific cause (the missing Coulée, the
+  ingot/furnace mismatch, the persistence failure detail). A generic-but-wrong REJETÉ message would still
+  pass.
+  evidence: Raised by the Blind Hunter layer at Story 4.7's code review. AC-FR21-5 only requires the cause
+  be "lisible" (readable), which the current assertions satisfy structurally; asserting the exact wording
+  would tie the test to message-format details not otherwise pinned by any AC. Not blocking; a future
+  hardening pass could assert on cause-specific substrings once the exact rejection message wording is
+  considered a contract worth pinning.
+
+- source_spec: `spec-4-7-e2e-suite-downstream-tables.md` / `tests/Kape22Importer.Tests/RejectionAtomicityIntegrationTests.cs`
+  summary: only `ErrorCode.BusinessRuleViolation` (x2) and `ErrorCode.PersistenceError` are exercised for
+  AD-1 atomicity on the rejection path. Other `ErrorCode` values established since Story 3.5 (e.g.
+  `SchemaInvalid`, `UnexpectedFailure`) are not proven to roll back all 11 AscoLSI tables the same way at
+  the E2E level.
+  evidence: Raised by the Blind Hunter layer at Story 4.7's code review. AC-FR21-5 only requires "au moins
+  une fixture fautive dédiée par cause" across the three named causes (coulée absente, répartition
+  lingots/fours incohérente, échec SQL simulé) — already satisfied. Extending to every `ErrorCode` is a
+  reasonable hardening step, not a gap in this story's own scope.
+
 ## Deferred from: story-4.6 implementation (2026-09-16)
 
 - source_spec: `spec-4-6-persister-bundle-single-transaction.md` / `epics.md` § Story 4.3 / § Story
