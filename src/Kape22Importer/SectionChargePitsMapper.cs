@@ -20,7 +20,7 @@ public static class SectionChargePitsMapper
         return new L_D_SECTIONCHARGE_PITS
         {
             CodeOperation = source.CodeOpePits!,
-            H2Coulee = source.H2Coulee,
+            H2Coulee = DecimalScale.Apply(source.H2Coulee, 1),
             NumeroFour1 = source.NumeroFour1,
             NumeroFour2 = source.NumeroFour2,
             OF = source.OF,

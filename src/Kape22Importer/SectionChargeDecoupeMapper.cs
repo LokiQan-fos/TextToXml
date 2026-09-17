@@ -20,7 +20,7 @@ public static class SectionChargeDecoupeMapper
         return new L_D_SECTIONCHARGE_DECOUPE
         {
             CodeOperation = source.CodeOpeDecoupe!,
-            LongueurMoyenne = source.LongueurMoyenne,
+            LongueurMoyenne = DecimalScale.Apply(source.LongueurMoyenne, 3),
             OF = source.OF,
             OutilDeDecoupe = source.OutilDecoupe,
             RangOperation = source.RangOpeDecoupe!,

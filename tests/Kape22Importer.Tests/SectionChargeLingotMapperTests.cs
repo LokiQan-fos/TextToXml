@@ -40,16 +40,16 @@ public class SectionChargeLingotMapperTests
 
         Assert.NotNull(entity);
         Assert.Equal(source.CodeOpeLingot, entity!.CodeOperation);
-        Assert.Equal((decimal?)source.EpaisseurEnLaminage, entity.EpaisseurEnLaminage);
+        Assert.Equal(DecimalScale.Apply(source.EpaisseurEnLaminage, 1), entity.EpaisseurEnLaminage);
         Assert.Equal(source.OF, entity.OF);
         Assert.Equal(source.PriseDeFer, entity.PriseDeFer);
         Assert.Equal(source.ProfileLamine, entity.ProfileLamine);
         Assert.Equal(source.RangOpeLingot, entity.RangOperation);
-        Assert.Equal((decimal?)source.SectionLaminage, entity.SectionLaminage);
-        Assert.Equal((decimal?)source.ToleranceMaxEpaisseur1, entity.ToleranceMaxEpaisseur);
-        Assert.Equal((decimal?)source.ToleranceMaxSection1, entity.ToleranceMaxSection);
-        Assert.Equal((decimal?)source.ToleranceMinEpaisseur1, entity.ToleranceMinEpaisseur);
-        Assert.Equal((decimal?)source.ToleranceMinSection1, entity.ToleranceMinSection);
+        Assert.Equal(DecimalScale.Apply(source.SectionLaminage, 1), entity.SectionLaminage);
+        Assert.Equal(DecimalScale.Apply(source.ToleranceMaxEpaisseur1, 1), entity.ToleranceMaxEpaisseur);
+        Assert.Equal(DecimalScale.Apply(source.ToleranceMaxSection1, 1), entity.ToleranceMaxSection);
+        Assert.Equal(DecimalScale.Apply(source.ToleranceMinEpaisseur1, 1), entity.ToleranceMinEpaisseur);
+        Assert.Equal(DecimalScale.Apply(source.ToleranceMinSection1, 1), entity.ToleranceMinSection);
     }
 
     // AC-FR19-4: the 8 PriseDeFer*/Programme* columns the annex leaves à_clarifier stay at their CLR

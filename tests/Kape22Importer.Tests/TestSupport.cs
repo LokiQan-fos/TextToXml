@@ -64,14 +64,9 @@ internal static class TestSupport
     // Map_UnmutatedReferenceFichier_IsHotCouleeMalformedInIsolation_AcFr20_3) - the other 2 FR-20 controls
     // already pass on the untouched values, so correcting only the Coulee's leading digit is enough to
     // make every FR-20 control pass. Stays "hot" (CodeConsignePits untouched), so Kape22Persister's
-    // AC-FR20-5 cold-Coulee existence check does not apply either. ZeroOutOfScaleDimensions keeps the
-    // bundle insertable against the real AscoLSI schema (see that helper's own comment).
+    // AC-FR20-5 cold-Coulee existence check does not apply either.
     public static Kape22ImportBundle MapReferenceBundle() =>
-        MapMutatedBundle(document =>
-        {
-            SetChamp(document, "message", "Coulee", "065718");
-            ZeroOutOfScaleDimensions(document);
-        });
+        MapMutatedBundle(document => SetChamp(document, "message", "Coulee", "065718"));
 
     // Converts the reference Fichier, applies a mutation to the normalized XML, then maps it through
     // Kape22ImportBundleMapper (Story 4.6).
@@ -80,43 +75,6 @@ internal static class TestSupport
         XDocument document = XDocument.Parse(ConvertReferenceFichier());
         mutate(document);
         return new Kape22ImportBundleMapper(WinterClock()).Map(document.ToString(), ReferenceFichierName);
-    }
-
-    // Story 4.6 (pre-existing, out-of-scope defect surfaced by this story's live SQL Server verification):
-    // OrdreFabricationMapper and SectionChargeLingotMapper cast several raw KAPE22 dimension/tolerance
-    // Champs straight into narrow DECIMAL columns (e.g. DECIMAL(2,1), max 9.9) without the rescaling the
-    // legacy values need (the reference Fichier's own ToleranceMaxSection is 18) - a Story 4.3 mapper
-    // scale mismatch already tracked as an open defer, and "Never: no change inside the 4.3/4.4 mappers"
-    // puts fixing it out of this story's reach. Zeroing these Champs here (none of them feeds an FR-20
-    // control) keeps a Kape22Persister test exercising the persister's own transactional behavior instead
-    // of tripping over that unrelated, pre-existing defect - see the story report for the full finding.
-    // CC-4 exemption: this list is deliberately grouped by originating mapper and kept in the same order
-    // as OutOfScaleDimensionFields below, position-for-position, so the two lists cross-reference each
-    // other by index rather than by name - sorting this one alphabetically would desynchronize them.
-    public static void ZeroOutOfScaleDimensions(XDocument document)
-    {
-        foreach (string champ in new[]
-        {
-            "DiametreProduit", "Epaisseur", "LongueurCD",
-            "ToleranceMaxSection", "ToleranceMinSection",
-            "ToleranceMaxEpaisseur", "ToleranceMinEpaisseur",
-            "ToleranceMaxLongueur", "ToleranceMinLongueur",
-            "PoidsDemiProduitUnitaire", "PoidsPrevuDemiProduit",
-            "EpaisseurEnLaminage", "SectionLaminage",
-            "ToleranceMaxSection1", "ToleranceMinSection1",
-            "ToleranceMaxEpaisseur1", "ToleranceMinEpaisseur1",
-            "H2Coulee", "ChutageTete", "ChutagePied", "LongueurMoyenne",
-        })
-        {
-            // D27: a blank int/decimal/datetime Champ omits its element entirely rather than emitting
-            // <Id></Id>, so a Champ absent from this Fichier (e.g. H2Coulee when Pits does not apply) has
-            // nothing to zero here - it is already blank, and Kape22Mapper.DefaultForNonNullable zero-
-            // fills it downstream regardless.
-            if (document.Root!.Element("message")!.Element(champ) is not null)
-            {
-                SetChamp(document, "message", champ, "0");
-            }
-        }
     }
 
     // Sets the text of a Champ element in the named Bloc. Blanking a NOT NULL string Champ (Client, ...)
@@ -146,38 +104,18 @@ internal static class TestSupport
     public static byte[] BlankClientReferenceFichier() =>
         WithText(ReadValidFixture(ReferenceFichierName), ReferenceClient, new string(' ', ReferenceClient.Length));
 
-    // Story 4.6: the reference Fichier's raw bytes with its Coulee corrected to start with '0' and its
-    // out-of-scale dimension Champs zeroed, the byte-level counterpart of MapReferenceBundle() for tests
-    // that run the whole Kape22FichierProcessor.Import pipeline from raw bytes rather than from
-    // pre-parsed XML.
+    // Story 4.6: the reference Fichier's raw bytes with its Coulee corrected to start with '0', the
+    // byte-level counterpart of MapReferenceBundle() for tests that run the whole
+    // Kape22FichierProcessor.Import pipeline from raw bytes rather than from pre-parsed XML. Story
+    // 4.3-bis: no longer zeroes the dimension/tolerance Champs - the mappers now scale them correctly
+    // (DecimalScale.Apply), so the raw fixture values are insertable as-is.
     public static byte[] InsertableReferenceFichier() =>
-        ZeroOutOfScaleDimensions(WithText(ReadValidFixture(ReferenceFichierName), "165718", "065718"));
+        WithText(ReadValidFixture(ReferenceFichierName), "165718", "065718");
 
-    // Story 4.6: any of the ten P60/ reference samples with its out-of-scale dimension Champs zeroed
-    // (see InsertableReferenceFichier); every sample but the reference one already has a valid hot-Coulee
-    // format, so no Coulee correction is needed here.
-    public static byte[] InsertableFichier(string fichierName) =>
-        ZeroOutOfScaleDimensions(ReadValidFixture(fichierName));
-
-    // Story 4.6 (deferred-work.md, decimal-scale defect): Detail-block Position/Size per Templates/P60.xml
-    // for every Champ ZeroOutOfScaleDimensions(XDocument) also blanks - the raw-byte counterpart, for
-    // tests that mutate a Fichier's bytes directly rather than its post-Converter XDocument.
-    private static readonly (int Position, int Size)[] OutOfScaleDimensionFields =
-    [
-        (59, 4), (63, 2), (65, 2), (67, 4), (71, 2), (73, 2), (79, 5), (84, 4), (88, 4),
-        (108, 5), (116, 6), (217, 4), (221, 2), (223, 2), (225, 4), (229, 2), (231, 2),
-        (158, 2), (275, 3), (278, 3), (317, 5),
-    ];
-
-    public static byte[] ZeroOutOfScaleDimensions(byte[] content)
-    {
-        foreach ((int position, int size) in OutOfScaleDimensionFields)
-        {
-            content = WithDetailChamp(content, position, size, string.Empty);
-        }
-
-        return content;
-    }
+    // Story 4.6: any of the ten P60/ reference samples, ready to insert (see InsertableReferenceFichier);
+    // every sample but the reference one already has a valid hot-Coulee format, so no Coulee correction is
+    // needed here.
+    public static byte[] InsertableFichier(string fichierName) => ReadValidFixture(fichierName);
 
     // Blanks a fixed-width Detail-block Champ in place by its Templates/P60.xml Position/Size; a blank
     // int Champ is zero-filled by Kape22Mapper.DefaultForNonNullable (D27), so this has the same effect

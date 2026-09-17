@@ -19,8 +19,8 @@ public static class SectionChargeChutageMapper
 
         return new L_D_SECTIONCHARGE_CHUTAGE
         {
-            ChutagePied = source.ChutagePied,
-            ChutageTete = source.ChutageTete,
+            ChutagePied = DecimalScale.Apply(source.ChutagePied, 2),
+            ChutageTete = DecimalScale.Apply(source.ChutageTete, 2),
             CodeOperation = source.CodeOpeChutage!,
             Destination = source.Destination,
             OF = source.OF,

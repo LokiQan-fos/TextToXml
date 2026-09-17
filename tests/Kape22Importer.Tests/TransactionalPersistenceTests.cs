@@ -178,7 +178,6 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
         Kape22ImportBundle bundle = MapMutatedBundle(d =>
         {
             SetChamp(d, "message", "Coulee", "065718");
-            ZeroOutOfScaleDimensions(d);
             SetChamp(d, "message", "Client", new string('A', 50));
         });
         Assert.True(bundle.Success, "over-long Client is only rejected by the database, not by the mapper.");
@@ -346,7 +345,6 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
         Kape22ImportBundle bundle = MapMutatedBundle(d =>
         {
             SetChamp(d, "message", "CodeConsignePits", "1");
-            ZeroOutOfScaleDimensions(d);
         });
         Assert.True(bundle.Success, "the cold happy-path fixture must still pass every FR-20 control.");
         string coulee = bundle.Kape22!.Coulee;

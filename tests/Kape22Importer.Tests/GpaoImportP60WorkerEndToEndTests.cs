@@ -20,13 +20,10 @@ namespace Kape22Importer.Tests;
 // SVN-tracked GpaoImportP60.json in the sibling checkout (restored by the script itself, even on
 // failure).
 //
-// Skipped as of Story 4.6, second-pass code review (deferred-work.md "Deferred from: story-4.6
-// implementation 2026-09-16"): the untouched P60_847_682_081/082 fixtures this script drops trip the
-// pre-existing Story 4.3/4.4 decimal-scale mapper defect once Kape22Persister stages every downstream
-// entity in one SaveChanges (AD-1) - true even with a reachable SQL Server instance, so the AR-12
-// fixture.Available skip alone would not have caught it. Left unpatched here (unlike the other
-// integration suites) because these fixtures are also relied on byte-for-byte by
-// Kape22ProductionDataParityTests. Unskip once the Story 4.3-bis mapper fix lands.
+// Story 4.3-bis: the decimal-scale mapper defect that used to trip the untouched P60_847_682_081/082
+// fixtures (deferred-work.md "Deferred from: story-4.6 implementation 2026-09-16") is fixed - every
+// mapper now scales its dimension/tolerance columns via DecimalScale.Apply, so this test runs unmutated
+// against the real fixtures like every other integration suite.
 [Collection(SqlServerIntegrationCollection.Name)]
 [Trait("Category", TestCategory.Integration)]
 public class GpaoImportP60WorkerEndToEndTests(SqlServerIntegrationFixture fixture)
@@ -41,12 +38,6 @@ public class GpaoImportP60WorkerEndToEndTests(SqlServerIntegrationFixture fixtur
     [SkippableFact]
     public void WorkerEndToEnd_ImportsArchivesAndMatchesProduction()
     {
-        Skip.If(
-            true,
-            "Blocked pending Story 4.3-bis (decimal-scale mapper fix, see deferred-work.md 'Deferred " +
-            "from: story-4.6 implementation 2026-09-16'): P60_847_682_081/082 trip the pre-existing " +
-            "Story 4.3/4.4 decimal-scale defect through the real Launcher regardless of SQL Server " +
-            "availability. Remove this skip once that fix lands.");
         Skip.IfNot(fixture.Available, fixture.SkipReason ?? "SQL Server test instance unavailable.");
         Skip.IfNot(
             Directory.Exists(MicroServicesRoot),

@@ -26,8 +26,8 @@ public class SectionChargeChutageMapperTests
         L_D_SECTIONCHARGE_CHUTAGE? entity = SectionChargeChutageMapper.Map(source);
 
         Assert.NotNull(entity);
-        Assert.Equal((decimal?)source.ChutagePied, entity!.ChutagePied);
-        Assert.Equal((decimal?)source.ChutageTete, entity.ChutageTete);
+        Assert.Equal(DecimalScale.Apply(source.ChutagePied, 2), entity!.ChutagePied);
+        Assert.Equal(DecimalScale.Apply(source.ChutageTete, 2), entity.ChutageTete);
         Assert.Equal(source.CodeOpeChutage, entity.CodeOperation);
         Assert.Equal(source.Destination, entity.Destination);
         Assert.Equal(source.OF, entity.OF);

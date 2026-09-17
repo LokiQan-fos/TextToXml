@@ -15,6 +15,10 @@ namespace Kape22Importer;
 // `?? 0` fallback on the int/decimal columns (DiametreProduit, Epaisseur, LongueurCD, NombreDemiProduit,
 // the six Tolerance*) is defensive only and provably unreachable today: Kape22Mapper.DefaultForNonNullable
 // already zero-fills every blank int Champ upstream (no NULL observed in 17710 production rows).
+//
+// Story 4.3-bis: DiametreProduit, Epaisseur, LongueurCD, PoidsDemiProduitUnitaire, PoidsPrevuDemiProduit
+// and the six Tolerance* columns are narrow DECIMAL columns in AscoLSI (Story 4.2-bis annex Scale) -
+// each is wrapped in DecimalScale.Apply with its literal annex scale instead of the raw widened int.
 public static class OrdreFabricationMapper
 {
     // timeProvider defaults to the system clock in production; tests inject a fixed one (AR-12) for the
@@ -34,25 +38,25 @@ public static class OrdreFabricationMapper
             Coulee = source.Coulee,
             DateMaj = importTimestamp,
             DateReception = importTimestamp,
-            DiametreProduit = source.DiametreProduit ?? 0,
-            Epaisseur = source.Epaisseur ?? 0,
+            DiametreProduit = DecimalScale.Apply(source.DiametreProduit ?? 0, 1),
+            Epaisseur = DecimalScale.Apply(source.Epaisseur ?? 0, 1),
             Indice = source.Indice,
-            LongueurCD = source.LongueurCD ?? 0,
+            LongueurCD = DecimalScale.Apply(source.LongueurCD ?? 0, 3),
             MarqueCommerciale = source.MarqueCommerciale ?? string.Empty,
             NombreDemiProduit = source.NombreDemiProduit ?? 0,
             Nuance = source.Nuance,
             NumeroFichier = source.NumeroFichier,
             NumeroMontage = source.NumeroMontage ?? string.Empty,
             OF = source.OF,
-            PoidsDemiProduitUnitaire = source.PoidsDemiProduitUnitaire,
-            PoidsPrevuDemiProduit = source.PoidsPrevuDemiProduit,
+            PoidsDemiProduitUnitaire = DecimalScale.Apply(source.PoidsDemiProduitUnitaire, 3),
+            PoidsPrevuDemiProduit = DecimalScale.Apply(source.PoidsPrevuDemiProduit, 3),
             ProfilProduit = source.ProfilProduit ?? string.Empty,
-            ToleranceMaxEpaisseur = source.ToleranceMaxEpaisseur ?? 0,
-            ToleranceMaxLongueur = source.ToleranceMaxLongueur ?? 0,
-            ToleranceMaxSection = source.ToleranceMaxSection ?? 0,
-            ToleranceMinEpaisseur = source.ToleranceMinEpaisseur ?? 0,
-            ToleranceMinLongueur = source.ToleranceMinLongueur ?? 0,
-            ToleranceMinSection = source.ToleranceMinSection ?? 0,
+            ToleranceMaxEpaisseur = DecimalScale.Apply(source.ToleranceMaxEpaisseur ?? 0, 1),
+            ToleranceMaxLongueur = DecimalScale.Apply(source.ToleranceMaxLongueur ?? 0, 0),
+            ToleranceMaxSection = DecimalScale.Apply(source.ToleranceMaxSection ?? 0, 1),
+            ToleranceMinEpaisseur = DecimalScale.Apply(source.ToleranceMinEpaisseur ?? 0, 1),
+            ToleranceMinLongueur = DecimalScale.Apply(source.ToleranceMinLongueur ?? 0, 0),
+            ToleranceMinSection = DecimalScale.Apply(source.ToleranceMinSection ?? 0, 1),
             Type = source.Type,
 
             // Etat, NombreLingotsWagon1Four1, NombreLingotsWagon1Four2, NombreLingotsWagon2Four1,

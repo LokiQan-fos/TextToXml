@@ -20,16 +20,16 @@ public static class SectionChargeLingotMapper
         return new L_D_SECTIONCHARGE_LINGOT
         {
             CodeOperation = source.CodeOpeLingot!,
-            EpaisseurEnLaminage = source.EpaisseurEnLaminage,
+            EpaisseurEnLaminage = DecimalScale.Apply(source.EpaisseurEnLaminage, 1),
             OF = source.OF,
             PriseDeFer = source.PriseDeFer,
             ProfileLamine = source.ProfileLamine,
             RangOperation = source.RangOpeLingot!,
-            SectionLaminage = source.SectionLaminage,
-            ToleranceMaxEpaisseur = source.ToleranceMaxEpaisseur1,
-            ToleranceMaxSection = source.ToleranceMaxSection1,
-            ToleranceMinEpaisseur = source.ToleranceMinEpaisseur1,
-            ToleranceMinSection = source.ToleranceMinSection1,
+            SectionLaminage = DecimalScale.Apply(source.SectionLaminage, 1),
+            ToleranceMaxEpaisseur = DecimalScale.Apply(source.ToleranceMaxEpaisseur1, 1),
+            ToleranceMaxSection = DecimalScale.Apply(source.ToleranceMaxSection1, 1),
+            ToleranceMinEpaisseur = DecimalScale.Apply(source.ToleranceMinEpaisseur1, 1),
+            ToleranceMinSection = DecimalScale.Apply(source.ToleranceMinSection1, 1),
 
             // PriseDeFerEpaisseur, PriseDeFerEpaisseurGPAO, PriseDeFerHauteur, PriseDeFerHauteurGPAO,
             // PriseDeFerSection, PriseDeFerSectionGPAO, Programme, ProgrammeGPAO: assumed, unverified -
