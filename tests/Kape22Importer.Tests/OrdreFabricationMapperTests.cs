@@ -27,27 +27,57 @@ public class OrdreFabricationMapperTests
         nameof(L_D_ORDRE_FABRICATION.Client),
         nameof(L_D_ORDRE_FABRICATION.CodeDemiProduit),
         nameof(L_D_ORDRE_FABRICATION.Coulee),
-        nameof(L_D_ORDRE_FABRICATION.DiametreProduit),
-        nameof(L_D_ORDRE_FABRICATION.Epaisseur),
         nameof(L_D_ORDRE_FABRICATION.Indice),
-        nameof(L_D_ORDRE_FABRICATION.LongueurCD),
         nameof(L_D_ORDRE_FABRICATION.MarqueCommerciale),
         nameof(L_D_ORDRE_FABRICATION.NombreDemiProduit),
         nameof(L_D_ORDRE_FABRICATION.Nuance),
         nameof(L_D_ORDRE_FABRICATION.NumeroFichier),
         nameof(L_D_ORDRE_FABRICATION.NumeroMontage),
         nameof(L_D_ORDRE_FABRICATION.OF),
-        nameof(L_D_ORDRE_FABRICATION.PoidsDemiProduitUnitaire),
-        nameof(L_D_ORDRE_FABRICATION.PoidsPrevuDemiProduit),
         nameof(L_D_ORDRE_FABRICATION.ProfilProduit),
-        nameof(L_D_ORDRE_FABRICATION.ToleranceMaxEpaisseur),
-        nameof(L_D_ORDRE_FABRICATION.ToleranceMaxLongueur),
-        nameof(L_D_ORDRE_FABRICATION.ToleranceMaxSection),
-        nameof(L_D_ORDRE_FABRICATION.ToleranceMinEpaisseur),
-        nameof(L_D_ORDRE_FABRICATION.ToleranceMinLongueur),
-        nameof(L_D_ORDRE_FABRICATION.ToleranceMinSection),
         nameof(L_D_ORDRE_FABRICATION.Type),
     ];
+
+    // Story 4.3-bis: the 11 columns whose annex Scale is not 1:1 - each mapper assignment is
+    // DecimalScale.Apply(rawValue, scale) instead of a raw widened int (deferred-work.md decimal-scale
+    // defect, Story 4.2-bis's Scale column). Non-nullable targets keep the mapper's own `?? 0` before
+    // scaling; PoidsDemiProduitUnitaire/PoidsPrevuDemiProduit are nullable, no `?? 0` - detected here via
+    // the target property's own type (Nullable.GetUnderlyingType) rather than a second hardcoded list, so
+    // there is exactly one place per column that says whether it is nullable: the entity itself.
+    public static TheoryData<string, int> ScaledColumns() =>
+        new()
+        {
+            { nameof(L_D_ORDRE_FABRICATION.DiametreProduit), 1 },
+            { nameof(L_D_ORDRE_FABRICATION.Epaisseur), 1 },
+            { nameof(L_D_ORDRE_FABRICATION.LongueurCD), 3 },
+            { nameof(L_D_ORDRE_FABRICATION.PoidsDemiProduitUnitaire), 3 },
+            { nameof(L_D_ORDRE_FABRICATION.PoidsPrevuDemiProduit), 3 },
+            { nameof(L_D_ORDRE_FABRICATION.ToleranceMaxEpaisseur), 1 },
+            { nameof(L_D_ORDRE_FABRICATION.ToleranceMaxLongueur), 0 },
+            { nameof(L_D_ORDRE_FABRICATION.ToleranceMaxSection), 1 },
+            { nameof(L_D_ORDRE_FABRICATION.ToleranceMinEpaisseur), 1 },
+            { nameof(L_D_ORDRE_FABRICATION.ToleranceMinLongueur), 0 },
+            { nameof(L_D_ORDRE_FABRICATION.ToleranceMinSection), 1 },
+        };
+
+    [Theory]
+    [MemberData(nameof(ScaledColumns))]
+    [Trait("AC", "FR18-1")]
+    public void Map_ScaledColumn_AppliesAnnexScale_AcFr18_1(string columnName, int scale)
+    {
+        L_D_KAPE22 source = ReferenceKape22();
+
+        L_D_ORDRE_FABRICATION entity = OrdreFabricationMapper.Map(source);
+
+        PropertyInfo targetProperty = typeof(L_D_ORDRE_FABRICATION).GetProperty(columnName)!;
+        int? rawValue = (int?)typeof(L_D_KAPE22).GetProperty(columnName)!.GetValue(source);
+        bool isNullableTarget = Nullable.GetUnderlyingType(targetProperty.PropertyType) is not null;
+        decimal? expected = isNullableTarget
+            ? DecimalScale.Apply(rawValue, scale)
+            : DecimalScale.Apply(rawValue ?? 0, scale);
+
+        Assert.Equal(expected, targetProperty.GetValue(entity) as decimal?);
+    }
 
     [Theory]
     [MemberData(nameof(SourcedColumns))]

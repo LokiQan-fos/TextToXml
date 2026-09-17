@@ -93,6 +93,61 @@
   fix lands. Must be fixed before Epic 4 goes to production — every real P60 Fichier whose applicable
   SectionCharge sections carry a value at or above each column's scale will fail to import until then.
 
+## Resolved by: story-4.3-bis implementation (2026-09-17)
+
+The "Deferred from: story-4.6 implementation (2026-09-16)" decimal-scale defect entry above, and the two
+"Deferred from: code review of story-4.6 (2026-09-16)" entries below referencing
+`ZeroOutOfScaleDimensions(XDocument)`/`OutOfScaleDimensionFields` (the hand-maintained-twice risk and the
+missing null-check), are resolved: Story 4.3-bis wraps the 21 affected columns across the 5 mappers in
+`DecimalScale.Apply` and deletes `ZeroOutOfScaleDimensions`/`OutOfScaleDimensionFields` entirely (no code
+left to carry either risk). `sprint-status.yaml`'s `story-4-6-decimal-scale-defect-story-4-3-bis` action
+item is marked `done` accordingly.
+
+## Deferred from: code review of story-4.3-bis (2026-09-17)
+
+- source_spec: `spec-4-3-bis-correctif-mise-a-l-echelle-decimale.md` / `src/Kape22Importer/DecimalScale.cs`
+  summary: the 21 per-column scale literals are hand-maintained independently in three places (each
+  mapper's call site, its test file, and the `annexe-mapping-dispatch-epic4.md` annex row) with nothing
+  cross-checking them against each other — a wrong digit copy-pasted consistently into a mapper and its
+  test would pass silently, since `MappingAnnexCompletenessTests` only checks the annex documents *a*
+  `Scale`, not that shipped mapper code matches it.
+  evidence: Raised by the Blind Hunter layer at Story 4.3-bis's code review. Verified all 21 literals in
+  this diff match the annex exactly, so not a live bug today; building a mapper-source-vs-annex
+  consistency check is a reasonable Story 4.9 hardening candidate (it already plans "downstream-table
+  Unit assertions"), not something this bugfix story's spec asked for.
+
+- source_spec: `src/Kape22Importer/DecimalScale.cs`
+  summary: nothing prevents a future 6th mapper from assigning a raw KAPE22 `int`/`int?` directly to a
+  narrow `decimal` EF column without going through `DecimalScale.Apply` — no analyzer or reflection-based
+  completeness test guards against a regression of the exact defect this story fixes.
+  evidence: Raised by the Blind Hunter layer at Story 4.3-bis's code review. Candidate for Story 4.9's
+  planned "downstream-table Unit assertions" hardening item rather than this story's own scope.
+
+- source_spec: `tests/Kape22Importer.Tests/Kape22ProductionDataParityTests.cs` /
+  `tests/Kape22Importer.Tests/GpaoImportP60WorkerEndToEndTests.cs`
+  summary: `Kape22ProductionDataParityTests.MappedFichier_MatchesLegacyProductionRow` only round-trips
+  `L_D_KAPE22` (`typeof(L_D_KAPE22).GetProperties()`); it never maps/inserts/reads back
+  `L_D_ORDRE_FABRICATION` or the `L_D_SECTIONCHARGE_*` entities, so no test in the verification chain
+  (unit, `PersistenceSmokeTests`, `TransactionalPersistenceTests`, or the `GpaoImportP60WorkerEndToEndTests`
+  → parity-test E2E path) actually compares a persisted, `DecimalScale`-scaled downstream column against a
+  known-correct real production value. Today's 21 scale literals all match the annex, so this is not a
+  live bug, but the E2E test proves "no SQL overflow," not "matches production" for these columns.
+  evidence: Raised by the Verification Gap Reviewer layer at Story 4.3-bis's code review, via direct
+  reading of `Kape22ProductionDataParityTests.cs:100-162` and `L_D_KAPE22.cs:62-186`. Extending production
+  parity to the downstream decimal-scale tables is pre-existing scope (set by the Epic 2/3 test design,
+  not touched by this diff) and a natural fit for Story 4.9 or a later hardening pass.
+
+- source_spec: `scripts/e2e-worker-import.ps1` (closing `Kape22ProductionDataParityTests` block)
+  summary: the script's final `dotnet test ... Kape22ProductionDataParityTests ...` invocation never
+  checks `$LASTEXITCODE`, unlike the earlier `dotnet build $launcherProject` step in the same script
+  (which does, with an explicit `throw`). A failing production-parity comparison would not fail the
+  wrapping process, so `GpaoImportP60WorkerEndToEndTests` (which only asserts `process.ExitCode == 0`)
+  could not detect it.
+  evidence: Raised by the Verification Gap Reviewer layer at Story 4.3-bis's code review; confirmed
+  empirically that a non-zero-exit native command under `$ErrorActionPreference = 'Stop'` does not
+  terminate the pwsh script by default. Script is unchanged by this diff (pre-existing gap), out of this
+  bugfix story's scope.
+
 ## Deferred from: code review of story-4.6 (2026-09-16)
 
 - source_spec: `src/Kape22Importer/Persistence/Kape22Persister.cs` (`PersistMapped`'s

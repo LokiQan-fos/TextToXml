@@ -9,7 +9,14 @@ internal static class DecimalScale
 {
     private static readonly decimal[] Pow10 = [1m, 10m, 100m, 1000m];
 
-    public static decimal Apply(int rawValue, int scale) => rawValue / Pow10[scale];
+    public static decimal Apply(int rawValue, int scale) => rawValue / Pow10ForScale(scale);
+
+    // Every call site today passes a literal 0-3 (Story 4.2-bis's annex Scale column caps out at 3), so
+    // this is unreachable in practice - but a future out-of-range scale should fail with a descriptive
+    // message naming the offending value, not a bare, unlabeled IndexOutOfRangeException.
+    private static decimal Pow10ForScale(int scale) => scale is >= 0 && scale < Pow10.Length
+        ? Pow10[scale]
+        : throw new ArgumentOutOfRangeException(nameof(scale), scale, $"Scale must be between 0 and {Pow10.Length - 1}.");
 
     public static decimal? Apply(int? rawValue, int scale) => rawValue is int value ? Apply(value, scale) : null;
 }
