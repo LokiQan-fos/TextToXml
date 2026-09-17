@@ -915,3 +915,9 @@ s'y trouver et rester à confirmer.
 - source_spec: `spec-4-5-import-bundle-mapper-orchestrator.md`
   summary: `Kape22ImportBundleMapper.AddHotCouleeFormatViolation` classifies "hot" strictly as `kape22.CodeConsignePits != "1"`, with no defined behavior for a null or whitespace-padded `CodeConsignePits` (the property is nullable on `L_D_KAPE22`) — such a value is silently bucketed as "hot" identically to an explicit non-`'1'` code, and neither `epics.md`'s FR-20 AC text nor the annex's legacy formula (`CodeConsigne != "1"`, `annexe-mapping-dispatch-epic4.md:106`) addresses this case.
   evidence: Found at Story 4.5 code review (edge-case-hunter + blind-hunter, independently). Not reproducible against the reference `P60/` fixture (its `CodeConsignePits` is always the real 12-char consigne code, never blank). Revisit if a null/blank `CodeConsignePits` is observed in a real Fichier, or before Story 4.6 relies on this control's output for the cold-Coulée DB check.
+
+## Deferred from: story-4.2-bis code review (2026-09-17)
+
+- source_spec: `spec-4-2-bis-extension-annexe-mapping-scale-precision.md`
+  summary: `MappingAnnexCompleteness.IsInt` only recognizes `int`/`int?` as the KAPE22 source type that triggers the decimal-without-Scale rule. A future KAPE22 field typed `short`, `byte`, or `long` feeding a narrow `decimal` column would carry the same precision-loss risk but would not be caught by the guard this story adds.
+  evidence: Found at Story 4.2-bis code review (blind-hunter). No live `L_D_KAPE22` field is currently typed `short`/`byte`/`long` (confirmed by reflection over `L_D_KAPE22.cs` — every numeric field is `int?` or `decimal?`), so this is speculative hardening rather than a live defect. Revisit only if such a field is ever added to `L_D_KAPE22`.
