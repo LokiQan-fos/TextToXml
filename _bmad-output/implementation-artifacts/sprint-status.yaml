@@ -67,7 +67,7 @@ development_status:
   3-6-validation-de-bout-en-bout-harnais-de-couverture-sm-1-2-3: done
   epic-3-retrospective: done
 
-  epic-4: done
+  epic-4: in-progress
   4-1-entités-ef-database-first-extension-du-harnais-sql-pour-les: done
   4-2-extraction-documentation-du-mapping-legacy-annexe-colonne-pa: done
   4-3-mapper-of-coulée-mapping-structurel-pur: done
@@ -76,6 +76,9 @@ development_status:
   4-6-kape22persister-remplacé-bundle-transaction-unique-contrôle: done
   4-7-extension-de-la-suite-e2e-aux-10-tables-aval: done
   epic-4-retrospective: done
+  4-2-bis-extension-annexe-mapping-scale-precision: backlog
+  4-3-bis-correctif-mise-a-l-echelle-decimale: backlog
+  4-9-hardening-epic-4: backlog
 action_items:
   - id: "story-4-6-decimal-scale-defect-story-4-3-bis"
     epic: 4
@@ -90,7 +93,7 @@ action_items:
       hors echelle."
     owner: "Dev"
     status: open
-    ref: "_bmad-output/implementation-artifacts/deferred-work.md#deferred-from-story-46-implementation-2026-09-16"
+    ref: "_bmad-output/implementation-artifacts/deferred-work.md#deferred-from-story-46-implementation-2026-09-16 -> story 4-3-bis-correctif-mise-a-l-echelle-decimale"
   - id: "epic-1-retro-item-1-passe-hygiene-story-0-epic-2-testsupport"
     epic: 1
     action: "Passe hygiene story-0 Epic 2: TestSupport partage (Windows1252 corrige
@@ -286,7 +289,7 @@ action_items:
       recurring independently across 5 mappers."
     owner: "Lead Architecte / PM"
     status: open
-    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-17.md"
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-17.md -> story 4-2-bis-extension-annexe-mapping-scale-precision"
   - id: "epic-4-retro-item-2-unit-tests-assert-downstream-tables"
     epic: 4
     action: "Extend Kape22FichierProcessorTests success cases (Import_CleanFichier_RunsThroughToTheInsert_AcFr13_1,
@@ -296,7 +299,7 @@ action_items:
       Kape22Persister.PersistMapped."
     owner: "Dev"
     status: open
-    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-17.md"
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-17.md -> story 4-9-hardening-epic-4"
   - id: "epic-4-retro-item-3-trim-of-coulee-at-source"
     epic: 4
     action: "Trim entity.OF and entity.Coulee once inside Kape22Mapper.Map (the reflective
@@ -305,7 +308,7 @@ action_items:
       live by Epic 4 fanning these fields into 9 more tables scalar key columns (AD-7)."
     owner: "Dev"
     status: open
-    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-17.md"
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-17.md -> story 4-9-hardening-epic-4"
   - id: "epic-4-retro-item-4-shared-cold-coulee-constant"
     epic: 4
     action: "Extract the hot/cold Coulee marker (CodeConsignePits == \"1\") into one
@@ -313,7 +316,7 @@ action_items:
       hard-coding their own copy."
     owner: "Dev"
     status: open
-    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-17.md"
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-17.md -> story 4-9-hardening-epic-4"
   - id: "epic-4-retro-item-5-widen-persister-exception-filter"
     epic: 4
     action: "Widen Kape22Persister catch (DbUpdateException or DbException) to also
@@ -324,4 +327,4 @@ action_items:
       gap in AD-4 found this epic."
     owner: "Dev"
     status: open
-    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-17.md"
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-17.md -> story 4-9-hardening-epic-4"

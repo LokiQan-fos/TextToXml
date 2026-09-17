@@ -2009,3 +2009,193 @@ extension de la suite E2E (Story 3.6) — fixtures fautives dédiées créées p
 cette story (Annexe A.4).
 
 **Critères transverses :** CC-1, CC-2, CC-3, CC-4, CC-5, CC-7.
+
+---
+
+## Corrections post-rétrospective Épic 4
+
+> Issues de la rétrospective Épic 4 (`epic-4-retro-2026-09-17.md`, verdict
+> accepted-with-open-items) et du Sprint Change Proposal
+> `_bmad-output/planning-artifacts/sprint-change-proposal-2026-09-17.md`
+> (approuvé). Périmètre FR-17..FR-21 inchangé — ce sont des corrections de
+> conformité aux `AC-FRx-y` déjà déclarés, pas de nouveaux FR. **Séquencement
+> imposé, série stricte, pas de parallélisation :** 4.2-bis → 4.3-bis → 4.9.
+
+### Story 4.2-bis : Extension de l'annexe de mapping (champ `scale`)
+
+As a développeur de `Kape22Importer`,
+I want que l'annexe `_bmad-output/implementation-artifacts/annexe-mapping-dispatch-epic4.md`
+enregistre, pour toute colonne cible `decimal` sourcée d'un champ KAPE22
+`int`/`int?`, son échelle sous un champ nommé `scale` (valeur = entier, nombre
+de décimales à appliquer, ex. `1` pour `DECIMAL(2,1)`) — et qu'un test de
+complétude échoue si ce champ manque, que la colonne soit déjà connue du défaut
+ou nouvellement découverte,
+So that aucun mapper, présent ou futur, ne puisse reproduire le défaut de mise
+à l'échelle découvert indépendamment dans 5 mappers
+(`story-4-6-decimal-scale-defect-story-4-3-bis`).
+
+**Acceptance Criteria:**
+
+**Given** une colonne `sourcée` de type cible `decimal` dont la source KAPE22
+  est `int`/`int?`
+**When** l'annexe est étendue
+**Then** elle porte un champ `scale` (entier, nombre de décimales à appliquer)
+  explicite pour cette colonne — format figé : nom de champ `scale`, valeur
+  entière, pas d'unité ni de facteur multiplicatif texte libre (AC-FR17-1 étendu)
+
+**Given** le modèle EF des 10 tables aval (Story 4.1) et l'annexe étendue
+**When** `MappingAnnexCompletenessTests` (famille `AC-FR17-5`) s'exécute
+**Then** il échoue si une colonne de type CLR `decimal` sourcée d'un `int`/`int?`
+  KAPE22 n'a pas de champ `scale` renseigné dans l'annexe — sans distinction
+  entre une colonne déjà identifiée par la rétro (les 5 mappers connus) et une
+  colonne nouvellement détectée par le test lui-même (fusion des deux AC
+  précédemment distinctes en une seule assertion de complétude)
+**And** une colonne `decimal` dont la source n'est pas `int`/`int?` (ex. déjà
+  `decimal` côté KAPE22) n'est pas soumise à cette règle
+
+**Given** l'annexe étendue
+**When** elle sert de référence à la Story 4.3-bis
+**Then** elle couvre explicitement, avec leur `scale`, les 12 colonnes déjà
+  connues (`OrdreFabricationMapper` : `DiametreProduit`, 6×`Tolerance*`,
+  `LongueurCD`, `PoidsDemiProduitUnitaire`, `PoidsPrevuDemiProduit` ;
+  `SectionChargeLingotMapper` : `SectionLaminage`, `EpaisseurEnLaminage`,
+  4×`Tolerance*1` ; `SectionChargeChutageMapper` : `ChutageTete`,
+  `ChutagePied` ; `SectionChargeDecoupeMapper` : `LongueurMoyenne` ;
+  `SectionChargePitsMapper` : `H2Coulee`)
+**And** elle note explicitement, par une ligne dédiée par table, que
+  `L_D_SECTIONCHARGE_REFROIDISSOIRS`, `L_D_SECTIONCHARGE_POIDSMETRIQUE` et
+  `L_D_SECTIONCHARGE_SVT` ne portent **aucune** colonne `decimal` (vérifié par
+  lecture directe des 3 entités EF) — hors périmètre de 4.3-bis, pas un trou
+  de l'annexe
+
+**Tests xUnit (TDD — écrits en premier, CC-1) :** extension de
+`MappingAnnexCompletenessTests.cs` (`Category=Unit`, même famille
+qu'`AC-FR17-5`, exempté du rouge→vert propre comme test-barrière-à-la-compilation) :
+un cas colonne `decimal←int` avec `scale` présent (succès), un cas sans
+`scale` (échec), un cas colonne `decimal` non sourcée d'un `int` (pas de
+règle, succès).
+
+**Critères transverses :** CC-1 (test de complétude), CC-2, CC-5.
+*(CC-3/CC-4/CC-6/CC-7 sans objet : pas de code de production.)*
+
+---
+
+### Story 4.3-bis : Correctif de mise à l'échelle décimale (5 mappers)
+
+As a `Kape22Importer`,
+I want que `OrdreFabricationMapper`, `SectionChargeLingotMapper`,
+`SectionChargeChutageMapper`, `SectionChargeDecoupeMapper` et
+`SectionChargePitsMapper` appliquent la mise à l'échelle documentée par le
+champ `scale` de l'annexe étendue (Story 4.2-bis) au lieu d'écrire l'entier
+KAPE22 brut,
+So that tout Fichier P60 réel dont les sections `SectionCharge` applicables
+portent une valeur dans l'échelle attendue s'insère sans dépassement SQL.
+
+**Prérequis :** Story 4.2-bis livrée — l'annexe étendue et son test de
+complétude sont la référence unique du facteur d'échelle par colonne.
+
+**Acceptance Criteria:**
+
+**Given** l'annexe étendue (Story 4.2-bis) portant le `scale` par colonne
+**When** chacun des 5 mappers ci-dessus est corrigé
+**Then** la valeur écrite dans la colonne `DECIMAL` cible respecte l'échelle
+  documentée (ex. `DECIMAL(2,1)` max 9.9 ne déborde plus pour un entier KAPE22
+  dans la plage réelle observée sur les fixtures `P60/`)
+
+**Given** `SectionChargeRefroidissoirsMapper`, `SectionChargePoidsMetriqueMapper`
+  et `SectionChargeSvtMapper`
+**When** le périmètre de cette story est vérifié
+**Then** ils sont explicitement **hors périmètre** — confirmé par 4.2-bis
+  (aucune colonne `decimal` dans leurs 3 tables cibles) — pas de mise à
+  l'échelle à coder
+
+**Given** les suites d'intégration qui contournaient le défaut
+  (`Kape22FichierProcessorIntegrationTests`, `DoubleJournalIntegrationTests`,
+  `EndToEndImportIntegrationTests`, `WorkerLoopRobustnessIntegrationTests` —
+  toutes patchées Story 4.6 via `TestSupport.ZeroOutOfScaleDimensions`/`InsertableFichier`)
+**When** le correctif est en place
+**Then** le contournement `TestSupport` est **retiré**, ces suites repassent
+  sur les fixtures réelles `P60/` non mutées, et restent vertes
+
+**Given** `GpaoImportP60WorkerEndToEndTests` (actuellement skip documenté,
+  fixtures partagées byte-for-byte avec `Kape22ProductionDataParityTests`)
+**When** le correctif est en place
+**Then** ce test cesse d'être skip et passe vert sur les fixtures réelles
+  `P60_847_682_081/082`
+
+**Tests xUnit (TDD — écrits en premier, CC-1) :** un test par colonne mise à
+l'échelle (fixtures `P60/` existantes, valeur brute connue → valeur decimal
+attendue), + les 4 suites d'intégration ci-dessus repassées sans
+contournement, + `GpaoImportP60WorkerEndToEndTests`.
+
+**Critères transverses :** CC-1, CC-2, CC-3, CC-4, CC-5.
+
+---
+
+### Story 4.9 : Hardening Épic 4 (A-2, A-3, A-4, A-5)
+
+As a `Kape22Importer`,
+I want fermer les 4 gaps de robustesse identifiés par la rétro Épic 4 sur le
+chemin `FichierProcessor → BundleMapper → Persister`,
+So that l'épic ne laisse aucune régression silencieuse ni cause d'échec non
+journalisée derrière lui.
+
+**Prérequis :** Story 4.3-bis livrée (séquence linéaire imposée — pas de
+parallélisation avec A-3, qui modifie la source des valeurs que 4.3-bis teste).
+
+**Acceptance Criteria:**
+
+**Given** `Import_CleanFichier_RunsThroughToTheInsert_AcFr13_1` et
+  `Import_Success_ResultShape_AcFr13_5` (`Category=Unit`, in-memory
+  `AscoLsiDbContext`)
+**When** un import réussit
+**Then** les 10 `DbSet` aval sont assertés en plus de
+  `Kape22Rows`/`LogCommandeRows` : `OrdreFabricationRows`, `CouleeRows`,
+  `ConsignesRows`, `SectionChargeChutageRows`, `SectionChargeDecoupeRows`,
+  `SectionChargeLingotRows`, `SectionChargePitsRows`,
+  `SectionChargePoidsMetriqueRows`, `SectionChargeRefroidissoirsRows`,
+  `SectionChargeSvtRows` (liste exhaustive, `AscoLsiDbContext.cs`) (A-2)
+
+**Given** `Kape22Mapper.Map` et sa boucle réflective par Champ
+**When** elle copie `OF` et `Coulee` sur `entity`
+**Then** `entity.OF` et `entity.Coulee` sont trim **une seule fois, à la
+  source**, dans cette boucle (ou immédiatement après) — chaque consommateur
+  aval (9 mappers + `Kape22Persister`) cesse de trim/ne-pas-trim à son propre
+  site de lecture ; `CouleeMapper.IdCoulee` n'a plus besoin de sa propre garde,
+  le risque de désynchronisation avec `Kape22Persister.couleeAlreadyExists`
+  disparaît structurellement (A-3)
+
+**Given** `Kape22Persister.cs` qui possède déjà `private const string
+  ColdConsignePits = "1";` et `Kape22ImportBundleMapper.cs` qui porte le
+  littéral inline `"1"` pour la même règle métier
+**When** le marqueur hot/cold Coulee est consulté par les deux collaborateurs
+**Then** `ColdConsignePits` est **extrait vers une source partagée** que les
+  deux référencent (ex. `Kape22ImportBundle` ou un petit type déjà référencé
+  par les deux) — il ne s'agit pas de créer une nouvelle constante, mais de
+  faire cesser la duplication de celle qui existe déjà côté `Kape22Persister`
+  (A-4)
+
+**Given** le risque déjà documenté (`ConsignesMapper.cs`) qu'une collision sur
+  la clé naturelle `(OF, CodeOperation, TypeConsigne, ConsigneGPAO)` de
+  `L_D_CONSIGNES` survienne au sein d'un même bundle
+**When** `Kape22Persister.PersistMapped` prépare
+  `context.ConsignesRows.AddRange(bundle.Consignes)`
+**Then** une **pré-vérification de la clé naturelle** s'exécute avant
+  l'`AddRange` : toute collision détectée produit un `ConversionError` + une
+  ligne `L_D_LOG_COMMANDE` REJETÉ via le circuit AD-4 existant, **sans jamais
+  appeler** `AddRange` sur les entrées en collision
+**And** le filtre `catch (... when (exception is DbUpdateException or
+  DbException))` de `Kape22Persister` **n'est pas élargi** — élargir le filtre
+  à `InvalidOperationException` risquerait d'avaler des
+  `InvalidOperationException` sans rapport avec cette collision (violation de
+  la frontière `UnexpectedFailure` du contrat `ErrorCode`, Story 3.5) ; la
+  pré-vérification est la seule implémentation retenue (A-5)
+
+**Tests xUnit (TDD — écrits en premier, CC-1) :** un test par AC (A-2 :
+assertions étendues des 2 tests existants ; A-3 : `Kape22MapperTests` sur un
+Champ `OF`/`Coulee` paddé ; A-4 : test de non-régression que les deux
+collaborateurs lisent la même source ; A-5 : un test d'intégration simulant
+une collision `CodeOperation` → `ConversionError` + ligne REJETÉ, zéro
+exception non catchée).
+
+**Critères transverses :** CC-1, CC-2, CC-3, CC-4, CC-5.
