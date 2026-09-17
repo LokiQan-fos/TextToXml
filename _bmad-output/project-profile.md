@@ -120,3 +120,16 @@ Format d'entrée (un bloc par item déféré) :
 - `source_spec:` document(s) source (epics.md § Story, annexe de mapping, etc.)
 - `summary:` description factuelle du point différé
 - `evidence:` comment il a été constaté (revue de code, lecture legacy, etc.) et pourquoi il n'est pas bloquant
+
+
+## Discipline de routage bmad-build
+
+Toutes les stories de ce projet passent par la route `plan-code-review`.
+La route `one-shot` est interdite — la discipline spec-first (spec figé au
+step-02, validé par checkpoint humain, avant toute implémentation) est
+non négociable.
+
+Motivation : la conformité aux critères transverses (CC-1 TDD strict,
+CC-4 tri alphabétique, CC-5 vocabulaire du glossaire) et aux invariants
+d'architecture (AD-1 à AD-7, listés ci-dessus) ne peut être garantie sans
+spec figé préalable.
