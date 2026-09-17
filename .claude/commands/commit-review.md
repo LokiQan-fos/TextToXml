@@ -1,4 +1,4 @@
----
+﻿---
 description: Commit de clôture post-review — applique patches, defers, sprint-status, puis commit
 ---
 
