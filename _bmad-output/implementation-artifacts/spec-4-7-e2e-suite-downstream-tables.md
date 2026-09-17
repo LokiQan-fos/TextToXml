@@ -71,6 +71,8 @@ baseline_commit: 'a7fb70de27eedeca3b244d4f2ecd014f12b9c508'
 
 The decimal-scale defect (5 mappers writing un-rescaled ints into narrow `DECIMAL` columns, deferred to Story 4.3-bis, still open) means the real, untouched reference files overflow a full 10-table transaction (confirmed 0/10 at Story 4.6). Per human decision (2026-09-16, this story's planning), Story 4.7 reuses the same `ZeroOutOfScaleDimensions`-backed helpers Story 4.6 already applied to every other Epic 4 integration suite, rather than blocking on Story 4.3-bis. AC-FR21-4 is proven for structural/cross-table coherence, not for real out-of-scale dimension values — that gap stays tracked under the existing Story 4.3-bis deferred-work entry; no new entry needed.
 
+**Downstream-table count correction (2026-09-17, code review):** the frozen Intent paragraph above says "the 9 downstream tables" while the frozen Approach/I-O-Matrix and everywhere else in this spec, the Code Map, and the shipped code say "10 tables" / "all 10 tables (L_D_KAPE22 + 9 downstream)". The real count, confirmed against `AscoLsiDbContext.cs` (12 `DbSet`s minus `Kape22Rows`/`LogCommandeRows`) and `epics.md:1630` ("les 10 nouvelles entités"), is 10 downstream tables (11 total including `L_D_KAPE22`). The "9" is a pre-existing off-by-one inherited from AD-1's wording in `project-profile.md` ("L_D_KAPE22 + les 9 tables aval", itself enumerating 10 tables), predating this story. The shipped tests correctly assert on 10 downstream / 11 total (see `RejectionAtomicityIntegrationTests.AssertAllElevenTablesEmpty`); only this spec's frozen prose carried the stale "9" forward. No code change; documented here so the frozen block's internal inconsistency isn't silently re-litigated. The AD-1 wording fix itself is tracked separately in `deferred-work.md` (pre-existing, out of this test-only story's scope).
+
 **AC-FR21-5 channel substitution (2026-09-17, code review):** epics.md's literal AC-FR21-5 text names `L_D_LOG_COMMANDE` + `*.errors.json` as the readable-cause channels. This spec's I/O matrix instead used `L_D_LOG_COMMANDE` + `MQTTnetServices.Logs` (the Story 3.3 double-journal pattern), and the implementation follows that: the 3 rejection tests call `Kape22FichierProcessor.Import` directly (same shortcut `DoubleJournalIntegrationTests` already takes), never through `InboxScanner`, so no `*.errors.json` sidecar is produced or asserted. Per human decision, this substitution is accepted as-is: `*.errors.json`'s shape is already proven at Unit level by the pre-existing SM-3 (`ErrorsReportReadabilityTests`), and the DB-backed double-journal assertion is at least as strong a real-pipeline proof of "readable cause" for this story's purpose. No code change; documented here so the deviation from the literal epics.md wording isn't silently re-litigated.
 
 ## Verification
@@ -123,4 +125,12 @@ The decimal-scale defect (5 mappers writing un-rescaled ints into narrow `DECIMA
 
 - Story marked `in-progress` → `review` in the sprint tracker.
   [`sprint-status.yaml`](sprint-status.yaml)
+
+### Review Findings
+
+- [x] [Review][Patch] Les 3 noms de test de rejet sous-comptent les tables vérifiées ("AllTenTables" vs `AssertAllElevenTablesEmpty`) [tests/Kape22Importer.Tests/RejectionAtomicityIntegrationTests.cs:73]
+- [x] [Review][Patch] Le bloc frozen contient une incohérence interne sur le nombre de tables avales (9 vs 10), sans note de renégociation datée [_bmad-output/implementation-artifacts/spec-4-7-e2e-suite-downstream-tables.md:15]
+- [x] [Review][Defer] Coquille préexistante « 9 tables aval » dans AD-1 (project-profile.md / epics.md) [_bmad-output/project-profile.md] — deferred, pre-existing
+- [x] [Review][Defer] Les tests de rejet contournent InboxScanner ; aucune preuve de déplacement vers error/ [tests/Kape22Importer.Tests/RejectionAtomicityIntegrationTests.cs] — deferred, pre-existing (raccourci déjà accepté par décision humaine)
+- [x] [Review][Defer] Les assertions sur les 9 tables avales (SM-2) ne vérifient que la présence/le compte par OF, pas les valeurs de champs [tests/Kape22Importer.Tests/EndToEndImportIntegrationTests.cs:130] — deferred, pre-existing (patron imposé par la spec elle-même)
 

@@ -24,6 +24,34 @@
   lingots/fours incohérente, échec SQL simulé) — already satisfied. Extending to every `ErrorCode` is a
   reasonable hardening step, not a gap in this story's own scope.
 
+- source_spec: `_bmad-output/project-profile.md` (AD-1) / `_bmad-output/planning-artifacts/epics.md:189-190`
+  summary: AD-1's wording says "L_D_KAPE22, L_D_LOG_COMMANDE et les 9 tables aval" while enumerating 10
+  tables (`L_D_ORDRE_FABRICATION`, `L_D_COULEE`, `L_D_CONSIGNES`, 7×`L_D_SECTIONCHARGE_*`) — a pre-existing
+  off-by-one in the architecture documentation, inherited from Story 4.1/4.6, outside this test-only
+  story's scope.
+  evidence: Raised by the /run-review aggregated review of Story 4.7 (Acceptance Auditor + Blind Hunter
+  layers). Confirmed against `AscoLsiDbContext.cs` (12 `DbSet`s minus `Kape22Rows`/`LogCommandeRows` = 10
+  downstream) and `epics.md:1630` ("les 10 nouvelles entités"). The code is correct; only the AD-1/epics.md
+  prose needs a wording fix, in a future documentation pass.
+
+- source_spec: `tests/Kape22Importer.Tests/RejectionAtomicityIntegrationTests.cs`
+  summary: the three rejection tests call `Kape22FichierProcessor.Import` directly rather than through
+  `InboxScanner.RunTick()`, so none of them proves the rejected Fichier is moved to `error/` with its
+  sidecar, or that `inbox`/`processing` end up empty on the rejection path (unlike SM-2 on the success
+  path).
+  evidence: Raised by the /run-review aggregated review of Story 4.7 (Blind Hunter layer). Same accepted
+  shortcut already documented in this spec's Design Notes (2026-09-17, AC-FR21-5 channel substitution); a
+  full folder-lifecycle proof on the rejection path would need a new dedicated test, out of this
+  test-only, no-new-plumbing story's scope. Not blocking.
+
+- source_spec: `tests/Kape22Importer.Tests/EndToEndImportIntegrationTests.cs:130-160`
+  summary: the per-file assertions on the 9 downstream tables only check row presence/count matched by OF,
+  never the tables' own column values, unlike `L_D_KAPE22` where Client/Coulee/Nuance are compared.
+  evidence: Raised by the /run-review aggregated review of Story 4.7 (Blind Hunter layer). This exactly
+  mirrors the pre-existing "count matches bundle.X is null ? 0 : 1" pattern the spec explicitly instructs
+  reusing from `TransactionalPersistenceTests.cs:390-394` — not a regression introduced by this story;
+  deepening it would mean inventing new plumbing the spec's own boundaries forbid.
+
 ## Deferred from: story-4.6 implementation (2026-09-16)
 
 - source_spec: `spec-4-6-persister-bundle-single-transaction.md` / `epics.md` § Story 4.3 / § Story

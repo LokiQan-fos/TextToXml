@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 16:00
-last_updated: 09-17-2026 10:00
+last_updated: 09-17-2026 11:00
 project: TextToXml
 project_key: NOKEY
 tracking_system: file-system
@@ -74,7 +74,7 @@ development_status:
   4-4-mapper-consignes-les-7-sectioncharge-mapping-structurel-pur: done
   4-5-kape22importbundlemapper-orchestrateur-contrôles-métier-purs: done
   4-6-kape22persister-remplacé-bundle-transaction-unique-contrôle: done
-  4-7-extension-de-la-suite-e2e-aux-10-tables-aval: review
+  4-7-extension-de-la-suite-e2e-aux-10-tables-aval: done
   epic-4-retrospective: optional
 action_items:
   - id: "story-4-6-decimal-scale-defect-story-4-3-bis"

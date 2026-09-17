@@ -70,7 +70,7 @@ public class RejectionAtomicityIntegrationTests(SqlServerIntegrationFixture fixt
     // L_D_LOG_COMMANDE row citing the missing Coulee, and an Error line in MQTTnetServices.Logs.
     [SkippableFact]
     [Trait("AC", "FR21-5")]
-    public void Import_ColdCouleeMissing_LeavesAllTenTablesEmptyWithReadableCause_AcFr21_5()
+    public void Import_ColdCouleeMissing_LeavesAllElevenTablesEmptyWithReadableCause_AcFr21_5()
     {
         Ready();
         byte[] content = WithDetailChamp(
@@ -97,7 +97,7 @@ public class RejectionAtomicityIntegrationTests(SqlServerIntegrationFixture fixt
     // mismatch, and an Error line in MQTTnetServices.Logs.
     [SkippableFact]
     [Trait("AC", "FR21-5")]
-    public void Import_InconsistentIngotFurnaceDistribution_LeavesAllTenTablesEmptyWithReadableCause_AcFr21_5()
+    public void Import_InconsistentIngotFurnaceDistribution_LeavesAllElevenTablesEmptyWithReadableCause_AcFr21_5()
     {
         Ready();
         byte[] content = WithDetailChamp(
@@ -126,7 +126,7 @@ public class RejectionAtomicityIntegrationTests(SqlServerIntegrationFixture fixt
     // TransactionalPersistenceTests.Persist_BundleSuccess_LogRowInsertFails_RollsBackKape22Row_AcFr11_3).
     [SkippableFact]
     [Trait("AC", "FR21-5")]
-    public void Import_SimulatedSqlFailure_LeavesAllTenTablesAndLogCommandeEmptyWithReadableCause_AcFr21_5()
+    public void Import_SimulatedSqlFailure_LeavesAllElevenTablesAndLogCommandeEmptyWithReadableCause_AcFr21_5()
     {
         Ready();
         byte[] content = InsertableReferenceFichier();
