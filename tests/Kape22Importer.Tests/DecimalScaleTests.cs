@@ -41,6 +41,14 @@ public class DecimalScaleTests
         Assert.Equal(0m, DecimalScale.Apply(0, 1));
     }
 
+    [Fact]
+    [Trait("AC", "FR18-1")]
+    public void Apply_ScaleOutOfRange_ThrowsArgumentOutOfRangeException()
+    {
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => DecimalScale.Apply(18, 4));
+        Assert.Equal("scale", exception.ParamName);
+    }
+
     // Scale 2 (ChutageTete/ChutagePied's annex scale). Both are 0 on the reference fixture (P60_847_682_001),
     // so this sources its known raw value from P60_847_682_002 instead, the way
     // Kape22ProductionDataParityTests maps a named P60/ fixture directly.
@@ -72,6 +80,8 @@ public class DecimalScaleTests
     {
         ConversionResult conversion = Converter.Convert(ReadValidFixture(fichierName), EmbeddedDescriptor.Xml);
         Assert.True(conversion.Success, $"{fichierName} failed to convert.");
-        return Map(conversion.Xml!, fichierName).Value!;
+        MapResult<L_D_KAPE22> result = Map(conversion.Xml!, fichierName);
+        Assert.True(result.Success, $"{fichierName} failed to map.");
+        return result.Value!;
     }
 }

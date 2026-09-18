@@ -147,6 +147,17 @@ Scale per column (mapper-grouped, from Story 4.2-bis's Design Notes / `annexe-ma
 - 2 dangling `ZeroOutOfScaleDimensions(d)` calls removed from `MapMutatedBundle` lambdas.
   [`TransactionalPersistenceTests.cs:180`](../../tests/Kape22Importer.Tests/TransactionalPersistenceTests.cs#L180)
 
+### Review Findings
+
+- [x] [Review][Patch] Broken anchor: the new `ref:` in sprint-status.yaml doesn't match deferred-work.md's actual heading slug (`story-4.3-bis` slugifies to `story-43-bis`, not `story-4-3-bis`) [_bmad-output/implementation-artifacts/sprint-status.yaml:96]
+- [x] [Review][Patch] This spec's own "Suggested Review Order" section says the sprint-status flag "flipped to `in-progress`", but the diff actually sets it to `review` [_bmad-output/implementation-artifacts/spec-4-3-bis-correctif-mise-a-l-echelle-decimale.md:166]
+- [x] [Review][Patch] The 4 new deferred-work.md entries this story's review produced have no sprint-status.yaml `action_items`, unlike the established retro/review-finding convention (e.g. `epic-4-retro-item-2..5`) [_bmad-output/implementation-artifacts/deferred-work.md:74-117]
+- [x] [Review][Patch] "Resolved by: story-4.3-bis" entry doesn't follow deferred-work.md's own documented `source_spec:`/`summary:`/`evidence:` template — freeform prose instead [_bmad-output/implementation-artifacts/deferred-work.md:96-106]
+- [x] [Review][Patch] The now-superseded "Deferred from: story-4.6" / "code review of story-4.6" decimal-scale entries below the new "Resolved by" note aren't marked resolved — a top-to-bottom reader could still treat them as open [_bmad-output/implementation-artifacts/deferred-work.md:55,151]
+- [x] [Review][Patch] `DecimalScaleTests.MappedFichier` dereferences `Map(...).Value!` without asserting `Success` first — an unsuccessful map yields an opaque `NullReferenceException` instead of a clear assertion failure [tests/Kape22Importer.Tests/DecimalScaleTests.cs:75]
+- [x] [Review][Patch] No test exercises `DecimalScale.Pow10ForScale`'s out-of-range throw path (scale outside 0-3) [src/Kape22Importer/DecimalScale.cs:17-19]
+- [x] [Review][Defer] `DecimalScale.Apply` fixes decimal-point placement but never validates the scaled result against each column's total `DECIMAL(p,s)` precision — an outlier raw magnitude would still overflow at persist time [src/Kape22Importer/DecimalScale.cs:12] — deferred, pre-existing (out of this story's stated boundary: "no design choice beyond DecimalScale's shape")
+
 **Tests (TDD proof, CC-1)**
 
 - Literal-value arithmetic coverage for `DecimalScale.Apply` itself — closes the tautology the mapper-level assertions alone would leave (matrix audit finding).
@@ -163,5 +174,5 @@ Scale per column (mapper-grouped, from Story 4.2-bis's Design Notes / `annexe-ma
 - Story 4.6/4.3-bis defect entries closed out; 4 new defer entries from the review layers (scale-literal triplication, no anti-bypass guard, production-parity scope gap, script exit-code gap).
   [`deferred-work.md:96`](deferred-work.md#L96)
 
-- `story-4-6-decimal-scale-defect-story-4-3-bis` action item flipped to `done`; `4-3-bis-correctif-mise-a-l-echelle-decimale` flipped to `in-progress`.
+- `story-4-6-decimal-scale-defect-story-4-3-bis` action item flipped to `done`; `4-3-bis-correctif-mise-a-l-echelle-decimale` flipped to `review`.
   [`sprint-status.yaml:80`](sprint-status.yaml#L80)

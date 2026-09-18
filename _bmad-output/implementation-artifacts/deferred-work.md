@@ -54,6 +54,8 @@
 
 ## Deferred from: story-4.6 implementation (2026-09-16)
 
+**RESOLVED** — see "Resolved by: story-4.3-bis implementation (2026-09-17)" below.
+
 - source_spec: `spec-4-6-persister-bundle-single-transaction.md` / `epics.md` § Story 4.3 / § Story
   4.4 (`annexe-mapping-dispatch-epic4.md` § L_D_ORDRE_FABRICATION, § L_D_SECTIONCHARGE_LINGOT,
   § L_D_SECTIONCHARGE_CHUTAGE, § L_D_SECTIONCHARGE_DECOUPE, § L_D_SECTIONCHARGE_PITS) — escalates the
@@ -95,13 +97,16 @@
 
 ## Resolved by: story-4.3-bis implementation (2026-09-17)
 
-The "Deferred from: story-4.6 implementation (2026-09-16)" decimal-scale defect entry above, and the two
-"Deferred from: code review of story-4.6 (2026-09-16)" entries below referencing
-`ZeroOutOfScaleDimensions(XDocument)`/`OutOfScaleDimensionFields` (the hand-maintained-twice risk and the
-missing null-check), are resolved: Story 4.3-bis wraps the 21 affected columns across the 5 mappers in
-`DecimalScale.Apply` and deletes `ZeroOutOfScaleDimensions`/`OutOfScaleDimensionFields` entirely (no code
-left to carry either risk). `sprint-status.yaml`'s `story-4-6-decimal-scale-defect-story-4-3-bis` action
-item is marked `done` accordingly.
+- source_spec: `spec-4-3-bis-correctif-mise-a-l-echelle-decimale.md` / `src/Kape22Importer/DecimalScale.cs`
+  summary: resolves the "Deferred from: story-4.6 implementation (2026-09-16)" decimal-scale defect entry
+  above, and the two "Deferred from: code review of story-4.6 (2026-09-16)" entries below referencing
+  `ZeroOutOfScaleDimensions(XDocument)`/`OutOfScaleDimensionFields` (the hand-maintained-twice risk and the
+  missing null-check). Story 4.3-bis wraps the 21 affected columns across the 5 mappers in
+  `DecimalScale.Apply` and deletes `ZeroOutOfScaleDimensions`/`OutOfScaleDimensionFields` entirely (no code
+  left to carry either risk).
+  evidence: `sprint-status.yaml`'s `story-4-6-decimal-scale-defect-story-4-3-bis` action item is marked
+  `done` accordingly; the three entries this resolves are superseded (see the "RESOLVED" marker on each,
+  below).
 
 ## Deferred from: code review of story-4.3-bis (2026-09-17)
 
@@ -148,6 +153,19 @@ item is marked `done` accordingly.
   terminate the pwsh script by default. Script is unchanged by this diff (pre-existing gap), out of this
   bugfix story's scope.
 
+## Deferred from: code review of story-4.3-bis (2026-09-18)
+
+- source_spec: `spec-4-3-bis-correctif-mise-a-l-echelle-decimale.md` / `src/Kape22Importer/DecimalScale.cs`
+  summary: `DecimalScale.Apply` fixes decimal-point placement (scale) but never validates the scaled result
+  against each column's total `DECIMAL(p,s)` precision. An outlier raw KAPE22 int whose scaled result
+  still exceeds the column's magnitude limit (not just its scale) would still throw a raw, undiagnosed SQL
+  overflow at persist time — the same failure class this story fixes, narrowed but not closed.
+  evidence: Raised independently by the Blind Hunter and Edge Case Hunter layers at the code review of
+  story-4.3-bis (`git diff a277925^..HEAD`). Explicitly out of this bugfix story's stated boundary ("Ask
+  First: None — conversion values are fixed by the annex/DDL, no design choice beyond DecimalScale's shape
+  (dictated by AD-2 + existing precedent)"); a magnitude guard would be a new design choice, not a
+  literal-scale fix. Candidate for Story 4.9's hardening pass.
+
 ## Deferred from: code review of story-4.6 (2026-09-16)
 
 - source_spec: `src/Kape22Importer/Persistence/Kape22Persister.cs` (`PersistMapped`'s
@@ -165,7 +183,8 @@ item is marked `done` accordingly.
   guard reads outside the write transaction... revisit if the orchestrator ever processes Fichiers
   concurrently").
 
-- source_spec: `tests/Kape22Importer.Tests/TestSupport.cs` (`ZeroOutOfScaleDimensions(XDocument)` /
+- **RESOLVED** — see "Resolved by: story-4.3-bis implementation (2026-09-17)" above.
+  source_spec: `tests/Kape22Importer.Tests/TestSupport.cs` (`ZeroOutOfScaleDimensions(XDocument)` /
   `OutOfScaleDimensionFields`)
   summary: the 21 out-of-scale Champs are hand-maintained twice — once by element name for the
   post-Converter `XDocument` mutation, once by raw `(Position, Size)` tuples for the byte-level fixture
@@ -184,7 +203,8 @@ item is marked `done` accordingly.
   current caller uses fixed, known-good positions from `Templates/P60.xml` against the real fixture
   files, so the gap is latent, not currently reachable.
 
-- source_spec: `tests/Kape22Importer.Tests/TestSupport.cs` (`ZeroOutOfScaleDimensions(XDocument)`)
+- **RESOLVED** — see "Resolved by: story-4.3-bis implementation (2026-09-17)" above.
+  source_spec: `tests/Kape22Importer.Tests/TestSupport.cs` (`ZeroOutOfScaleDimensions(XDocument)`)
   summary: `ZeroOutOfScaleDimensions(XDocument)` dereferences `document.Root!.Element("message")!` with
   no null check before probing for each Champ; an `XDocument` whose root has no `message` element throws
   a raw `NullReferenceException` instead of a descriptive test-setup failure.

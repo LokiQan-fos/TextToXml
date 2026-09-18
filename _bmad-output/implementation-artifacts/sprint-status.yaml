@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 16:00
-last_updated: 09-17-2026 16:40
+last_updated: 09-18-2026 10:00
 project: TextToXml
 project_key: NOKEY
 tracking_system: file-system
@@ -77,7 +77,7 @@ development_status:
   4-7-extension-de-la-suite-e2e-aux-10-tables-aval: done
   epic-4-retrospective: done
   4-2-bis-extension-annexe-mapping-scale-precision: done
-  4-3-bis-correctif-mise-a-l-echelle-decimale: review
+  4-3-bis-correctif-mise-a-l-echelle-decimale: done
   4-9-hardening-epic-4: backlog
 action_items:
   - id: "story-4-6-decimal-scale-defect-story-4-3-bis"
@@ -93,7 +93,44 @@ action_items:
       hors echelle."
     owner: "Dev"
     status: done
-    ref: "_bmad-output/implementation-artifacts/deferred-work.md#resolved-by-story-4-3-bis-implementation-2026-09-17 -> spec-4-3-bis-correctif-mise-a-l-echelle-decimale.md"
+    ref: "_bmad-output/implementation-artifacts/deferred-work.md#resolved-by-story-43-bis-implementation-2026-09-17 -> spec-4-3-bis-correctif-mise-a-l-echelle-decimale.md"
+  - id: "story-4-3-bis-review-item-1-scale-literal-triplication"
+    epic: 4
+    action: "The 21 per-column scale literals are hand-maintained independently in three
+      places (each mapper's call site, its test file, and annexe-mapping-dispatch-epic4.md)
+      with nothing cross-checking them against each other -- a wrong digit copy-pasted
+      consistently into a mapper and its test would pass silently. Build a mapper-source-
+      vs-annex consistency check."
+    owner: "Dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/deferred-work.md#deferred-from-code-review-of-story-43-bis-2026-09-17 -> story 4-9-hardening-epic-4"
+  - id: "story-4-3-bis-review-item-2-no-anti-bypass-guard"
+    epic: 4
+    action: "Nothing prevents a future 6th mapper from assigning a raw KAPE22 int/int?
+      directly to a narrow decimal EF column without going through DecimalScale.Apply --
+      no analyzer or reflection-based completeness test guards against a regression of
+      the exact defect Story 4.3-bis fixes."
+    owner: "Dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/deferred-work.md#deferred-from-code-review-of-story-43-bis-2026-09-17 -> story 4-9-hardening-epic-4"
+  - id: "story-4-3-bis-review-item-3-production-parity-scope-gap"
+    epic: 4
+    action: "Kape22ProductionDataParityTests only round-trips L_D_KAPE22; it never maps/inserts/reads
+      back L_D_ORDRE_FABRICATION or the L_D_SECTIONCHARGE_* entities, so no test compares
+      a persisted, DecimalScale-scaled downstream column against a known-correct real
+      production value. Extend production parity to the downstream decimal-scale tables."
+    owner: "Dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/deferred-work.md#deferred-from-code-review-of-story-43-bis-2026-09-17 -> story 4-9-hardening-epic-4"
+  - id: "story-4-3-bis-review-item-4-e2e-script-exit-code-gap"
+    epic: 4
+    action: "scripts/e2e-worker-import.ps1's final dotnet test ... Kape22ProductionDataParityTests
+      invocation never checks $LASTEXITCODE, unlike the earlier dotnet build step in the
+      same script. A failing production-parity comparison would not fail the wrapping
+      process, so GpaoImportP60WorkerEndToEndTests could not detect it."
+    owner: "Dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/deferred-work.md#deferred-from-code-review-of-story-43-bis-2026-09-17 -> story 4-9-hardening-epic-4"
   - id: "epic-1-retro-item-1-passe-hygiene-story-0-epic-2-testsupport"
     epic: 1
     action: "Passe hygiene story-0 Epic 2: TestSupport partage (Windows1252 corrige
