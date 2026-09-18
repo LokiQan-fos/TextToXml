@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 16:00
-last_updated: 09-18-2026 15:00
+last_updated: 09-18-2026 16:00
 project: TextToXml
 project_key: NOKEY
 tracking_system: file-system
@@ -67,7 +67,7 @@ development_status:
   3-6-validation-de-bout-en-bout-harnais-de-couverture-sm-1-2-3: done
   epic-3-retrospective: done
 
-  epic-4: in-progress
+  epic-4: done
   4-1-entités-ef-database-first-extension-du-harnais-sql-pour-les: done
   4-2-extraction-documentation-du-mapping-legacy-annexe-colonne-pa: done
   4-3-mapper-of-coulée-mapping-structurel-pur: done
@@ -78,7 +78,7 @@ development_status:
   epic-4-retrospective: done
   4-2-bis-extension-annexe-mapping-scale-precision: done
   4-3-bis-correctif-mise-a-l-echelle-decimale: done
-  4-9-hardening-epic-4: review
+  4-9-hardening-epic-4: done
 action_items:
   - id: "story-4-6-decimal-scale-defect-story-4-3-bis"
     epic: 4
@@ -335,7 +335,7 @@ action_items:
       would catch a regression that silently drops one of the AddIfPresent calls in
       Kape22Persister.PersistMapped."
     owner: "Dev"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-17.md -> story 4-9-hardening-epic-4"
   - id: "epic-4-retro-item-3-trim-of-coulee-at-source"
     epic: 4
@@ -344,7 +344,7 @@ action_items:
       trimming inconsistently at their own read sites. Pre-existing Epic 2 gap made
       live by Epic 4 fanning these fields into 9 more tables scalar key columns (AD-7)."
     owner: "Dev"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-17.md -> story 4-9-hardening-epic-4"
   - id: "epic-4-retro-item-4-shared-cold-coulee-constant"
     epic: 4
@@ -352,7 +352,7 @@ action_items:
       shared constant instead of Kape22ImportBundleMapper and Kape22Persister each
       hard-coding their own copy."
     owner: "Dev"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-17.md -> story 4-9-hardening-epic-4"
   - id: "epic-4-retro-item-5-widen-persister-exception-filter"
     epic: 4
@@ -363,5 +363,5 @@ action_items:
       -- today it would escape uncaught with no ConversionError/REJETE row, the one
       gap in AD-4 found this epic."
     owner: "Dev"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-17.md -> story 4-9-hardening-epic-4"

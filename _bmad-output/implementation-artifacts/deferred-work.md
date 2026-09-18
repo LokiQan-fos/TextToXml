@@ -24,6 +24,23 @@
   `TypeConsigne`/`ConsigneGPAO` always constant, two independent simultaneous collisions in one bundle is
   an unlikely combination. Not blocking; a future hardening pass could report every colliding group.
 
+- source_spec: `spec-4-9-hardening-epic-4.md` / `src/Kape22Importer/Kape22Mapper.cs`
+  summary: no test exercises a blank/whitespace-only `OF` or `Coulee` Champ through the new unconditional
+  `entity.OF.Trim()`/`entity.Coulee.Trim()` (`Kape22Mapper.cs:112`) — only the padded-Champ trim case is
+  covered. The generic `RequiredFieldCheck` blank-field pattern is tested for other columns but not
+  specifically routed through this new trim site for OF/Coulee.
+  evidence: Raised by the formal `/run-review` pass on story-4.9 (2026-09-18). Verified by inspection that
+  `Kape22FileMessage.OF`/`.Coulee` default to `string.Empty`, never null, so `.Trim()` cannot throw; the
+  gap is coverage-only, not a correctness risk. Not blocking.
+
+- source_spec: `spec-4-9-hardening-epic-4.md` / `src/Kape22Importer/Persistence/Kape22Persister.cs`
+  summary: the A-5 REJETÉ message (`Kape22Persister.cs:124`) cites only the raw colliding `CodeOperation`
+  value, not which two sections collided (e.g. Chutage vs Decoupe). An operator reading the
+  `L_D_LOG_COMMANDE` row has to cross-reference the source Fichier by hand to identify the sections.
+  evidence: Raised by the formal `/run-review` pass on story-4.9 (2026-09-18). Diagnosability nice-to-have;
+  the frozen spec only requires the message to name the OF and cite the collision, which it does. Not
+  blocking.
+
 ## Deferred from: code review of story-4.7 (2026-09-17)
 
 - source_spec: `spec-4-7-e2e-suite-downstream-tables.md` / `tests/Kape22Importer.Tests/RejectionAtomicityIntegrationTests.cs`
