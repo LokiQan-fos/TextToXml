@@ -106,6 +106,12 @@ public sealed class Kape22Mapper(TimeProvider? timeProvider = null)
             }
         }
 
+        // A-3 (Epic 4 retro): trim OF/Coulee once, here, right after the reflective copy - every
+        // downstream reader (9 Story 4.3/4.4 mappers, Kape22Persister) stops trimming/not-trimming at
+        // its own site and just reads the already-trimmed value.
+        entity.OF = entity.OF.Trim();
+        entity.Coulee = entity.Coulee.Trim();
+
         // Annexe B "Legacy blank-Champ defaults": two Champs the legacy import fills with a fixed
         // value instead of copying it, confirmed against the production L_D_KAPE22 (parity check
         // 2026-09-07). OForiginInterne is the one string column it leaves NULL; AcompteSolde it
@@ -133,8 +139,11 @@ public sealed class Kape22Mapper(TimeProvider? timeProvider = null)
 
         // AC-FR11-4 / D22: the Header roulette and the trimmed Detail OF ride along even on a rejection,
         // so the persister can write the REJETÉ L_D_LOG_COMMANDE line and key the anti-duplicate guard.
+        // entity.OF is already trimmed above (A-3) - on both the success and failure paths, since the
+        // reflective loop and that trim run unconditionally before this line - so this reads it back
+        // instead of re-trimming the raw DTO field, keeping the one trim site truly the only one.
         string numeroFichier = file.Header.NumeroFichier;
-        string of = file.Message.OF.Trim();
+        string of = entity.OF;
 
         return errors.Count > 0
             ? new MapResult<L_D_KAPE22> { Errors = errors, NumeroFichier = numeroFichier, OF = of, Warnings = warnings }

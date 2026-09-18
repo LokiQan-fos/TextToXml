@@ -110,7 +110,7 @@ public sealed class Kape22ImportBundleMapper(TimeProvider? timeProvider = null)
     // filtered L_D_CONSIGNES row - see spec Design Notes) must carry a Coulee number starting with '0'.
     private static void AddHotCouleeFormatViolation(List<ConversionError> errors, L_D_KAPE22 kape22)
     {
-        bool isHot = kape22.CodeConsignePits != "1";
+        bool isHot = kape22.CodeConsignePits != Kape22ImportBundle.ColdConsignePits;
         if (!isHot || kape22.Coulee.StartsWith('0'))
         {
             return;

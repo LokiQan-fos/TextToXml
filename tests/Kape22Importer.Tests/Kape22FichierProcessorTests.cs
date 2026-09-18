@@ -88,6 +88,7 @@ public class Kape22FichierProcessorTests
     // stage ran.
     [Fact]
     [Trait("AC", "FR13-1")]
+    [Trait("AC", "A-2")]
     public void Import_CleanFichier_RunsThroughToTheInsert_AcFr13_1()
     {
         InMemoryContextFactory contexts = new();
@@ -104,6 +105,7 @@ public class Kape22FichierProcessorTests
         Assert.Equal(inserted.Id, result.InsertedId);
         L_D_LOG_COMMANDE log = Assert.Single(verify.LogCommandeRows);
         Assert.EndsWith("— OK", log.Message);
+        AssertDownstreamRowsFromReferenceFichier(verify);
     }
 
     // AC-FR13-3: Converter succeeds, Kape22Mapper rejects -> no L_D_KAPE22 row, the normalized XML is
@@ -187,6 +189,7 @@ public class Kape22FichierProcessorTests
     // be present), NormalizedXml and XmlArchivePath non-null.
     [Fact]
     [Trait("AC", "FR13-5")]
+    [Trait("AC", "A-2")]
     public void Import_Success_ResultShape_AcFr13_5()
     {
         InMemoryContextFactory contexts = new();
@@ -198,5 +201,32 @@ public class Kape22FichierProcessorTests
         Assert.Empty(result.Errors);
         Assert.NotNull(result.NormalizedXml);
         Assert.Equal(ExpectedXmlArchivePath, result.XmlArchivePath);
+
+        using AscoLsiDbContext verify = contexts.Reader();
+        AssertDownstreamRowsFromReferenceFichier(verify);
+    }
+
+    // A-2 (Epic 4 retro): the 9 Story 4.1 downstream dispatch tables InsertableReferenceFichier's own
+    // Kape22ImportBundleMapper output drives - the retro found the two Category=Unit success tests above
+    // asserted only L_D_KAPE22/L_D_LOG_COMMANDE, never these. PoidsMetrique/SVT stay empty on this
+    // fixture (CodeOpePoidMetrique/RangOpePoidMetrique and CodeOpeSVT/RangOpeSVT are both blank on the
+    // reference Fichier, same fact Kape22ImportBundleMapperTests's AC-FR20-1 happy-path test documents),
+    // so their DbSets are asserted empty rather than single, and every other of the 9 holds exactly one
+    // row for this OF.
+    private static void AssertDownstreamRowsFromReferenceFichier(AscoLsiDbContext verify)
+    {
+        Assert.Single(verify.OrdreFabricationRows);
+        Assert.Single(verify.CouleeRows);
+        Assert.Single(verify.SectionChargeChutageRows);
+        Assert.Single(verify.SectionChargeDecoupeRows);
+        Assert.Single(verify.SectionChargeLingotRows);
+        Assert.Single(verify.SectionChargePitsRows);
+        Assert.Empty(verify.SectionChargePoidsMetriqueRows);
+        Assert.Single(verify.SectionChargeRefroidissoirsRows);
+        Assert.Empty(verify.SectionChargeSvtRows);
+
+        // One L_D_CONSIGNES row per applicable section above (Chutage/Decoupe/Lingot/Pits/Refroidissoirs
+        // - PoidsMetrique/SVT contribute none, ConsignesMapper.Map).
+        Assert.Equal(5, verify.ConsignesRows.Count());
     }
 }

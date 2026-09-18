@@ -1,5 +1,29 @@
 # Deferred Work
 
+## Deferred from: code review of story-4.9 (2026-09-18)
+
+- source_spec: `spec-4-9-hardening-epic-4.md` / `src/Kape22Importer/Persistence/Kape22Persister.cs`
+  summary: `PersistMapped`'s two rejection checks (the pre-existing missing-cold-Coulee guard and the new
+  A-5 consignes-natural-key-collision guard) are sequential early-returns, not an accumulate-then-report
+  pass — unlike the sibling FR-20 controls in `Kape22ImportBundleMapper`, which run regardless of an
+  earlier one's outcome so multiple violations surface together. A Fichier that has both a missing Coulee
+  and a consignes collision only ever reports the missing-Coulee error; the collision stays hidden until
+  that is fixed and the Fichier is resubmitted.
+  evidence: Raised by the Blind Hunter layer at Story 4.9's code review. Neither epics.md's A-5 AC nor the
+  frozen spec requires combining these two Persister-level checks into one pass, and doing so now would
+  mean restructuring the pre-existing missing-Coulee check, which is outside this story's stated boundary.
+  Real, but not blocking; a future hardening pass could accumulate both.
+
+- source_spec: `spec-4-9-hardening-epic-4.md` / `src/Kape22Importer/Persistence/Kape22Persister.cs`
+  summary: the new A-5 pre-check reports only the first colliding `CodeOperation` group
+  (`.FirstOrDefault(group => group.Count() > 1)`). If a bundle had two independent collisions, only one
+  would ever surface in the `ConversionError`/REJETÉ log; the second stays undiscovered until the first is
+  fixed and the Fichier resubmitted.
+  evidence: Raised by the Blind Hunter layer at Story 4.9's code review. epics.md's A-5 AC only describes
+  "a collision" (singular); with `ConsignesMapper` producing at most 7 rows per bundle and
+  `TypeConsigne`/`ConsigneGPAO` always constant, two independent simultaneous collisions in one bundle is
+  an unlikely combination. Not blocking; a future hardening pass could report every colliding group.
+
 ## Deferred from: code review of story-4.7 (2026-09-17)
 
 - source_spec: `spec-4-7-e2e-suite-downstream-tables.md` / `tests/Kape22Importer.Tests/RejectionAtomicityIntegrationTests.cs`

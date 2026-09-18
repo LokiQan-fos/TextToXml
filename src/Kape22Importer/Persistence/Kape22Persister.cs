@@ -19,6 +19,9 @@ namespace Kape22Importer.Persistence;
 // already-imported skip: AlreadyImported true, Success true, InsertedId null, empty Errors (AC-FR11-6).
 // A cold Coulee whose L_D_COULEE row is missing
 // is rejected instead, with a REJETÉ log row citing the missing Coulee (AC-FR20-5).
+// A same-bundle L_D_CONSIGNES natural-key collision (two sections sharing the same CodeOperation for
+// this OF) is rejected the same way, with a REJETÉ log row citing the colliding CodeOperation, before
+// ConsignesRows.AddRange is ever called (A-5, Epic 4 retro).
 // On a bundle that already carries Errors (Kape22Mapper.Map failed upstream, or one of
 // Kape22ImportBundleMapper's own FR-20 controls tripped): no L_D_KAPE22 row; a single
 // "<NumeroFichier> — REJETÉ : <summary>" L_D_LOG_COMMANDE row in its own transaction when the OF is
@@ -31,10 +34,6 @@ namespace Kape22Importer.Persistence;
 // constructed per Fichier with a fresh context.
 public sealed class Kape22Persister(AscoLsiDbContext context, IConfiguration configuration, TimeProvider? timeProvider = null)
 {
-    // L_D_KAPE22.CodeConsignePits value that marks a "cold" Coulee (AC-FR20-5): its L_D_COULEE row must
-    // already exist elsewhere in AscoLSI before this Fichier can be persisted.
-    private const string ColdConsignePits = "1";
-
     // L_D_LOG_COMMANDE.Commande is a format variation point (AC-FR16-2): it comes from configuration,
     // falling back to the P60 command for the reference template.
     private const string CommandeKey = "Import:Commande";
@@ -86,9 +85,9 @@ public sealed class Kape22Persister(AscoLsiDbContext context, IConfiguration con
             // Fichiers (several OF from the same cast) sharing the same IdCoulee, so an already-present
             // Coulee is never re-added - only a genuinely new one is (AD-7's "no navigation properties"
             // keeps this a plain existence check, not a relationship).
-            string coulee = entity.Coulee.Trim();
+            string coulee = entity.Coulee;
             bool couleeAlreadyExists = context.CouleeRows.Any(row => row.IdCoulee == coulee);
-            if (entity.CodeConsignePits == ColdConsignePits && !couleeAlreadyExists)
+            if (entity.CodeConsignePits == Kape22ImportBundle.ColdConsignePits && !couleeAlreadyExists)
             {
                 string couleeMessage = $"OF '{of}' : la coulée '{coulee}' est introuvable dans L_D_COULEE.";
                 ConversionError couleeError = new() { Block = Block.File, Code = ErrorCode.BusinessRuleViolation, Message = couleeMessage };
@@ -106,6 +105,40 @@ public sealed class Kape22Persister(AscoLsiDbContext context, IConfiguration con
                 }
 
                 return new ImportResult { Errors = [couleeError] };
+            }
+
+            // A-5 (Epic 4 retro): a same-bundle L_D_CONSIGNES natural-key collision - two sections
+            // sharing the same CodeOperation for this OF (today's TypeConsigne/ConsigneGPAO defaults,
+            // 0/false, make CodeOperation the effective discriminant - see ConsignesMapper's own
+            // comment) - would otherwise throw an uncaught InvalidOperationException at AddRange time.
+            // Caught here, in-memory, before anything is staged on the context, and routed through the
+            // same ConversionError/REJETÉ-log shape as the missing-Coulee check above - never widening
+            // the DbUpdateException/DbException catch filter to cover it.
+            // The full 4-part tuple mirrors L_D_CONSIGNES' real natural key, but OF is bundle-constant
+            // today (every ConsignesMapper.Build call passes the same source.OF), so this grouping is
+            // today effectively just CodeOperation, since TypeConsigne/ConsigneGPAO are always 0/false
+            // (spec Design Notes).
+            List<L_D_CONSIGNES>? collidingGroup = bundle.Consignes
+                .GroupBy(row => (row.OF, row.CodeOperation, row.TypeConsigne, row.ConsigneGPAO))
+                .FirstOrDefault(group => group.Count() > 1)
+                ?.ToList();
+            if (collidingGroup is not null)
+            {
+                string collisionMessage = $"OF '{of}' : plusieurs consignes partagent le même "
+                    + $"CodeOperation '{collidingGroup[0].CodeOperation}'.";
+                ConversionError collisionError = new() { Block = Block.File, Code = ErrorCode.BusinessRuleViolation, Message = collisionMessage };
+                context.LogCommandeRows.Add(BuildLogRow(of, $"{numeroFichier} — REJETÉ : {collisionMessage}"));
+
+                try
+                {
+                    context.SaveChanges();
+                }
+                catch (Exception exception) when (exception is DbUpdateException or DbException)
+                {
+                    return PersistenceFailure(exception, [collisionError]);
+                }
+
+                return new ImportResult { Errors = [collisionError] };
             }
 
             context.Kape22Rows.Add(entity);

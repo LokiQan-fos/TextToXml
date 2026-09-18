@@ -13,6 +13,11 @@ namespace Kape22Importer;
 // Properties are declared in alphabetical order (CC-4).
 public sealed record Kape22ImportBundle
 {
+    // A-4 (Epic 4 retro): the one shared source for the "cold" Coulee marker on
+    // L_D_KAPE22.CodeConsignePits (AC-FR20-5) - Kape22Persister and Kape22ImportBundleMapper both
+    // reference this instead of duplicating the "1" literal.
+    public const string ColdConsignePits = "1";
+
     public List<L_D_CONSIGNES> Consignes { get; init; } = [];
 
     public L_D_COULEE? Coulee { get; init; }

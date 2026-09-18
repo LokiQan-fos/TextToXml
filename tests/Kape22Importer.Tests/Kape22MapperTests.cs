@@ -121,6 +121,23 @@ public class Kape22MapperTests
         Assert.Equal(0, entity.Epaisseur);
     }
 
+    // A-3 (Epic 4 retro): a padded OF/Coulee Champ maps to a trimmed entity.OF/entity.Coulee - trimmed
+    // once here in Kape22Mapper.Map, so every downstream mapper (Story 4.3/4.4) and Kape22Persister read
+    // an already-trimmed value instead of trimming (or forgetting to trim) at their own site.
+    [Fact]
+    [Trait("AC", "A-3")]
+    public void Map_PaddedOfAndCouleeChamp_MapsToTrimmedEntityValues()
+    {
+        XDocument document = XDocument.Parse(ConvertReferenceFichier());
+        SetChamp(document, "message", "OF", " P1 ");
+        SetChamp(document, "message", "Coulee", " 065718 ");
+
+        L_D_KAPE22 entity = Map(document.ToString(), ReferenceFichierName).Value!;
+
+        Assert.Equal("P1", entity.OF);
+        Assert.Equal("065718", entity.Coulee);
+    }
+
     // AC-FR7-2: OForiginInterne is the one string column the legacy import leaves NULL for a blank
     // Champ (production parity: NULL in 100% of 17710 rows). The reference Fichier leaves it blank.
     [Fact]

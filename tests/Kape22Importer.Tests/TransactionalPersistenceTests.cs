@@ -413,6 +413,111 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
             verify.ConsignesRows.AsNoTracking().Count(row => row.OF.Trim() == bundle.OF!.Trim()));
     }
 
+    // A-5 (Epic 4 retro): a same-bundle L_D_CONSIGNES natural-key collision - two sections sharing the
+    // same CodeOperation for one OF - is caught by an in-memory pre-check before AddRange, instead of
+    // throwing an uncaught InvalidOperationException at that call. Forcing CodeOpeDecoupe to the
+    // Chutage section's own CodeOpeChutage value (both sections stay applicable, only the shared
+    // discriminant collides) reproduces the collision without touching TypeConsigne/ConsigneGPAO,
+    // exactly the scenario ConsignesMapper.cs's own comment documents as unguarded today. Modeled on
+    // Persist_ColdCouleeMissingFromLDCoulee_RejectsWithNoInsertsAndBusinessRuleViolation_AcFr20_5's
+    // rejection shape: one ConversionError (BusinessRuleViolation), one REJETÉ log row, zero rows in
+    // every one of the 10 downstream tables.
+    [SkippableFact]
+    [Trait("AC", "A-5")]
+    public void Persist_ConsignesNaturalKeyCollision_RejectsWithNoInsertsAndBusinessRuleViolation_A5()
+    {
+        Ready();
+        Kape22ImportBundle bundle = ConsignesCollisionBundle();
+        Assert.True(bundle.Success, "the collision must be caught by the pre-check, not by an upstream FR-20 control.");
+        Assert.NotNull(bundle.SectionChargeChutage);
+        Assert.NotNull(bundle.SectionChargeDecoupe);
+        Assert.Equal(bundle.SectionChargeChutage!.CodeOperation, bundle.SectionChargeDecoupe!.CodeOperation);
+
+        ImportResult? result = null;
+        Exception? exception = Record.Exception(() => result = Persist(bundle));
+        Assert.Null(exception);
+
+        Assert.False(result!.Success);
+        ConversionError error = Assert.Single(result.Errors);
+        Assert.Equal(Block.File, error.Block);
+        Assert.Equal(ErrorCode.BusinessRuleViolation, error.Code);
+        Assert.Contains(bundle.SectionChargeChutage!.CodeOperation, error.Message, StringComparison.Ordinal);
+
+        using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
+        Assert.Empty(verify.Kape22Rows.AsNoTracking());
+        L_D_LOG_COMMANDE log = Assert.Single(verify.LogCommandeRows.AsNoTracking());
+        Assert.Contains("REJETÉ", log.Message);
+
+        Assert.Empty(verify.OrdreFabricationRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Empty(verify.CouleeRows.AsNoTracking().Where(row => row.IdCoulee.Trim() == bundle.Kape22!.Coulee.Trim()));
+        Assert.Empty(verify.SectionChargeChutageRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Empty(verify.SectionChargeDecoupeRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Empty(verify.SectionChargeLingotRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Empty(verify.SectionChargePitsRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Empty(verify.SectionChargePoidsMetriqueRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Empty(verify.SectionChargeRefroidissoirsRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Empty(verify.SectionChargeSvtRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Empty(verify.ConsignesRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
+    }
+
+    // A-5 (Epic 4 retro): the collision branch's own REJETÉ-log SaveChanges can itself fail at the DB
+    // level (an over-long Commande, same forcing technique as
+    // Persist_BundleSuccess_LogRowInsertFails_RollsBackKape22Row_AcFr11_3) - nothing exercised that
+    // nested catch before this test (verification-gap review finding). Persist must still come back as
+    // an ImportResult - never throw - carrying both the original BusinessRuleViolation collision error
+    // and the PersistenceError, with every table left empty.
+    [SkippableFact]
+    [Trait("AC", "A-5")]
+    public void Persist_ConsignesNaturalKeyCollision_LogRowInsertAlsoFails_ReturnsBothErrorsWithNoInserts_A5()
+    {
+        Ready();
+        Kape22ImportBundle bundle = ConsignesCollisionBundle();
+        Assert.True(bundle.Success, "the collision must be caught by the pre-check, not by an upstream FR-20 control.");
+
+        ImportResult? result = null;
+        Exception? exception = Record.Exception(() => result = Persist(bundle, commande: new string('P', 100)));
+        Assert.Null(exception);
+
+        Assert.False(result!.Success);
+        Assert.Equal(2, result.Errors.Count);
+        Assert.Contains(result.Errors, error => error.Code == ErrorCode.BusinessRuleViolation);
+        Assert.Contains(result.Errors, error => error.Code == ErrorCode.PersistenceError);
+
+        using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
+        Assert.Empty(verify.Kape22Rows.AsNoTracking());
+        Assert.Empty(verify.LogCommandeRows.AsNoTracking());
+        Assert.Empty(verify.OrdreFabricationRows.AsNoTracking());
+        Assert.Empty(verify.CouleeRows.AsNoTracking());
+        Assert.Empty(verify.SectionChargeChutageRows.AsNoTracking());
+        Assert.Empty(verify.SectionChargeDecoupeRows.AsNoTracking());
+        Assert.Empty(verify.SectionChargeLingotRows.AsNoTracking());
+        Assert.Empty(verify.SectionChargePitsRows.AsNoTracking());
+        Assert.Empty(verify.SectionChargePoidsMetriqueRows.AsNoTracking());
+        Assert.Empty(verify.SectionChargeRefroidissoirsRows.AsNoTracking());
+        Assert.Empty(verify.SectionChargeSvtRows.AsNoTracking());
+        Assert.Empty(verify.ConsignesRows.AsNoTracking());
+    }
+
+    // A-4 (Epic 4 retro) non-regression: Kape22Persister and Kape22ImportBundleMapper both read the one
+    // shared Kape22ImportBundle.ColdConsignePits constant for the hot/cold Coulee marker, instead of each
+    // carrying its own "1" literal - pinned by reflection so a future revert back to a private duplicate
+    // fails this test instead of silently reintroducing the drift risk the retro flagged. Pure
+    // reflection, no database needed.
+    [Fact]
+    [Trait("AC", "A-4")]
+    public void ColdConsignePits_IsTheOneSharedConstantBothCollaboratorsReference_A4()
+    {
+        Assert.Equal("1", Kape22ImportBundle.ColdConsignePits);
+
+        FieldInfo? persisterOwnConstant = typeof(Kape22Persister)
+            .GetField("ColdConsignePits", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
+        Assert.Null(persisterOwnConstant);
+
+        FieldInfo? bundleMapperOwnConstant = typeof(Kape22ImportBundleMapper)
+            .GetField("ColdConsignePits", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
+        Assert.Null(bundleMapperOwnConstant);
+    }
+
     // AC-FR21-3 (AD-6): Kape22Persister exposes exactly one Persist overload, taking a
     // Kape22ImportBundle - the MapResult<L_D_KAPE22> overload this story replaces is gone. Pure
     // reflection, no database needed.
@@ -450,6 +555,19 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
                 ["Import:InitiatingServer"] = initiatingServer,
             })
             .Build();
+
+    // A-5 (Epic 4 retro): the reference bundle mutated so CodeOpeDecoupe collides with CodeOpeChutage -
+    // shared by both A-5 tests above (the plain rejection and the log-row-insert-also-fails variant).
+    private static Kape22ImportBundle ConsignesCollisionBundle() =>
+        MapMutatedBundle(d =>
+        {
+            // The untouched reference Fichier is "hot Coulee malformed" (TestSupport.MapReferenceBundle's
+            // own comment) - correct that first so only the CodeOperation collision this test targets
+            // trips a control, not the unrelated AC-FR20-3 hot-Coulee-format one.
+            SetChamp(d, "message", "Coulee", "065718");
+            string codeOpeChutage = d.Root!.Element("message")!.Element("CodeOpeChutage")!.Value;
+            SetChamp(d, "message", "CodeOpeDecoupe", codeOpeChutage);
+        });
 
     private void SeedOkLogRow(string numeroFichier, string of) =>
         SeedLogRow(numeroFichier, of, $"{numeroFichier} — OK");
