@@ -193,6 +193,59 @@ internal static class MappingAnnexCompleteness
         return failures;
     }
 
+    // Story 4.10 (B-1/B-2): the mapper-side counterpart of the check above. That check only requires an
+    // annex Scale to be present; it never confronts it against what the mapper code actually passes to
+    // DecimalScale.Apply, nor detects a mapper that skips DecimalScale.Apply entirely for a column the
+    // annex says needs it. callSites is read from the 5 mapper source files by MapperScaleCallSites - a
+    // decimal/int-sourced annex row with no matching call site is a bypass (B-2); one with a call site
+    // whose literal scale differs from the annex Scale is a drift (B-1).
+    public static IReadOnlyList<string> CheckMapperScaleUsage(
+        IReadOnlyList<MappingAnnexEntry> annex,
+        IReadOnlyDictionary<string, IReadOnlyList<ModelColumn>> modelColumnsByTable,
+        IReadOnlyDictionary<string, Type> kape22FieldTypesByName,
+        IReadOnlyList<MapperScaleCallSite> callSites)
+    {
+        List<string> failures = [];
+        ILookup<(string Table, string Column), MapperScaleCallSite> byTarget =
+            callSites.ToLookup(site => (site.Table, site.Property));
+
+        foreach (MappingAnnexEntry entry in annex)
+        {
+            if (entry.Status != MappingAnnexStatus.Sourced || entry.Scale is null)
+            {
+                continue;
+            }
+
+            ModelColumn? column = modelColumnsByTable.TryGetValue(entry.Table, out IReadOnlyList<ModelColumn>? columns)
+                ? columns.FirstOrDefault(candidate => candidate.Name.Equals(entry.Column, StringComparison.Ordinal))
+                : null;
+            if (column is null || !IsDecimal(column.ClrType))
+            {
+                continue;
+            }
+
+            Type? sourceType = SourceKape22Type(entry.SourceOrRule, kape22FieldTypesByName);
+            if (sourceType is null || !IsInt(sourceType))
+            {
+                continue;
+            }
+
+            MapperScaleCallSite? callSite = byTarget[(entry.Table, entry.Column)].FirstOrDefault();
+            if (callSite is null)
+            {
+                failures.Add(
+                    $"{entry.Table}.{entry.Column}: no DecimalScale.Apply call site found in its mapper (bypasses the annex Scale).");
+            }
+            else if (callSite.Scale != entry.Scale)
+            {
+                failures.Add(
+                    $"{entry.Table}.{entry.Column}: mapper DecimalScale.Apply scale {callSite.Scale} diverges from annex Scale {entry.Scale}.");
+            }
+        }
+
+        return failures;
+    }
+
     private static bool IsDecimal(Type clrType) => clrType == typeof(decimal) || clrType == typeof(decimal?);
 
     private static bool IsInt(Type? clrType) => clrType == typeof(int) || clrType == typeof(int?);
@@ -220,4 +273,31 @@ internal static class MappingAnnexCompleteness
                 paragraph.Contains(citation, StringComparison.Ordinal)
                 && paragraph.Contains("assumed, unverified", StringComparison.Ordinal));
     }
+}
+
+// One "<Property> = DecimalScale.Apply(source.<Field>, <Scale>)" call site extracted from a mapper's
+// C# source (Story 4.10, B-1/B-2) - the mechanical counterpart of the annex's Scale column, read from
+// the code itself instead of assumed to match it. Table is supplied by the caller: the mapper's own
+// source text never names its target table. Properties are declared in alphabetical order (CC-4).
+internal sealed record MapperScaleCallSite(string Property, int Scale, string Table);
+
+// Extracts every DecimalScale.Apply call site from a mapper's source text, the same throw-nothing,
+// regex-over-a-known-shape discipline as MappingAnnex/SqlTableSchema for the other two file formats
+// this story cross-checks. A call site not matching this exact shape (for example a future mapper
+// computing its scale argument instead of passing a literal) is invisible to it by design - it can
+// only ever add false CheckMapperScaleUsage failures (a real call site it misses reads as a B-2
+// bypass), never hide a real drift.
+internal static class MapperScaleCallSites
+{
+    private static readonly Regex CallSite = new(
+        @"(?<property>\w+)\s*=\s*DecimalScale\.Apply\(source\.\w+(?:\s*\?\?\s*0)?,\s*(?<scale>\d+)\)",
+        RegexOptions.Compiled);
+
+    public static IReadOnlyList<MapperScaleCallSite> ExtractFrom(string sourceCode, string table) =>
+        CallSite.Matches(sourceCode)
+            .Select(match => new MapperScaleCallSite(
+                match.Groups["property"].Value,
+                int.Parse(match.Groups["scale"].Value),
+                table))
+            .ToArray();
 }

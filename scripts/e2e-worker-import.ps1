@@ -186,5 +186,8 @@ if (-not $SkipProductionCompare) {
         # filtering the class by FullyQualifiedName and the Fichier by DisplayName is what actually narrows
         # to one test case; a FullyQualifiedName~ filter on the Fichier alone matches nothing.
         dotnet @dotnetTestArgs --filter "FullyQualifiedName~Kape22ProductionDataParityTests&DisplayName~$fichier" --nologo -v minimal
+        # B-4 (Story 4.10): guarded the same way as the dotnet build step above (line 106) - a forced
+        # production-parity failure must stop the script instead of continuing silently.
+        if ($LASTEXITCODE -ne 0) { throw "Production-parity test failed for $fichier." }
     }
 }

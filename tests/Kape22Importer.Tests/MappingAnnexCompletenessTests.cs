@@ -213,6 +213,105 @@ public class MappingAnnexCompletenessTests
         Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
     }
 
+    // Story 4.10 (B-1): a mapper's literal DecimalScale.Apply scale that diverges from the annex's own
+    // Scale for the same column fails CheckMapperScaleUsage.
+    [Fact]
+    [Trait("AC", "4.10-B1")]
+    public void MapperScaleCallSite_DivergesFromAnnexScale_FailsCheck_AcB1()
+    {
+        Dictionary<string, IReadOnlyList<ModelColumn>> model = new() { ["T"] = [new ModelColumn(typeof(decimal), "A")] };
+        Dictionary<string, Type> kape22Fields = new() { ["Champ"] = typeof(int?) };
+        MappingAnnexEntry[] annex = [new MappingAnnexEntry("A", 1, "KAPE22.Champ", MappingAnnexStatus.Sourced, "T")];
+        MapperScaleCallSite[] callSites = [new MapperScaleCallSite("A", 2, "T")];
+
+        IReadOnlyList<string> failures = MappingAnnexCompleteness.CheckMapperScaleUsage(annex, model, kape22Fields, callSites);
+
+        Assert.Contains(failures, failure => failure.Contains("T.A", StringComparison.Ordinal) && failure.Contains("diverges", StringComparison.Ordinal));
+    }
+
+    // Story 4.10 (B-2): an annex row requiring DecimalScale.Apply (decimal target, int KAPE22 source,
+    // annex Scale present) with no matching mapper call site at all - the 6th-mapper bypass scenario -
+    // fails CheckMapperScaleUsage.
+    [Fact]
+    [Trait("AC", "4.10-B2")]
+    public void MapperScaleCallSite_MissingEntirely_FailsCheckAsBypass_AcB2()
+    {
+        Dictionary<string, IReadOnlyList<ModelColumn>> model = new() { ["T"] = [new ModelColumn(typeof(decimal), "A")] };
+        Dictionary<string, Type> kape22Fields = new() { ["Champ"] = typeof(int?) };
+        MappingAnnexEntry[] annex = [new MappingAnnexEntry("A", 1, "KAPE22.Champ", MappingAnnexStatus.Sourced, "T")];
+
+        IReadOnlyList<string> failures = MappingAnnexCompleteness.CheckMapperScaleUsage(annex, model, kape22Fields, callSites: []);
+
+        Assert.Contains(failures, failure => failure.Contains("T.A", StringComparison.Ordinal) && failure.Contains("bypasses", StringComparison.Ordinal));
+    }
+
+    // Story 4.10 (B-1/B-2): a call site whose scale matches the annex passes.
+    [Fact]
+    [Trait("AC", "4.10-B1")]
+    [Trait("AC", "4.10-B2")]
+    public void MapperScaleCallSite_MatchesAnnexScale_PassesCheck_AcB1B2()
+    {
+        Dictionary<string, IReadOnlyList<ModelColumn>> model = new() { ["T"] = [new ModelColumn(typeof(decimal), "A")] };
+        Dictionary<string, Type> kape22Fields = new() { ["Champ"] = typeof(int?) };
+        MappingAnnexEntry[] annex = [new MappingAnnexEntry("A", 1, "KAPE22.Champ", MappingAnnexStatus.Sourced, "T")];
+        MapperScaleCallSite[] callSites = [new MapperScaleCallSite("A", 1, "T")];
+
+        IReadOnlyList<string> failures = MappingAnnexCompleteness.CheckMapperScaleUsage(annex, model, kape22Fields, callSites);
+
+        Assert.Empty(failures);
+    }
+
+    // Story 4.10 (B-1/B-2): the extraction regex itself, against a small literal snippet mirroring the
+    // real mappers' "Property = DecimalScale.Apply(source.Field ?? 0, N)" shape (with and without the
+    // "?? 0" fallback, as OrdreFabricationMapper and the SectionCharge* mappers respectively use).
+    [Fact]
+    [Trait("AC", "4.10-B1")]
+    public void MapperScaleCallSites_ExtractFrom_ReadsPropertyAndLiteralScale()
+    {
+        const string source = """
+            return new L_D_ORDRE_FABRICATION
+            {
+                DiametreProduit = DecimalScale.Apply(source.DiametreProduit ?? 0, 1),
+                LongueurCD = DecimalScale.Apply(source.LongueurCD ?? 0, 3),
+            };
+            """;
+
+        IReadOnlyList<MapperScaleCallSite> callSites = MapperScaleCallSites.ExtractFrom(source, "T");
+
+        Assert.Equal(2, callSites.Count);
+        Assert.Contains(callSites, site => site is { Property: "DiametreProduit", Scale: 1, Table: "T" });
+        Assert.Contains(callSites, site => site is { Property: "LongueurCD", Scale: 3, Table: "T" });
+    }
+
+    // Story 4.10 (B-1/B-2): the real gate - every one of the 21 literal DecimalScale.Apply call sites
+    // across the 5 real mappers matches the real annex's Scale for the same column. Story 4.10 is not
+    // done until this one is green.
+    [Fact]
+    [Trait("AC", "4.10-B1")]
+    [Trait("AC", "4.10-B2")]
+    public void MapperScaleCallSites_MatchTheRealAnnexScale_AcB1B2()
+    {
+        string annexPath = RepoLayout.ProjectFile(
+            Path.Combine("_bmad-output", "implementation-artifacts", "annexe-mapping-dispatch-epic4.md"));
+        IReadOnlyList<MappingAnnexEntry> annex = MappingAnnex.Parse(File.ReadAllText(annexPath));
+
+        List<MapperScaleCallSite> callSites = [];
+        callSites.AddRange(MapperScaleCallSites.ExtractFrom(MapperSource("OrdreFabricationMapper.cs"), "L_D_ORDRE_FABRICATION"));
+        callSites.AddRange(MapperScaleCallSites.ExtractFrom(MapperSource("SectionChargeChutageMapper.cs"), "L_D_SECTIONCHARGE_CHUTAGE"));
+        callSites.AddRange(MapperScaleCallSites.ExtractFrom(MapperSource("SectionChargeDecoupeMapper.cs"), "L_D_SECTIONCHARGE_DECOUPE"));
+        callSites.AddRange(MapperScaleCallSites.ExtractFrom(MapperSource("SectionChargeLingotMapper.cs"), "L_D_SECTIONCHARGE_LINGOT"));
+        callSites.AddRange(MapperScaleCallSites.ExtractFrom(MapperSource("SectionChargePitsMapper.cs"), "L_D_SECTIONCHARGE_PITS"));
+        Assert.Equal(21, callSites.Count);
+
+        IReadOnlyList<string> failures = MappingAnnexCompleteness.CheckMapperScaleUsage(
+            annex, ModelColumnsByTable(), Kape22FieldTypes(), callSites);
+
+        Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
+    }
+
+    private static string MapperSource(string fileName) =>
+        File.ReadAllText(RepoLayout.ProjectFile(Path.Combine("src", "Kape22Importer", fileName)));
+
     private static IReadOnlyDictionary<string, Type> NoKape22Fields { get; } = new Dictionary<string, Type>();
 
     private static ModelColumn Col(string name) => new(typeof(string), name);

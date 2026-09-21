@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Data.Common;
+using System.Globalization;
 using System.Linq;
+using System.Reflection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using TextToXml;
@@ -21,7 +23,9 @@ namespace Kape22Importer.Persistence;
 // is rejected instead, with a REJETÉ log row citing the missing Coulee (AC-FR20-5).
 // A same-bundle L_D_CONSIGNES natural-key collision (two sections sharing the same CodeOperation for
 // this OF) is rejected the same way, with a REJETÉ log row citing the colliding CodeOperation, before
-// ConsignesRows.AddRange is ever called (A-5, Epic 4 retro).
+// ConsignesRows.AddRange is ever called (A-5, Epic 4 retro). A scaled decimal column whose value
+// exceeds its DECIMAL(p,s) column's magnitude (DownstreamColumnMagnitudes) is rejected the same way
+// too, before anything is staged (B-5, Story 4.10 hardening).
 // On a bundle that already carries Errors (Kape22Mapper.Map failed upstream, or one of
 // Kape22ImportBundleMapper's own FR-20 controls tripped): no L_D_KAPE22 row; a single
 // "<NumeroFichier> — REJETÉ : <summary>" L_D_LOG_COMMANDE row in its own transaction when the OF is
@@ -126,19 +130,19 @@ public sealed class Kape22Persister(AscoLsiDbContext context, IConfiguration con
             {
                 string collisionMessage = $"OF '{of}' : plusieurs consignes partagent le même "
                     + $"CodeOperation '{collidingGroup[0].CodeOperation}'.";
-                ConversionError collisionError = new() { Block = Block.File, Code = ErrorCode.BusinessRuleViolation, Message = collisionMessage };
-                context.LogCommandeRows.Add(BuildLogRow(of, $"{numeroFichier} — REJETÉ : {collisionMessage}"));
+                return RejectWithBusinessRuleViolation(of, numeroFichier, collisionMessage);
+            }
 
-                try
-                {
-                    context.SaveChanges();
-                }
-                catch (Exception exception) when (exception is DbUpdateException or DbException)
-                {
-                    return PersistenceFailure(exception, [collisionError]);
-                }
-
-                return new ImportResult { Errors = [collisionError] };
+            // B-5 (Story 4.10 hardening): DecimalScale.Apply corrects decimal placement but never checks
+            // a column's total DECIMAL(p,s) magnitude - an out-of-gabarit raw KAPE22 int, once scaled,
+            // can still exceed it and would otherwise overflow at SaveChanges as an undiagnosed SQL
+            // exception. Checked here, before anything is staged, against DownstreamColumnMagnitudes;
+            // same ConversionError/REJETÉ-log shape as the check above.
+            string? magnitudeOverflow = FindMagnitudeOverflow(bundle);
+            if (magnitudeOverflow is not null)
+            {
+                string magnitudeMessage = $"OF '{of}' : la valeur convertie {magnitudeOverflow} dépasse le gabarit de sa colonne.";
+                return RejectWithBusinessRuleViolation(of, numeroFichier, magnitudeMessage);
             }
 
             context.Kape22Rows.Add(entity);
@@ -208,6 +212,81 @@ public sealed class Kape22Persister(AscoLsiDbContext context, IConfiguration con
     {
         string okMessage = numeroFichier + OkMessageSuffix;
         return context.LogCommandeRows.Any(row => row.OF == of && row.Message == okMessage);
+    }
+
+    // Shared shape behind the Consignes-collision (A-5) and magnitude-overflow (B-5) pre-checks: one
+    // BusinessRuleViolation ConversionError, one REJETÉ L_D_LOG_COMMANDE row, committed in its own
+    // SaveChanges - a SaveChanges failure here still carries the original message forward, the same way
+    // the missing-Coulee block above (left untouched, AC-FR20-5) does inline.
+    private ImportResult RejectWithBusinessRuleViolation(string of, string numeroFichier, string message)
+    {
+        ConversionError error = new() { Block = Block.File, Code = ErrorCode.BusinessRuleViolation, Message = message };
+        context.LogCommandeRows.Add(BuildLogRow(of, $"{numeroFichier} — REJETÉ : {message}"));
+
+        try
+        {
+            context.SaveChanges();
+        }
+        catch (Exception exception) when (exception is DbUpdateException or DbException)
+        {
+            return PersistenceFailure(exception, [error]);
+        }
+
+        return new ImportResult { Errors = [error] };
+    }
+
+    // B-5: the first mapped downstream decimal property whose value's magnitude reaches or exceeds its
+    // column's DownstreamColumnMagnitudes bound, formatted "<Entity>.<Property> = <value>", or null when
+    // every scaled column is in gabarit. Reflection over the mapped entities' own properties, not the
+    // AD-2 "zero reflection" mapper style - this is the persister's own one-shot check, run once per
+    // Fichier, not a mapper.
+    private static string? FindMagnitudeOverflow(Kape22ImportBundle bundle)
+    {
+        foreach (object entity in DownstreamDecimalEntities(bundle))
+        {
+            foreach (PropertyInfo property in entity.GetType().GetProperties())
+            {
+                if (!DownstreamColumnMagnitudes.MaxAbsoluteValues.TryGetValue(property.Name, out decimal bound))
+                {
+                    continue;
+                }
+
+                if (property.GetValue(entity) is decimal actual && Math.Abs(actual) >= bound)
+                {
+                    return $"{entity.GetType().Name}.{property.Name} = {actual.ToString(CultureInfo.InvariantCulture)}";
+                }
+            }
+        }
+
+        return null;
+    }
+
+    // The bundle's downstream entities that can carry a DownstreamColumnMagnitudes-registered column -
+    // OrdreFabrication always (non-null on the success path this check runs on), the 4 SectionCharge*
+    // tables only when the Story 4.4 per-OF applicability rule kept them.
+    private static IEnumerable<object> DownstreamDecimalEntities(Kape22ImportBundle bundle)
+    {
+        yield return bundle.OrdreFabrication!;
+
+        if (bundle.SectionChargeChutage is not null)
+        {
+            yield return bundle.SectionChargeChutage;
+        }
+
+        if (bundle.SectionChargeDecoupe is not null)
+        {
+            yield return bundle.SectionChargeDecoupe;
+        }
+
+        if (bundle.SectionChargeLingot is not null)
+        {
+            yield return bundle.SectionChargeLingot;
+        }
+
+        if (bundle.SectionChargePits is not null)
+        {
+            yield return bundle.SectionChargePits;
+        }
     }
 
     // Adds a Story 4.1 downstream entity only when the Story 4.3/4.4 mapper found its section applicable

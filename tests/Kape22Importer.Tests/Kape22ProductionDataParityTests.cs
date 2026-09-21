@@ -197,6 +197,159 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
             .ToList();
     }
 
+    // Story 4.10 (B-3): DecimalScale.Apply's own literal scale (Story 4.3-bis) is only ever checked
+    // against the annex (B-1) - never against what the legacy application actually stored for the same
+    // Fichier. Round-trips L_D_ORDRE_FABRICATION and the L_D_SECTIONCHARGE_* tables DecimalScale scales
+    // (Chutage, Decoupe, Lingot, Pits - Refroidissoirs/PoidsMetrique/Svt carry no decimal column,
+    // 4.2-bis) through the test database the same way as MappedFichier_MatchesLegacyProductionRow, then
+    // compares only their DownstreamColumnMagnitudes-registered (scaled) columns against the real
+    // production row - never a full row: L_D_ORDRE_FABRICATION's non-scaled columns are legitimately
+    // rewritten by later, non-P60 GPAO events (annexe-mapping-dispatch-epic4.md), which a full-row
+    // compare would flag as a false regression. A table with no production row for this OF, or with the
+    // Story 4.4 per-OF applicability rule leaving its mapper output null, has nothing to compare and is
+    // silently skipped rather than failing the whole Fichier.
+    [SkippableTheory]
+    [MemberData(nameof(P60Fichiers))]
+    public void MappedFichier_ScaledDownstreamColumns_MatchLegacyProductionRow(string fichierName)
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason ?? "SQL Server test instance unavailable.");
+        Skip.If(
+            string.IsNullOrWhiteSpace(ProductionConnectionString),
+            "No production database configured. Set ConnectionStrings:AscoLSI_Production in " +
+            "tests/Kape22Importer.Tests/appsettings.Test.json or KAPE22_TEST_ConnectionStrings__AscoLSI_Production.");
+
+        byte[] bytes = File.ReadAllBytes(Path.Combine(P60Directory, fichierName));
+        ConversionResult conversion = Converter.Convert(bytes, EmbeddedDescriptor.Xml);
+        Assert.True(conversion.Success, $"Step 1 failed for {fichierName}: {Describe(conversion.Errors)}");
+
+        MapResult<L_D_KAPE22> mapping = new Kape22Mapper(StableClock()).Map(conversion.Xml!, fichierName);
+        Assert.True(mapping.Success, $"Step 2 mapping failed for {fichierName}: {Describe(mapping.Errors)}");
+        L_D_KAPE22 mapped = mapping.Value!;
+        string of = mapped.OF.Trim();
+
+        L_D_ORDRE_FABRICATION? productionOrdre = ReadProductionRow<L_D_ORDRE_FABRICATION>(
+            rows => rows.FirstOrDefault(row => row.OF == of));
+        Skip.If(
+            productionOrdre is null,
+            $"{fichierName}: aucune ligne L_D_ORDRE_FABRICATION en production pour OF '{of}'.");
+
+        List<string> regressions = [];
+        L_D_ORDRE_FABRICATION testOrdre = RoundTrip(
+            OrdreFabricationMapper.Map(mapped, StableClock()), rows => rows.Single(row => row.OF == of));
+        regressions.AddRange(ScaledRegressions(testOrdre, productionOrdre!));
+
+        CompareSectionCharge(regressions, fichierName, of, SectionChargeChutageMapper.Map(mapped));
+        CompareSectionCharge(regressions, fichierName, of, SectionChargeDecoupeMapper.Map(mapped));
+        CompareSectionCharge(regressions, fichierName, of, SectionChargeLingotMapper.Map(mapped));
+        CompareSectionCharge(regressions, fichierName, of, SectionChargePitsMapper.Map(mapped));
+
+        Assert.True(
+            regressions.Count == 0,
+            $"{fichierName} (OF {of}) diverge de la production sur une colonne mise à l'échelle :\n" +
+            string.Join("\n", regressions));
+    }
+
+    // A section-charge table is per-OF applicable or not (Story 4.4): a null mapped entity, or no
+    // matching production row, means nothing to compare here - not a regression. Unlike
+    // L_D_ORDRE_FABRICATION (whose key IS OF, so at most one production row can ever exist), a
+    // L_D_SECTIONCHARGE_* table's key is (OF, CodeOperation) - OF alone can legitimately match more than
+    // one production row across re-dispatches, so a silent FirstOrDefault could compare against the
+    // wrong one; ambiguity fails loudly instead, the same policy ReadProductionRows already applies to
+    // L_D_KAPE22 above.
+    private void CompareSectionCharge<TEntity>(List<string> regressions, string fichierName, string of, TEntity? mapped)
+        where TEntity : class
+    {
+        if (mapped is null)
+        {
+            return;
+        }
+
+        List<TEntity> candidates = ReadProductionRows<TEntity>(rows => WithOf(rows, of).ToList());
+        if (candidates.Count == 0)
+        {
+            return;
+        }
+
+        Assert.True(
+            candidates.Count == 1,
+            $"{fichierName}: {candidates.Count} lignes de production {typeof(TEntity).Name} pour OF '{of}' " +
+            "- impossible de designer la ligne de reference.");
+
+        TEntity testRow = RoundTrip(mapped, rows => WithOf(rows, of).Single());
+        regressions.AddRange(ScaledRegressions(testRow, candidates[0]));
+    }
+
+    // Every L_D_SECTIONCHARGE_* entity this test round-trips shares a string OF column (half of its
+    // composite key). EF.Property<string> reaches it in a form EF Core actually translates to SQL against
+    // a real provider - a PropertyInfo-reflection filter throws "the LINQ expression could not be
+    // translated" instead.
+    private static IQueryable<TEntity> WithOf<TEntity>(IQueryable<TEntity> rows, string of)
+        where TEntity : class =>
+        rows.Where(row => EF.Property<string>(row, "OF") == of);
+
+    // Compares only the DownstreamColumnMagnitudes-registered (scale-guarded) decimal columns of two
+    // same-typed entities - the columns B-3 exists to check, never the full row.
+    private static IEnumerable<string> ScaledRegressions<TEntity>(TEntity testRow, TEntity productionRow)
+    {
+        foreach (PropertyInfo property in typeof(TEntity).GetProperties())
+        {
+            if (!DownstreamColumnMagnitudes.MaxAbsoluteValues.ContainsKey(property.Name))
+            {
+                continue;
+            }
+
+            object? expected = property.GetValue(productionRow);
+            object? actual = property.GetValue(testRow);
+            if (!Equals(expected, actual))
+            {
+                yield return $"{typeof(TEntity).Name}.{property.Name}: production={Format(expected)}, nouveau traitement={Format(actual)}";
+            }
+        }
+    }
+
+    // Generic counterpart of RoundTripThroughTestDatabase for the Story 4.1 downstream tables: none of
+    // them has a generated identity (natural business key), so the caller supplies how to reload the
+    // just-inserted row instead of matching on Id.
+    private TEntity RoundTrip<TEntity>(TEntity entity, Func<IQueryable<TEntity>, TEntity> reload)
+        where TEntity : class
+    {
+        using TransactionScope scope = new(TransactionScopeAsyncFlowOption.Enabled);
+        using AscoLsiDbContext context = fixture.NewAscoLsiContext();
+        context.Database.OpenConnection();
+
+        context.Set<TEntity>().Add(entity);
+        context.SaveChanges();
+
+        // No scope.Complete(): the insert rolls back here, same as RoundTripThroughTestDatabase.
+        return reload(context.Set<TEntity>().AsNoTracking());
+    }
+
+    // READ-ONLY production access for the downstream tables - a LINQ query only, never Add/SaveChanges,
+    // the same discipline as ReadProductionRows.
+    private static TEntity? ReadProductionRow<TEntity>(Func<IQueryable<TEntity>, TEntity?> query)
+        where TEntity : class
+    {
+        DbContextOptions<AscoLsiDbContext> options = new DbContextOptionsBuilder<AscoLsiDbContext>()
+            .UseSqlServer(ProductionConnectionString)
+            .Options;
+
+        using AscoLsiDbContext production = new(options);
+        return query(production.Set<TEntity>().AsNoTracking());
+    }
+
+    // List-returning counterpart of ReadProductionRow, for a table whose key isn't OF alone (the 4
+    // L_D_SECTIONCHARGE_* tables) - the caller must handle more than one candidate itself.
+    private static List<TEntity> ReadProductionRows<TEntity>(Func<IQueryable<TEntity>, List<TEntity>> query)
+        where TEntity : class
+    {
+        DbContextOptions<AscoLsiDbContext> options = new DbContextOptionsBuilder<AscoLsiDbContext>()
+            .UseSqlServer(ProductionConnectionString)
+            .Options;
+
+        using AscoLsiDbContext production = new(options);
+        return query(production.Set<TEntity>().AsNoTracking());
+    }
+
     // Trailing spaces on a fixed-width NCHAR column are storage padding, not a data difference.
     private static object? Normalize(object? value) => value is string text ? text.TrimEnd() : value;
 
