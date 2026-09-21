@@ -1051,3 +1051,37 @@ s'y trouver et rester à confirmer.
 - source_spec: `spec-4-10-hardening-epic-4-b.md`
   summary: `MappingAnnexSchema.CheckMapperScaleUsage` (B-1/B-2) only cross-checks annex rows with `Status == Sourced`; a `Règle`/`à_clarifier`-status row that later gained both a `Scale` value and a real `DecimalScale.Apply` call site in its mapper would not be checked by this guard at all — it mirrors the original 4.2-bis Scale-presence check's own `Sourced`-only scope, not a gap newly introduced by this story's guard specifically.
   evidence: Found at Story 4.10 code review (edge-case-hunter). No current annex row hits this — all 21 real `DecimalScale.Apply` call sites are `Sourced`-status (verified by `MapperScaleCallSites_MatchTheRealAnnexScale_AcB1B2`). Revisit only if a `Règle`/`à_clarifier` row is ever reclassified to `Sourced` with a KAPE22 int source and a narrow decimal target.
+
+## Deferred from: code review of story-4.10 (2026-09-21)
+
+- source_spec: `spec-4-10-hardening-epic-4-b.md`
+  summary: `Kape22Persister`'s missing-Coulee rejection block (`Kape22Persister.cs:92-112`, AC-FR20-5) still duplicates the `ConversionError`/REJETÉ-log/`SaveChanges`+catch shape inline instead of calling the `RejectWithBusinessRuleViolation` helper this story extracted for the Consignes-collision (A-5) and magnitude-overflow (B-5) checks right below it. The refactor unified two of the three identical copies, leaving the file in a mixed style.
+  evidence: Found at /run-review of story-4.10 (blind-hunter). Purely a style/consistency nit — the missing-Coulee block's behavior is unchanged and correct. Revisit the next time `Kape22Persister`'s rejection blocks are touched.
+
+- source_spec: `spec-4-10-hardening-epic-4-b.md`
+  summary: `DownstreamColumnMagnitudesParityTests` (`DownstreamColumnMagnitudesParityTests.cs`) locks `DownstreamColumnMagnitudes` against `10^(p-s)` only, so two columns with different `(p,s)` but the same `p-s` (e.g. `DECIMAL(4,1)` vs `DECIMAL(6,3)`) would yield the same bound and be indistinguishable to this parity test — it cannot catch a `DecimalScale.Apply` literal scale drift as long as `p-s` happens to still match.
+  evidence: Found at /run-review of story-4.10 (blind-hunter). No current column pair hits this collision (verified against `scripts/schema/01-ascolsi-tables.sql`'s real `(p,s)` values for the 17 registered columns). Revisit only if a future column addition creates a `p-s` collision with a mismatched actual scale.
+
+- source_spec: `spec-4-10-hardening-epic-4-b.md`
+  summary: `Kape22Persister.FindMagnitudeOverflow` (`Kape22Persister.cs:243`) reports the first out-of-gabarit column found via `entity.GetType().GetProperties()`, whose enumeration order is a CLR implementation detail, not a documented contract. No test pins which column is named in the REJETÉ message when more than one column overflows simultaneously.
+  evidence: Found at /run-review of story-4.10 (blind-hunter). A future refactor could silently change which column an operator sees named; low impact since the message still correctly signals a rejection either way. Revisit if operators ever need a stable "first offender" guarantee.
+
+- source_spec: `spec-4-10-hardening-epic-4-b.md`
+  summary: `Kape22ProductionDataParityTests.CompareSectionCharge` (`Kape22ProductionDataParityTests.cs:259`) silently returns when a mapper output is null or has no matching production row, with nothing asserting that at least one `SectionCharge*` comparison actually ran across the theory's `P60Fichiers` fixtures. A fixture set that happened to hit only skip branches would report green with zero real assertions for those tables.
+  evidence: Found at /run-review of story-4.10 (blind-hunter). This test is `Category=Integration`, opt-in behind a production connection string (AR-12) — never runs in CI unattended. Revisit if this suite becomes part of a required gate.
+
+- source_spec: `spec-4-10-hardening-epic-4-b.md`
+  summary: `SqlTableSchema.DecimalMagnitudeFor` (`SqlTableSchema.cs:88`) computes `(decimal)Math.Pow(10, precision - scale)` via double-precision floating point before casting to `decimal`. A `DECIMAL(p,s)` column with `p-s >= 29` would overflow the `decimal` cast with an unhandled `OverflowException`, crashing any `SqlTableSchema.Read` call over that table — not just this story's own tests.
+  evidence: Found at /run-review of story-4.10 (edge-case-hunter). No column in `scripts/schema/01-ascolsi-tables.sql` today has `p-s >= 29` (largest is 7). Revisit if a future AFV004-LSI schema regeneration ever introduces such a column, or replace with an integer-exact computation as a defensive measure.
+
+- source_spec: `spec-4-10-hardening-epic-4-b.md`
+  summary: `MappingAnnexCompleteness.CheckMapperScaleUsage` (`MappingAnnexSchema.cs:202`) takes only the first `MapperScaleCallSite` via `FirstOrDefault()` when more than one call site targets the same Table+Column; a second, divergent call site for that same column would go unchecked.
+  evidence: Found at /run-review of story-4.10 (edge-case-hunter). Unreachable under the mappers' current object-initializer style (`new T { Property = ... }`), where assigning the same property twice in one initializer is a C# compile error (CS1912). Revisit only if a mapper ever assigns a scaled property outside a single object initializer.
+
+- source_spec: `spec-4-10-hardening-epic-4-b.md`
+  summary: `scripts/e2e-worker-import.ps1`'s `--filter "FullyQualifiedName~Kape22ProductionDataParityTests&DisplayName~$fichier"` clause (line 188) could match zero tests (a naming/typo mismatch) and `dotnet test` would still exit 0, so the new B-4 `$LASTEXITCODE` guard (line 191) would never fire even though no parity comparison actually ran.
+  evidence: Found at /run-review of story-4.10 (edge-case-hunter). The `--filter` clause itself predates this story and is unchanged by it; only the exit-code check is new. Revisit if this script's filter is ever rewritten, or add a "did anything run" assertion alongside the exit-code check.
+
+- source_spec: `spec-4-10-hardening-epic-4-b.md`
+  summary: The spec's own "Suggested Review Order" and "Code Map" sections cite exact line numbers (`Kape22Persister.cs:243`, `:267`, `:221`, `DownstreamColumnMagnitudes.cs:19`, etc.) that will silently go stale the next time anyone edits those files — a purely textual, unenforced cross-reference inside a `<frozen-after-approval>`-adjacent document.
+  evidence: Found at /run-review of story-4.10 (blind-hunter). Same class of drift risk as every other spec's line-numbered "Suggested Review Order" section in this project; not specific to Story 4.10. Revisit only if stale line references are found to actively mislead a future reviewer.

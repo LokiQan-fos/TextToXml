@@ -10,12 +10,12 @@ namespace Kape22Importer.Tests;
 
 // Story 4.10 (B-5): same discipline as DownstreamColumnLengthsParityTests, for the DECIMAL(p,s)
 // magnitude bound Kape22Persister's pre-SaveChanges guard checks scaled columns against. In scope is
-// exactly the set DecimalScale.Apply actually touches - the same 21 call sites MappingAnnexCompleteness
-// -Tests' B-1/B-2 gate extracts via MapperScaleCallSites - not every DECIMAL column of these 5 tables:
-// L_D_SECTIONCHARGE_LINGOT's 4 PriseDeFer* columns are DECIMAL(4,1) too but stay at their CLR default
-// (à_clarifier, never assigned via DecimalScale.Apply - see the mapper's own comment), so they carry no
-// overflow risk from a mapper-produced value and no DownstreamColumnMagnitudes entry. Written
-// test-first (CC-1), Unit-only.
+// exactly the set DecimalScale.Apply actually touches - the same 21 call sites
+// MappingAnnexCompletenessTests' B-1/B-2 gate extracts via MapperScaleCallSites - not every DECIMAL
+// column of these 5 tables: L_D_SECTIONCHARGE_LINGOT's 4 PriseDeFer* columns are DECIMAL(4,1) too but
+// stay at their CLR default (à_clarifier, never assigned via DecimalScale.Apply - see the mapper's own
+// comment), so they carry no overflow risk from a mapper-produced value and no
+// DownstreamColumnMagnitudes entry. Written test-first (CC-1), Unit-only.
 [Trait("Category", TestCategory.Unit)]
 public class DownstreamColumnMagnitudesParityTests
 {

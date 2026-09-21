@@ -272,7 +272,7 @@ public class MappingAnnexCompletenessTests
             return new L_D_ORDRE_FABRICATION
             {
                 DiametreProduit = DecimalScale.Apply(source.DiametreProduit ?? 0, 1),
-                LongueurCD = DecimalScale.Apply(source.LongueurCD ?? 0, 3),
+                LongueurCD = DecimalScale.Apply(source.LongueurCD, 3),
             };
             """;
 

@@ -66,6 +66,21 @@ baseline_commit: '61c2e40ec715a72a6893b24ed05f18e2b012403e'
 
 **Acceptance Criteria:** the 5 Given/When/Then ACs verbatim in `epics.md` § "Story 4.10 : Hardening Épic 4 (B-1..B-5)".
 
+### Review Findings
+
+- [x] [Review][Patch] Accented-French typo "designer"/"reference" in a new assertion message [tests/Kape22Importer.Tests/Kape22ProductionDataParityTests.cs:276] — fixed: "désigner la ligne de référence"
+- [x] [Review][Patch] Garbled line-wrapped comment splits "MappingAnnexCompleteness" across a stray hyphen [tests/Kape22Importer.Tests/DownstreamColumnMagnitudesParityTests.cs:13-14] — fixed: re-wrapped
+- [x] [Review][Patch] Test doc comment claims coverage of the "no `?? 0`" call-site shape that the test's own literal snippet never exercises [tests/Kape22Importer.Tests/MappingAnnexCompletenessTests.cs:269] — fixed: `LongueurCD` literal now omits `?? 0`, matching the SectionCharge* mapper shape the comment claims to cover
+- [x] [Review][Patch] No regression test drives a negative out-of-gabarit value through the magnitude guard [tests/Kape22Importer.Tests/DecimalMagnitudeGuardTests.cs] — investigated, not applicable: `NormalizedXmlBuilder.cs:156` enforces D17 ("Int Champs are always unsigned", `NumberStyles.None`), so no KAPE22 source field feeding a `DownstreamColumnMagnitudes`-registered column can ever carry a negative raw value; `FindMagnitudeOverflow`'s `Math.Abs` is defensive-only and unreachable via any real input, so a synthetic negative-value test would test a path the real pipeline can never take. No test added.
+- [x] [Review][Defer] Missing-Coulee block still duplicates the ConversionError/REJETÉ/SaveChanges shape inline instead of using this story's own `RejectWithBusinessRuleViolation` helper [src/Kape22Importer/Persistence/Kape22Persister.cs:92-112] — deferred, pre-existing
+- [x] [Review][Defer] `DownstreamColumnMagnitudesParityTests` locks only `10^(p-s)`, so two columns with different `(p,s)` but equal `p-s` would be indistinguishable [tests/Kape22Importer.Tests/DownstreamColumnMagnitudesParityTests.cs] — deferred, pre-existing
+- [x] [Review][Defer] `FindMagnitudeOverflow`'s reported column on a multi-column overflow relies on unordered reflection enumeration, untested [src/Kape22Importer/Persistence/Kape22Persister.cs:243] — deferred, pre-existing
+- [x] [Review][Defer] `CompareSectionCharge` silently no-ops on a missing mapper output or production row, with no assertion that at least one comparison ran [tests/Kape22Importer.Tests/Kape22ProductionDataParityTests.cs:259] — deferred, pre-existing
+- [x] [Review][Defer] `DecimalMagnitudeFor` uses double-precision `Math.Pow` before casting to `decimal`, would throw `OverflowException` for a `DECIMAL(p,s)` with `p-s>=29` (none exist in the current schema) [tests/Kape22Importer.Tests/SqlTableSchema.cs:88] — deferred, pre-existing
+- [x] [Review][Defer] `CheckMapperScaleUsage`'s `FirstOrDefault` only checks the first call site per Table+Column, unreachable under the mappers' object-initializer style [tests/Kape22Importer.Tests/MappingAnnexSchema.cs:202] — deferred, pre-existing
+- [x] [Review][Defer] The e2e script's `--filter` clause could match zero tests and still exit 0, pre-existing and not introduced by this story's `$LASTEXITCODE` guard [scripts/e2e-worker-import.ps1:188] — deferred, pre-existing
+- [x] [Review][Defer] The spec's own "Suggested Review Order"/"Code Map" line-number citations will silently go stale on the next edit [_bmad-output/implementation-artifacts/spec-4-10-hardening-epic-4-b.md] — deferred, pre-existing
+
 ## Spec Change Log
 
 ## Design Notes

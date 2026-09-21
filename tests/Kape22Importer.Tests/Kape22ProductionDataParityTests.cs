@@ -273,7 +273,7 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
         Assert.True(
             candidates.Count == 1,
             $"{fichierName}: {candidates.Count} lignes de production {typeof(TEntity).Name} pour OF '{of}' " +
-            "- impossible de designer la ligne de reference.");
+            "- impossible de désigner la ligne de référence.");
 
         TEntity testRow = RoundTrip(mapped, rows => WithOf(rows, of).Single());
         regressions.AddRange(ScaledRegressions(testRow, candidates[0]));
