@@ -1037,3 +1037,17 @@ s'y trouver et rester à confirmer.
 - source_spec: `spec-4-2-bis-extension-annexe-mapping-scale-precision.md`
   summary: `MappingAnnexCompleteness.IsInt` only recognizes `int`/`int?` as the KAPE22 source type that triggers the decimal-without-Scale rule. A future KAPE22 field typed `short`, `byte`, or `long` feeding a narrow `decimal` column would carry the same precision-loss risk but would not be caught by the guard this story adds.
   evidence: Found at Story 4.2-bis code review (blind-hunter). No live `L_D_KAPE22` field is currently typed `short`/`byte`/`long` (confirmed by reflection over `L_D_KAPE22.cs` — every numeric field is `int?` or `decimal?`), so this is speculative hardening rather than a live defect. Revisit only if such a field is ever added to `L_D_KAPE22`.
+
+## Deferred from: story-4.10 code review (2026-09-18)
+
+- source_spec: `spec-4-10-hardening-epic-4-b.md`
+  summary: B-5's magnitude REJETÉ message (`Kape22Persister.FindMagnitudeOverflow`/the new pre-`SaveChanges` check) embeds a code-shaped fragment (`"<EntityTypeName>.<PropertyName> = <value>"`) directly into an otherwise French business message, unlike the sibling missing-Coulee and Consignes-collision REJETÉ messages beside it, which describe the situation entirely in French business terms (coulée id, CodeOperation value) with no internal type/property names. An operator reading `L_D_LOG_COMMANDE` sees a C#-identifier-shaped fragment mixed into the French prose.
+  evidence: Found at Story 4.10 code review (blind-hunter). Same class of message-wording item Story 4.9's own code review already deferred rather than blocked on (`story-4-3-bis-review-item-4-e2e-script-exit-code-gap` sibling entry, A-5's REJETÉ message citing only the raw CodeOperation). Revisit if operators report the message is hard to read, or the next story to touch `Kape22Persister`'s REJETÉ messages.
+
+- source_spec: `spec-4-10-hardening-epic-4-b.md`
+  summary: B-4's new `$LASTEXITCODE` guard in `scripts/e2e-worker-import.ps1` (the per-`Fichier` production-parity `dotnet test` call) has no automated regression test — `GpaoImportP60WorkerEndToEndTests`'s happy-path run never drives a parity failure, so it cannot tell if the guard were later dropped or broken by a future edit to that loop. The frozen spec's own Verification section already scoped B-4 to a manual/CI spot-check rather than an automated test, so this is a known, accepted gap, not a blocker.
+  evidence: Found at Story 4.10 code review (verification-gap). Revisit if `e2e-worker-import.ps1` grows more guarded steps, or a lightweight pwsh-level test harness for this script is ever justified.
+
+- source_spec: `spec-4-10-hardening-epic-4-b.md`
+  summary: `MappingAnnexSchema.CheckMapperScaleUsage` (B-1/B-2) only cross-checks annex rows with `Status == Sourced`; a `Règle`/`à_clarifier`-status row that later gained both a `Scale` value and a real `DecimalScale.Apply` call site in its mapper would not be checked by this guard at all — it mirrors the original 4.2-bis Scale-presence check's own `Sourced`-only scope, not a gap newly introduced by this story's guard specifically.
+  evidence: Found at Story 4.10 code review (edge-case-hunter). No current annex row hits this — all 21 real `DecimalScale.Apply` call sites are `Sourced`-status (verified by `MapperScaleCallSites_MatchTheRealAnnexScale_AcB1B2`). Revisit only if a `Règle`/`à_clarifier` row is ever reclassified to `Sourced` with a KAPE22 int source and a narrow decimal target.
