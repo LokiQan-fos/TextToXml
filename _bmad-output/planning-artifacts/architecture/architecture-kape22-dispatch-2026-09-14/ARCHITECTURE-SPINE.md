@@ -122,7 +122,9 @@ flowchart LR
   perdre à l'un des deux les garanties de l'autre (garde-fou anti-doublon, rejet AC-FR11-4).
 - **Rule:** `Kape22ImportBundle` porte les **mêmes** métadonnées que `MapResult<L_D_KAPE22>`
   (`Success`, `Errors`, `Warnings`, `NumeroFichier`, `OF`) en plus des 9 entités avales
-  nullables. `Kape22Persister.Persist` est **remplacé** par une seule surface acceptant le
+  nullables (`OrdreFabrication`, `Coulee`, les 7 `SectionCharge*`) et de la liste `Consignes`
+  (non nullable, `List<L_D_CONSIGNES>`) — 10 entités avales au total depuis la Story 4.5.
+  `Kape22Persister.Persist` est **remplacé** par une seule surface acceptant le
   bundle (l'ancien appel `Persist(MapResult<L_D_KAPE22>)` disparaît, `Kape22FichierProcessor`
   est mis à jour dans la même story) — aucune deuxième méthode `Persist` gardée en parallèle.
 

@@ -295,12 +295,14 @@ public class MappingAnnexCompletenessTests
             Path.Combine("_bmad-output", "implementation-artifacts", "annexe-mapping-dispatch-epic4.md"));
         IReadOnlyList<MappingAnnexEntry> annex = MappingAnnex.Parse(File.ReadAllText(annexPath));
 
+        // C-3 (Épic 4 retro #3): the mapper-file -> table pairing is the one shared source
+        // (DownstreamDecimalMapperTables), also consumed by DownstreamColumnMagnitudesParityTests.
         List<MapperScaleCallSite> callSites = [];
-        callSites.AddRange(MapperScaleCallSites.ExtractFrom(MapperSource("OrdreFabricationMapper.cs"), "L_D_ORDRE_FABRICATION"));
-        callSites.AddRange(MapperScaleCallSites.ExtractFrom(MapperSource("SectionChargeChutageMapper.cs"), "L_D_SECTIONCHARGE_CHUTAGE"));
-        callSites.AddRange(MapperScaleCallSites.ExtractFrom(MapperSource("SectionChargeDecoupeMapper.cs"), "L_D_SECTIONCHARGE_DECOUPE"));
-        callSites.AddRange(MapperScaleCallSites.ExtractFrom(MapperSource("SectionChargeLingotMapper.cs"), "L_D_SECTIONCHARGE_LINGOT"));
-        callSites.AddRange(MapperScaleCallSites.ExtractFrom(MapperSource("SectionChargePitsMapper.cs"), "L_D_SECTIONCHARGE_PITS"));
+        foreach ((string mapperFile, string table) in DownstreamDecimalMapperTables.TableByMapperFile)
+        {
+            callSites.AddRange(MapperScaleCallSites.ExtractFrom(MapperSource(mapperFile), table));
+        }
+
         Assert.Equal(21, callSites.Count);
 
         IReadOnlyList<string> failures = MappingAnnexCompleteness.CheckMapperScaleUsage(

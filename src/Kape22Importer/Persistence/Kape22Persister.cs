@@ -90,6 +90,10 @@ public sealed class Kape22Persister(AscoLsiDbContext context, IConfiguration con
             // Coulee is never re-added - only a genuinely new one is (AD-7's "no navigation properties"
             // keeps this a plain existence check, not a relationship).
             string coulee = entity.Coulee;
+
+            // Business note (Q-5, Épic 4 retro #3): a Coulee is created once, by the first OF that
+            // references it, and reused as-is by every later OF of the same Coulee - a later OF never
+            // modifies the row a previous one created.
             bool couleeAlreadyExists = context.CouleeRows.Any(row => row.IdCoulee == coulee);
             if (entity.CodeConsignePits == Kape22ImportBundle.ColdConsignePits && !couleeAlreadyExists)
             {
@@ -121,17 +125,17 @@ public sealed class Kape22Persister(AscoLsiDbContext context, IConfiguration con
             // The full 4-part tuple mirrors L_D_CONSIGNES' real natural key, but OF is bundle-constant
             // today (every ConsignesMapper.Build call passes the same source.OF), so this grouping is
             // today effectively just CodeOperation, since TypeConsigne/ConsigneGPAO are always 0/false
-            // (spec Design Notes).
+            // (spec Design Notes). C-2 (Épic 4 retro #3): CodeOperation collides case-insensitively at
+            // the real SQL Server (case-insensitive collation) even though plain tuple equality would
+            // treat "XC1" and "xc1" as distinct - ConsignesNaturalKeyComparer makes only CodeOperation
+            // case-insensitive, OF/TypeConsigne/ConsigneGPAO stay ordinal, and the message below still
+            // reads collidingGroup[0]'s own original-case CodeOperation, never a normalized form.
             List<L_D_CONSIGNES>? collidingGroup = bundle.Consignes
-                .GroupBy(row => (row.OF, row.CodeOperation, row.TypeConsigne, row.ConsigneGPAO))
+                .GroupBy(
+                    row => (row.OF, row.CodeOperation, row.TypeConsigne, row.ConsigneGPAO),
+                    ConsignesNaturalKeyComparer.Instance)
                 .FirstOrDefault(group => group.Count() > 1)
                 ?.ToList();
-            if (collidingGroup is not null)
-            {
-                string collisionMessage = $"OF '{of}' : plusieurs consignes partagent le même "
-                    + $"CodeOperation '{collidingGroup[0].CodeOperation}'.";
-                return RejectWithBusinessRuleViolation(of, numeroFichier, collisionMessage);
-            }
 
             // B-5 (Story 4.10 hardening): DecimalScale.Apply corrects decimal placement but never checks
             // a column's total DECIMAL(p,s) magnitude - an out-of-gabarit raw KAPE22 int, once scaled,
@@ -139,10 +143,40 @@ public sealed class Kape22Persister(AscoLsiDbContext context, IConfiguration con
             // exception. Checked here, before anything is staged, against DownstreamColumnMagnitudes;
             // same ConversionError/REJETÉ-log shape as the check above.
             string? magnitudeOverflow = FindMagnitudeOverflow(bundle);
+
+            // C-4 (Épic 4 retro #3): a mapped downstream string column whose value exceeds its
+            // DownstreamColumnLengths bound would otherwise overflow at SaveChanges as an undiagnosed SQL
+            // truncation error - the same posture B-5 already established for decimal magnitude. Checked
+            // here, before anything is staged, against DownstreamColumnLengths.
+            string? lengthOverflow = FindLengthOverflow(bundle);
+
+            // C-6 (Épic 4 retro #3): A-5, B-5 and C-4 are independent pre-checks, but used to reject
+            // sequentially - a bundle failing more than one only ever reported whichever fired first, one
+            // SaveChanges each (a code-review finding: C-4 originally shipped after this accumulation as
+            // its own separate early return, silently reintroducing the same "first cause wins" symptom
+            // one guard later). All three now run unconditionally above and accumulate into a single
+            // REJETÉ log row / ConversionError when more than one fires. The missing-Coulee check above
+            // stays its own separate, untouched early return - out of this accumulation's scope.
+            List<string> businessRuleMessages = [];
+            if (collidingGroup is not null)
+            {
+                businessRuleMessages.Add($"OF '{of}' : plusieurs consignes partagent le même "
+                    + $"CodeOperation '{collidingGroup[0].CodeOperation}'.");
+            }
+
             if (magnitudeOverflow is not null)
             {
-                string magnitudeMessage = $"OF '{of}' : la valeur convertie {magnitudeOverflow} dépasse le gabarit de sa colonne.";
-                return RejectWithBusinessRuleViolation(of, numeroFichier, magnitudeMessage);
+                businessRuleMessages.Add($"OF '{of}' : la valeur convertie {magnitudeOverflow} dépasse le gabarit de sa colonne.");
+            }
+
+            if (lengthOverflow is not null)
+            {
+                businessRuleMessages.Add($"OF '{of}' : la valeur '{lengthOverflow}' dépasse la longueur maximale de sa colonne.");
+            }
+
+            if (businessRuleMessages.Count > 0)
+            {
+                return RejectWithBusinessRuleViolation(of, numeroFichier, businessRuleMessages);
             }
 
             context.Kape22Rows.Add(entity);
@@ -156,6 +190,10 @@ public sealed class Kape22Persister(AscoLsiDbContext context, IConfiguration con
             AddIfPresent(context.SectionChargeChutageRows, bundle.SectionChargeChutage);
             AddIfPresent(context.SectionChargeDecoupeRows, bundle.SectionChargeDecoupe);
             AddIfPresent(context.SectionChargeLingotRows, bundle.SectionChargeLingot);
+
+            // C-7 (Épic 4 retro #3): Pits is never actually null here - AC-FR20-4 already rejected the
+            // bundle upstream (Kape22ImportBundleMapper) when SectionChargePitsMapper returned null - but
+            // AddIfPresent's own null-check still guards it uniformly with its 6 siblings.
             AddIfPresent(context.SectionChargePitsRows, bundle.SectionChargePits);
             AddIfPresent(context.SectionChargePoidsMetriqueRows, bundle.SectionChargePoidsMetrique);
             AddIfPresent(context.SectionChargeRefroidissoirsRows, bundle.SectionChargeRefroidissoirs);
@@ -208,18 +246,23 @@ public sealed class Kape22Persister(AscoLsiDbContext context, IConfiguration con
         }
     }
 
+    // Business note (Q-3, Épic 4 retro #3): an OF cannot be resubmitted today - a failed OF is reissued
+    // under a new OF number rather than retried under the same NumeroFichier/OF pair.
     private bool OkLogRowExists(string numeroFichier, string of)
     {
         string okMessage = numeroFichier + OkMessageSuffix;
         return context.LogCommandeRows.Any(row => row.OF == of && row.Message == okMessage);
     }
 
-    // Shared shape behind the Consignes-collision (A-5) and magnitude-overflow (B-5) pre-checks: one
-    // BusinessRuleViolation ConversionError, one REJETÉ L_D_LOG_COMMANDE row, committed in its own
-    // SaveChanges - a SaveChanges failure here still carries the original message forward, the same way
-    // the missing-Coulee block above (left untouched, AC-FR20-5) does inline.
-    private ImportResult RejectWithBusinessRuleViolation(string of, string numeroFichier, string message)
+    // Shared shape behind the Consignes-collision (A-5), magnitude-overflow (B-5) and length-overflow
+    // (C-4) pre-checks: one BusinessRuleViolation ConversionError, one REJETÉ L_D_LOG_COMMANDE row,
+    // committed in its own SaveChanges - a SaveChanges failure here still carries the original message(s)
+    // forward, the same way the missing-Coulee block above (left untouched, AC-FR20-5) does inline. C-6
+    // (Épic 4 retro #3): messages is a list, not a single string, so the A-5+B-5 caller can combine both
+    // causes into the one ConversionError/REJETÉ row a simultaneous failure of both must produce.
+    private ImportResult RejectWithBusinessRuleViolation(string of, string numeroFichier, IReadOnlyList<string> messages)
     {
+        string message = string.Join(" ; ", messages);
         ConversionError error = new() { Block = Block.File, Code = ErrorCode.BusinessRuleViolation, Message = message };
         context.LogCommandeRows.Add(BuildLogRow(of, $"{numeroFichier} — REJETÉ : {message}"));
 
@@ -289,6 +332,82 @@ public sealed class Kape22Persister(AscoLsiDbContext context, IConfiguration con
         }
     }
 
+    // C-4 (Épic 4 retro #3): the first mapped downstream string property whose value exceeds its
+    // column's DownstreamColumnLengths bound, formatted "<Entity>.<Property> = <value>", or null when
+    // every bounded column is within length. Same reflection-walk shape as FindMagnitudeOverflow, run
+    // once per Fichier, not a mapper.
+    private static string? FindLengthOverflow(Kape22ImportBundle bundle)
+    {
+        foreach (object entity in DownstreamStringEntities(bundle))
+        {
+            foreach (PropertyInfo property in entity.GetType().GetProperties())
+            {
+                if (!DownstreamColumnLengths.MaxLengths.TryGetValue(property.Name, out int maxLength))
+                {
+                    continue;
+                }
+
+                if (property.GetValue(entity) is string actual && actual.Length > maxLength)
+                {
+                    return $"{entity.GetType().Name}.{property.Name} = {actual}";
+                }
+            }
+        }
+
+        return null;
+    }
+
+    // C-4: the bundle's downstream entities that can carry a DownstreamColumnLengths-registered string
+    // column - all 10 Story 4.1 tables (string columns exist outside FindMagnitudeOverflow's 5-table
+    // decimal subset above), not DownstreamDecimalEntities reused as-is. OrdreFabrication and Coulee
+    // always (non-null on the success path this check runs on), the 7 SectionCharge* tables only when
+    // the Story 4.4 per-OF applicability rule kept them, and every Consignes row the bundle carries.
+    private static IEnumerable<object> DownstreamStringEntities(Kape22ImportBundle bundle)
+    {
+        yield return bundle.OrdreFabrication!;
+        yield return bundle.Coulee!;
+
+        if (bundle.SectionChargeChutage is not null)
+        {
+            yield return bundle.SectionChargeChutage;
+        }
+
+        if (bundle.SectionChargeDecoupe is not null)
+        {
+            yield return bundle.SectionChargeDecoupe;
+        }
+
+        if (bundle.SectionChargeLingot is not null)
+        {
+            yield return bundle.SectionChargeLingot;
+        }
+
+        if (bundle.SectionChargePits is not null)
+        {
+            yield return bundle.SectionChargePits;
+        }
+
+        if (bundle.SectionChargePoidsMetrique is not null)
+        {
+            yield return bundle.SectionChargePoidsMetrique;
+        }
+
+        if (bundle.SectionChargeRefroidissoirs is not null)
+        {
+            yield return bundle.SectionChargeRefroidissoirs;
+        }
+
+        if (bundle.SectionChargeSvt is not null)
+        {
+            yield return bundle.SectionChargeSvt;
+        }
+
+        foreach (L_D_CONSIGNES consigne in bundle.Consignes)
+        {
+            yield return consigne;
+        }
+    }
+
     // Adds a Story 4.1 downstream entity only when the Story 4.3/4.4 mapper found its section applicable
     // to this OF (AC-FR21-1: "every non-null SectionCharge*").
     private static void AddIfPresent<TEntity>(DbSet<TEntity> rows, TEntity? entity)
@@ -353,4 +472,29 @@ public sealed class Kape22Persister(AscoLsiDbContext context, IConfiguration con
     // The rejection summary carried in L_D_LOG_COMMANDE, shaped "<count> erreur(s) : <message> ; ...".
     private static string Summarize(IReadOnlyList<ConversionError> errors) =>
         $"{errors.Count} erreur(s) : {string.Join(" ; ", errors.Select(error => error.Message))}";
+}
+
+// C-2 (Épic 4 retro #3): the A-5 pre-check's natural-key equality - CodeOperation collides
+// case-insensitively at the real SQL Server (case-insensitive collation), so the in-memory GroupBy must
+// match that instead of plain Ordinal tuple equality, which would let "XC1" and "xc1" sail through as two
+// distinct groups. OF, TypeConsigne and ConsigneGPAO stay Ordinal/exact - only CodeOperation is
+// case-insensitive.
+internal sealed class ConsignesNaturalKeyComparer : IEqualityComparer<(string OF, string CodeOperation, int TypeConsigne, bool ConsigneGPAO)>
+{
+    public static readonly ConsignesNaturalKeyComparer Instance = new();
+
+    public bool Equals(
+        (string OF, string CodeOperation, int TypeConsigne, bool ConsigneGPAO) x,
+        (string OF, string CodeOperation, int TypeConsigne, bool ConsigneGPAO) y) =>
+        x.OF == y.OF
+        && string.Equals(x.CodeOperation, y.CodeOperation, StringComparison.OrdinalIgnoreCase)
+        && x.TypeConsigne == y.TypeConsigne
+        && x.ConsigneGPAO == y.ConsigneGPAO;
+
+    public int GetHashCode((string OF, string CodeOperation, int TypeConsigne, bool ConsigneGPAO) key) =>
+        HashCode.Combine(
+            key.OF,
+            StringComparer.OrdinalIgnoreCase.GetHashCode(key.CodeOperation),
+            key.TypeConsigne,
+            key.ConsigneGPAO);
 }

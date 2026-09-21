@@ -102,8 +102,9 @@ public class EndToEndPerformanceTests
     // NFR-2: one tick of 500 Fichiers finishes far under 30 s. The 500 are the ten samples cycled 50
     // times under distinct names.
     // ponytail: the 50 copies of each sample share a Header roulette, so the D22 guard skips the insert
-    // on the repeats - the tick still runs Converter, Kape22Mapper and the guard query per Fichier.
-    // Swap in 500 distinct Headers if NFR-2 must time 500 real inserts.
+    // on the repeats - the tick still runs Kape22FichierProcessor's full pipeline (Kape22ImportBundleMapper,
+    // then Kape22Persister's guard query) per Fichier. Swap in 500 distinct Headers if NFR-2 must time 500
+    // real inserts.
     [Fact]
     [Trait("NFR", "2")]
     public void Tick_FiveHundredFichiers_FinishesWellUnderThirtySeconds_Nfr2()

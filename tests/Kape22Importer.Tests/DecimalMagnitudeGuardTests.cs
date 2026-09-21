@@ -111,6 +111,98 @@ public class DecimalMagnitudeGuardTests
         Assert.Equal(999.9m, inserted.DiametreProduit);
     }
 
+    // C-1 (Épic 4 retro #3): the same guard, exercised through the SectionChargeChutage branch - not
+    // previously covered - out-of-gabarit ChutageTete (L_D_SECTIONCHARGE_CHUTAGE.ChutageTete is
+    // DECIMAL(3,2), bound 10) - the raw KAPE22 int 99999, scaled by 2, becomes 999.99. ChutagePied shares
+    // the same DECIMAL(3,2)/bound-10 shape in the same branch (the reference Fichier leaves it blank, so
+    // ChutageTete is the one this fixture can mutate), so this one property proves the branch.
+    [Fact]
+    [Trait("AC", "4.11-C1")]
+    public void Persist_OutOfGabaritSectionChargeChutageColumn_RejectsWithBusinessRuleViolationAndNoInserts_AcC1()
+    {
+        InMemoryContextFactory contexts = new();
+        Kape22ImportBundle bundle = MapMutatedBundle(d =>
+        {
+            SetChamp(d, "message", "Coulee", "065718");
+            SetChamp(d, "message", "ChutageTete", "99999");
+        });
+        Assert.True(bundle.Success, "the mutation must only trip the magnitude guard, not an upstream FR-20 control.");
+        Assert.NotNull(bundle.SectionChargeChutage);
+
+        using AscoLsiDbContext context = contexts.Next();
+        ImportResult result = new Kape22Persister(context, Configuration(), WinterClock()).Persist(bundle);
+
+        Assert.False(result.Success);
+        ConversionError error = Assert.Single(result.Errors);
+        Assert.Equal(Block.File, error.Block);
+        Assert.Equal(ErrorCode.BusinessRuleViolation, error.Code);
+        Assert.Contains("ChutageTete", error.Message, StringComparison.Ordinal);
+
+        using AscoLsiDbContext verify = contexts.Reader();
+        Assert.Empty(verify.Kape22Rows);
+        Assert.Empty(verify.SectionChargeChutageRows);
+    }
+
+    // C-1: the same guard, exercised through the SectionChargeDecoupe branch - out-of-gabarit
+    // LongueurMoyenne (L_D_SECTIONCHARGE_DECOUPE.LongueurMoyenne is DECIMAL(5,3), bound 100) - the raw
+    // KAPE22 int 999999, scaled by 3, becomes 999.999.
+    [Fact]
+    [Trait("AC", "4.11-C1")]
+    public void Persist_OutOfGabaritSectionChargeDecoupeColumn_RejectsWithBusinessRuleViolationAndNoInserts_AcC1()
+    {
+        InMemoryContextFactory contexts = new();
+        Kape22ImportBundle bundle = MapMutatedBundle(d =>
+        {
+            SetChamp(d, "message", "Coulee", "065718");
+            SetChamp(d, "message", "LongueurMoyenne", "999999");
+        });
+        Assert.True(bundle.Success, "the mutation must only trip the magnitude guard, not an upstream FR-20 control.");
+        Assert.NotNull(bundle.SectionChargeDecoupe);
+
+        using AscoLsiDbContext context = contexts.Next();
+        ImportResult result = new Kape22Persister(context, Configuration(), WinterClock()).Persist(bundle);
+
+        Assert.False(result.Success);
+        ConversionError error = Assert.Single(result.Errors);
+        Assert.Equal(Block.File, error.Block);
+        Assert.Equal(ErrorCode.BusinessRuleViolation, error.Code);
+        Assert.Contains("LongueurMoyenne", error.Message, StringComparison.Ordinal);
+
+        using AscoLsiDbContext verify = contexts.Reader();
+        Assert.Empty(verify.Kape22Rows);
+        Assert.Empty(verify.SectionChargeDecoupeRows);
+    }
+
+    // C-1: the same guard, exercised through the SectionChargePits branch - out-of-gabarit H2Coulee
+    // (L_D_SECTIONCHARGE_PITS.H2Coulee is DECIMAL(3,1), bound 10) - the raw KAPE22 int 99999, scaled by
+    // 1, becomes 9999.9.
+    [Fact]
+    [Trait("AC", "4.11-C1")]
+    public void Persist_OutOfGabaritSectionChargePitsColumn_RejectsWithBusinessRuleViolationAndNoInserts_AcC1()
+    {
+        InMemoryContextFactory contexts = new();
+        Kape22ImportBundle bundle = MapMutatedBundle(d =>
+        {
+            SetChamp(d, "message", "Coulee", "065718");
+            SetChamp(d, "message", "H2Coulee", "99999");
+        });
+        Assert.True(bundle.Success, "the mutation must only trip the magnitude guard, not an upstream FR-20 control.");
+        Assert.NotNull(bundle.SectionChargePits);
+
+        using AscoLsiDbContext context = contexts.Next();
+        ImportResult result = new Kape22Persister(context, Configuration(), WinterClock()).Persist(bundle);
+
+        Assert.False(result.Success);
+        ConversionError error = Assert.Single(result.Errors);
+        Assert.Equal(Block.File, error.Block);
+        Assert.Equal(ErrorCode.BusinessRuleViolation, error.Code);
+        Assert.Contains("H2Coulee", error.Message, StringComparison.Ordinal);
+
+        using AscoLsiDbContext verify = contexts.Reader();
+        Assert.Empty(verify.Kape22Rows);
+        Assert.Empty(verify.SectionChargePitsRows);
+    }
+
     private static IConfiguration Configuration() =>
         new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>

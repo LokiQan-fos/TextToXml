@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
+using System.Text;
 using Kape22Importer.Persistence;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -38,6 +39,18 @@ public class RejectionAtomicityIntegrationTests(SqlServerIntegrationFixture fixt
     private const int CodeConsignePitsPosition = 146;
 
     private const int CodeConsignePitsSize = 12;
+
+    private const int CodeOpeChutagePosition = 241;
+
+    private const int CodeOpeChutageSize = 3;
+
+    private const int CodeOpeDecoupePosition = 284;
+
+    private const int CodeOpeDecoupeSize = 3;
+
+    private const int CodeOpePitsPosition = 125;
+
+    private const int CodeOpePitsSize = 3;
 
     private const string InitiatingServer = "AFS017";
 
@@ -146,6 +159,93 @@ public class RejectionAtomicityIntegrationTests(SqlServerIntegrationFixture fixt
         AssertAllElevenTablesEmpty(verify);
     }
 
+    // C-5 (Épic 4 retro #3): AC-FR20-3 - a hot Coulee (CodeConsignePits != "1") whose number does not
+    // start with '0' - proven only at the Persister-unit level before this story
+    // (Kape22ImportBundleMapperTests.Map_UnmutatedReferenceFichier_IsHotCouleeMalformedInIsolation_AcFr20_3
+    // documents the untouched reference Fichier as exactly this case in isolation). Zero rows in all 11
+    // dispatch tables, a REJETÉ L_D_LOG_COMMANDE row, and an Error line in MQTTnetServices.Logs, proven
+    // through the real Kape22FichierProcessor.Import pipeline this time.
+    [SkippableFact]
+    [Trait("AC", "FR20-3")]
+    public void Import_HotCouleeMalformed_LeavesAllElevenTablesEmptyWithReadableCause_AcFr20_3()
+    {
+        Ready();
+        byte[] content = ReadValidFixture(ReferenceFichierName);
+
+        ImportResult result = RunWithSerilog(ReferenceFichierName, content);
+
+        Assert.False(result.Success);
+        Assert.Contains(result.Errors, error => error.Code == ErrorCode.BusinessRuleViolation);
+
+        LogRow row = Assert.Single(ReadMqttLogs());
+        Assert.Equal("Error", row.Level);
+        Assert.Contains("[Kape22Importer][ImportRejected]", row.Message);
+
+        using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
+        L_D_LOG_COMMANDE log = Assert.Single(verify.LogCommandeRows.AsNoTracking());
+        Assert.Contains("REJETÉ", log.Message);
+
+        AssertAllElevenTablesEmpty(verify);
+    }
+
+    // C-5: AC-FR20-4 - every OF needs an enfournement instruction (L_D_SECTIONCHARGE_PITS); a blank
+    // CodeOpePits makes the section inapplicable, itself the violation. Zero rows in all 11 dispatch
+    // tables, a REJETÉ L_D_LOG_COMMANDE row, and an Error line in MQTTnetServices.Logs.
+    [SkippableFact]
+    [Trait("AC", "FR20-4")]
+    public void Import_MissingPitsInstruction_LeavesAllElevenTablesEmptyWithReadableCause_AcFr20_4()
+    {
+        Ready();
+        byte[] content = WithDetailChamp(
+            InsertableReferenceFichier(), CodeOpePitsPosition, CodeOpePitsSize, string.Empty);
+
+        ImportResult result = RunWithSerilog(ReferenceFichierName, content);
+
+        Assert.False(result.Success);
+        Assert.Contains(result.Errors, error => error.Code == ErrorCode.BusinessRuleViolation);
+
+        LogRow row = Assert.Single(ReadMqttLogs());
+        Assert.Equal("Error", row.Level);
+        Assert.Contains("[Kape22Importer][ImportRejected]", row.Message);
+
+        using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
+        L_D_LOG_COMMANDE log = Assert.Single(verify.LogCommandeRows.AsNoTracking());
+        Assert.Contains("REJETÉ", log.Message);
+
+        AssertAllElevenTablesEmpty(verify);
+    }
+
+    // C-5: A-5 - two sections sharing the same CodeOperation for one OF (CodeOpeDecoupe forced onto
+    // CodeOpeChutage's own raw value) is caught by the in-memory pre-check before ConsignesRows.AddRange,
+    // instead of throwing an uncaught InvalidOperationException - proven only at the Persister-unit level
+    // before this story (TransactionalPersistenceTests.Persist_ConsignesNaturalKeyCollision_...). Zero
+    // rows in all 11 dispatch tables, a REJETÉ L_D_LOG_COMMANDE row, and an Error line in
+    // MQTTnetServices.Logs, proven through the real Kape22FichierProcessor.Import pipeline this time.
+    [SkippableFact]
+    [Trait("AC", "A-5")]
+    public void Import_ConsignesNaturalKeyCollision_LeavesAllElevenTablesEmptyWithReadableCause_A5()
+    {
+        Ready();
+        byte[] fichier = InsertableReferenceFichier();
+        string codeOpeChutage = ReadDetailChamp(fichier, CodeOpeChutagePosition, CodeOpeChutageSize);
+        byte[] content = WithDetailChamp(fichier, CodeOpeDecoupePosition, CodeOpeDecoupeSize, codeOpeChutage);
+
+        ImportResult result = RunWithSerilog(ReferenceFichierName, content);
+
+        Assert.False(result.Success);
+        Assert.Contains(result.Errors, error => error.Code == ErrorCode.BusinessRuleViolation);
+
+        LogRow row = Assert.Single(ReadMqttLogs());
+        Assert.Equal("Error", row.Level);
+        Assert.Contains("[Kape22Importer][ImportRejected]", row.Message);
+
+        using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
+        L_D_LOG_COMMANDE log = Assert.Single(verify.LogCommandeRows.AsNoTracking());
+        Assert.Contains("REJETÉ", log.Message);
+
+        AssertAllElevenTablesEmpty(verify);
+    }
+
     private void Ready()
     {
         Skip.IfNot(fixture.Available, fixture.SkipReason ?? "SQL Server test instance unavailable.");
@@ -171,6 +271,14 @@ public class RejectionAtomicityIntegrationTests(SqlServerIntegrationFixture fixt
         Assert.Empty(verify.SectionChargeSvtRows.AsNoTracking());
         Assert.Empty(verify.ConsignesRows.AsNoTracking());
     }
+
+    // Code-review patch (Épic 4 retro #3): reads a fixed-width Detail-block Champ back out of a raw
+    // Fichier's bytes by its own Templates/P60.xml Position/Size, the read-side counterpart of
+    // TestSupport.WithDetailChamp - lets a test force one field onto another field's own current value
+    // (the A-5 collision below) instead of a hardcoded literal that would go stale silently if the
+    // reference Fichier's fixture value ever changed.
+    private static string ReadDetailChamp(byte[] source, int position, int size) =>
+        Encoding.Latin1.GetString(source).Split("\r\n")[1].Substring(position, size);
 
     // Processes one Fichier with an ILogger backed by the real Serilog MSSqlServer sink, then flushes the
     // sink so ReadMqttLogs sees the row (DoubleJournalIntegrationTests' own RunWithSerilog, parameterized

@@ -19,14 +19,8 @@ namespace Kape22Importer.Tests;
 [Trait("Category", TestCategory.Unit)]
 public class DownstreamColumnMagnitudesParityTests
 {
-    private static readonly Dictionary<string, string> TableByMapperFile = new()
-    {
-        ["OrdreFabricationMapper.cs"] = "L_D_ORDRE_FABRICATION",
-        ["SectionChargeChutageMapper.cs"] = "L_D_SECTIONCHARGE_CHUTAGE",
-        ["SectionChargeDecoupeMapper.cs"] = "L_D_SECTIONCHARGE_DECOUPE",
-        ["SectionChargeLingotMapper.cs"] = "L_D_SECTIONCHARGE_LINGOT",
-        ["SectionChargePitsMapper.cs"] = "L_D_SECTIONCHARGE_PITS",
-    };
+    // C-3 (Épic 4 retro #3): the mapper-file -> table pairing is the one shared source
+    // (DownstreamDecimalMapperTables), also consumed by MappingAnnexCompletenessTests.
 
     // Every column a real DecimalScale.Apply call site targets has a matching DownstreamColumnMagnitudes
     // entry carrying its real DECIMAL(p,s) bound (10^(p-s)), and vice versa. A column name that repeats
@@ -37,7 +31,7 @@ public class DownstreamColumnMagnitudesParityTests
     public void DownstreamColumnMagnitudes_MatchGeneratedSchema()
     {
         Dictionary<string, decimal> expected = new(StringComparer.OrdinalIgnoreCase);
-        foreach ((string mapperFile, string table) in TableByMapperFile)
+        foreach ((string mapperFile, string table) in DownstreamDecimalMapperTables.TableByMapperFile)
         {
             string source = File.ReadAllText(RepoLayout.ProjectFile(Path.Combine("src", "Kape22Importer", mapperFile)));
             Dictionary<string, decimal?> boundsByColumn = SqlTableSchema.Read("01-ascolsi-tables.sql", table)

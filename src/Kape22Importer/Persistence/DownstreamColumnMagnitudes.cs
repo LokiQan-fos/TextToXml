@@ -10,9 +10,11 @@ namespace Kape22Importer.Persistence;
 // same DECIMAL(p,s) in both; ToleranceMaxLongueur/ToleranceMinLongueur exist only in
 // L_D_ORDRE_FABRICATION). Taken once from scripts/schema/01-ascolsi-tables.sql, the same
 // shared-by-column-name discipline as DownstreamColumnLengths, parity-locked by
-// DownstreamColumnMagnitudesParityTests. Kape22Persister checks a mapped entity's scaled value against
-// this before SaveChanges, so an out-of-gabarit raw KAPE22 int surfaces as a diagnosed ConversionError
-// instead of an undiagnosed SQL overflow.
+// DownstreamColumnMagnitudesParityTests - whose mapper-file <-> table pairing (the 5 tables these 17
+// columns live in) is Kape22Importer.Tests/DownstreamDecimalMapperTables.cs, the one shared source C-3
+// (Épic 4 retro #3) also gives MappingAnnexCompletenessTests. Kape22Persister checks a mapped entity's
+// scaled value against this before SaveChanges, so an out-of-gabarit raw KAPE22 int surfaces as a
+// diagnosed ConversionError instead of an undiagnosed SQL overflow.
 public static class DownstreamColumnMagnitudes
 {
     // Keyed by column name, in case-insensitive dictionary order (CC-4), matching DownstreamColumnLengths.

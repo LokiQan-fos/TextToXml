@@ -2290,3 +2290,170 @@ le `$LASTEXITCODE` de l'étape est gardé ; B-5 : un cas hors gabarit →
 
 Owner : Dev (B-5 : Dev / Lead Architecte pour le choix d'emplacement du
 garde-fou).
+
+## Corrections post-rétrospective Épic 4 (rétro #3)
+
+> Issues de la rétrospective Épic 4 #3 (`epic-4-retro-2026-09-21.md`, verdict
+> accepted-with-open-items) — premier passage `bmad-review` multi-lentille
+> (adversarial, edge-case-hunter, verification-gap) mené sur l'arc complet
+> 4.1→4.10, plutôt que la revue par story ou la vérification ciblée des deux
+> rétros précédentes. Périmètre FR-17..FR-21 inchangé — C-1..C-10 sont des
+> corrections de conformité (couverture manquante, sensibilité à la casse,
+> documentation obsolète) et du hardening supplémentaire dans la même lignée
+> que B-1..B-5 (Story 4.10), pas de nouveaux FR. Q-3 et Q-5 sont deux notes
+> métier documentation-only, sans impact code, portées par cette même story
+> faute d'une story dédiée.
+
+### Story 4.11 : Hardening Épic 4 (C-1..C-10) + notes métier Q-3/Q-5
+
+As a `Kape22Importer`,
+I want fermer les 10 items de hardening/couverture/documentation restants
+identifiés par la rétrospective Épic 4 #3 et documenter par une note d'une
+phrase chacune les deux questions métier Q-3/Q-5 qu'elle a soulevées,
+So that les garde-fous de production déjà en place (magnitude B-5, collision
+Consignes A-5) et leur couverture de test restent fiables dans le temps, et
+qu'aucune règle métier tacite sur la resoumission d'OF ou la réutilisation de
+Coulée ne reste implicite dans le code.
+
+**Prérequis :** aucun — C-1..C-10 sont indépendants entre eux et des stories
+4.2-bis/4.3-bis/4.9/4.10 déjà livrées ; regroupés en une seule story pour un
+seul cycle de revue de code (même rationale que Stories 4.9 et 4.10).
+
+**Acceptance Criteria:**
+
+**Notes métier (documentation-only, Q-3/Q-5) :**
+
+**Given** `Kape22Persister`, dont le garde-fou anti-doublon D22 clé
+  `(NumeroFichier, OF)` et non `OF` seul, sans traitement équivalent à la
+  réutilisation de `Coulee` pour les 9 autres tables avales indexées par `OF`
+**When** une note d'exploitation d'une phrase est ajoutée au point du code
+  concerné dans `Kape22Persister.cs`
+**Then** elle indique qu'un OF ne peut pas être resoumis aujourd'hui — la
+  procédure amont injecte tout ou refuse tout, et un OF en erreur est
+  reconduit sous un nouveau numéro d'OF plutôt que rejoué à l'identique
+  (Q-3)
+
+**Given** `couleeAlreadyExists` (`Kape22Persister.cs:92-96`), simple contrôle
+  d'existence sans comparaison de données entre la `Coulee` déjà en base et
+  celle du dispatch courant
+**When** une note d'exploitation d'une phrase est ajoutée au point du code
+  concerné dans `Kape22Persister.cs`
+**Then** elle indique qu'une Coulée est créée par le premier OF qui la
+  référence puis partagée telle quelle par les OF suivants de la même coulée
+  (jusqu'à 20 lingots, tous non consommés par un seul OF), et qu'un OF
+  suivant ne doit pas la modifier (Q-5)
+
+**Priorité 1 — correctness (TDD, Unit) :**
+
+**Given** `Kape22Persister.FindMagnitudeOverflow`/`DownstreamDecimalEntities`
+  (`Kape22Persister.cs:243-291`), qui enregistre 5 branches d'entité
+  (`OrdreFabrication`, `SectionChargeChutage`/`Decoupe`/`Lingot`/`Pits`), et
+  `tests/Kape22Importer.Tests/DecimalMagnitudeGuardTests.cs`, qui n'exerce
+  aujourd'hui le garde-fou que via `OrdreFabrication.DiametreProduit` et
+  `SectionChargeLingot.EpaisseurEnLaminage`
+**When** `DecimalMagnitudeGuardTests.cs` est étendu
+**Then** il couvre également les 3 branches non testées via
+  `ChutagePied`/`ChutageTete` (Chutage), `LongueurMoyenne` (Decoupe) et
+  `H2Coulee` (Pits) — une régression sur l'une de ces 3 branches ne doit plus
+  pouvoir passer inaperçue de la suite `Category=Unit` exécutée en CI (C-1)
+
+**Given** le `GroupBy(row => (row.OF, row.CodeOperation, row.TypeConsigne,
+  row.ConsigneGPAO))` du pré-check A-5 (`Kape22Persister.cs:126`), qui compare
+  `CodeOperation` avec l'égalité ordinale par défaut, alors que la collation
+  SQL Server par défaut de `L_D_CONSIGNES` (clé primaire réelle) est
+  insensible à la casse
+**When** la comparaison `CodeOperation` du pré-check A-5 est corrigée
+**Then** elle devient insensible à la casse, alignée sur la collation de la
+  PK réelle — une collision ne différant que par la casse est détectée par
+  le pré-check en mémoire au lieu de remonter en violation de PK SQL brute
+  (C-2)
+
+**Priorité 2 — robustesse (TDD) :**
+
+**Given** trois listes de fichiers-mappers aujourd'hui codées en dur
+  séparément (`DownstreamColumnMagnitudesParityTests.TableByMapperFile`,
+  `MappingAnnexSchema.MapperScaleCallSites`,
+  `DownstreamColumnMagnitudes.MaxAbsoluteValues`), toutes les trois censées
+  couvrir le même ensemble de mappers utilisant `DecimalScale.Apply`
+**When** ces listes sont dérivées génériquement d'une source unique au lieu
+  d'être maintenues à la main à trois endroits
+**Then** un futur 6e mapper introduisant son propre appel à
+  `DecimalScale.Apply` ne peut plus échapper silencieusement à l'une des
+  trois vérifications que B-1/B-2/B-5 existent pour fournir (C-3)
+
+**Given** `DownstreamColumnLengths.cs`, qui documente ~45 colonnes string
+  bornées via `HasMaxLength` (métadonnée EF/schéma seulement) sans contrôle
+  côté client équivalent au garde-fou de magnitude B-5
+**When** un garde-fou de dépassement de longueur miroir de B-5 s'exécute
+  avant `SaveChanges`
+**Then** une chaîne dépassant sa borne produit un `ConversionError`
+  diagnostiqué (circuit AD-4) au lieu d'une `DbUpdateException` de troncature
+  SQL brute non diagnostiquée — l'emplacement du contrôle (nouvelle donnée
+  dans l'annexe vs. lecture directe du schéma) est une décision Ask First au
+  step-02 de `bmad-build`, comme pour B-5 (C-4)
+
+**Given** `Kape22Persister.PersistMapped`, qui enchaîne aujourd'hui le
+  contrôle Coulée manquante, le pré-check A-5 (collision Consignes) et le
+  pré-check B-5 (dépassement de magnitude) en early-returns séquentiels
+**When** un Fichier échoue simultanément à A-5 et B-5
+**Then** les deux violations sont accumulées dans le message REJETÉ au lieu
+  que seule la première rencontrée soit rapportée — sans modifier le
+  comportement du contrôle Coulée manquante, laissé en l'état (C-6)
+
+**Given** `couleeAlreadyExists`, dont la seule couverture de test existante
+  insère la ligne `Coulee` directement en base plutôt que via un premier
+  dispatch réel
+**When** un test d'intégration « hot-Coulee, sequential cross-Persist »
+  s'exécute — deux OF partageant la même Coulée réelle, dispatchés via deux
+  appels `Persist` séparés, chacun sur un `DbContext` neuf
+**Then** le second dispatch réutilise la Coulée créée par le premier sans la
+  modifier, reproduisant fidèlement le flux réel que le design
+  `couleeAlreadyExists` visait à couvrir (C-9)
+
+**Priorité 3 — couverture et documentation :**
+
+**Given** `RejectionAtomicityIntegrationTests.cs`, qui ne prouve
+  aujourd'hui l'atomicité et la double-journalisation de bout en bout que
+  pour 3 causes de rejet (Coulée manquante AC-FR20-5, une autre cause métier
+  pré-existante, le chemin composite d'échec SQL)
+**When** la suite est étendue
+**Then** elle couvre également AC-FR20-3 (hot-Coulee malformée), AC-FR20-4
+  (Pits manquant), A-5 (collision Consignes) et B-5 (dépassement de
+  magnitude) — aujourd'hui prouvées uniquement au niveau Unit/Persister (C-5)
+
+**Given** `Kape22Persister.cs:159`, qui traite `bundle.SectionChargePits`
+  de façon identique aux 6 tables `SectionCharge*` réellement optionnelles
+  via `AddIfPresent`, alors que sa non-nullité est déjà garantie
+  structurellement par le contrôle AC-FR20-4 (`Kape22ImportBundleMapper`,
+  deux stories plus tôt)
+**When** un commentaire est ajouté au site d'usage
+**Then** l'invariant AC-FR20-4 devient visible localement, sans changement
+  de comportement (C-7)
+
+**Given** le commentaire de la ligne ~105 de `EndToEndPerformanceTests.cs`,
+  qui décrit encore le pipeline pré-Épic-4 (Converter, Kape22Mapper et la
+  requête de garde par Fichier)
+**When** ce commentaire est mis à jour
+**Then** il décrit le pipeline réellement mesuré aujourd'hui — les budgets
+  NFR-1/NFR-2 eux-mêmes restent inchangés et déjà vérifiés au vert (C-8)
+
+**Given** `ARCHITECTURE-SPINE.md:124`, qui mentionne encore « 9 entités
+  avales » alors que `Kape22ImportBundle.cs` modélise correctement 10
+  entités avales depuis la Story 4.5
+**When** cette ligne est corrigée
+**Then** elle indique « 10 entités avales », sans changement de code (C-10)
+
+**Tests xUnit (TDD — écrits en premier, CC-1) :** un test par AC de code
+(C-1 : 3 nouveaux cas `DecimalMagnitudeGuardTests` sur Chutage/Decoupe/Pits ;
+C-2 : cas de collision Consignes ne différant que par la casse détecté ;
+C-3 : cas où une liste dérivée reflète un mapper ajouté/retiré sans édition
+manuelle ; C-4 : cas de dépassement de longueur → `ConversionError` ; C-5 :
+un cas d'intégration par cause de rejet restante ; C-6 : cas A-5+B-5
+simultanés → message REJETÉ cumulant les deux ; C-9 : le scénario hot-Coulee
+séquentiel décrit ci-dessus). C-7, C-8, C-10 et les notes Q-3/Q-5 sont
+documentation-only, sans test associé.
+
+**Critères transverses :** CC-1, CC-2, CC-3, CC-4, CC-5.
+
+Owner : Dev (C-4 : Dev / Lead Architecte pour le choix d'emplacement du
+garde-fou ; C-10 : Dev / PM).

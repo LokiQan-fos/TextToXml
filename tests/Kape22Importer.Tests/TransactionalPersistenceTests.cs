@@ -165,10 +165,14 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
         Assert.Equal(bundle.OF!.Trim(), log.OF.Trim());
     }
 
-    // AC-FR11-5 / AC-FR21-2: a SQL failure on the L_D_KAPE22 insert (Client over its bounded column)
-    // comes back as {Block:File, Code:PersistenceError} with no exception escaping, and none of the rows
-    // staged for that one SaveChanges is left committed - not just L_D_KAPE22, every downstream entity
-    // too (AC-FR21-2 extends AC-FR11-5).
+    // AC-FR11-5 / AC-FR21-2: a SQL failure on the L_D_KAPE22 insert comes back as
+    // {Block:File, Code:PersistenceError} with no exception escaping, and none of the rows staged for
+    // that one SaveChanges is left committed - not just L_D_KAPE22, every downstream entity too
+    // (AC-FR21-2 extends AC-FR11-5). LibelleConsigneChutage is over-long here rather than the once-used
+    // Client: Story 4.11's C-4 pre-check now catches an over-long Client before SaveChanges even runs
+    // (Client is also L_D_ORDRE_FABRICATION.Client, a DownstreamColumnLengths-bounded column), so this
+    // test needs a bounded L_D_KAPE22-only column that no downstream mapper copies anywhere - a genuine,
+    // undiagnosed SQL truncation is still reachable there.
     [SkippableFact]
     [Trait("AC", "FR11-5")]
     [Trait("AC", "FR21-2")]
@@ -178,9 +182,9 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
         Kape22ImportBundle bundle = MapMutatedBundle(d =>
         {
             SetChamp(d, "message", "Coulee", "065718");
-            SetChamp(d, "message", "Client", new string('A', 50));
+            SetChamp(d, "message", "LibelleConsigneChutage", new string('A', 50));
         });
-        Assert.True(bundle.Success, "over-long Client is only rejected by the database, not by the mapper.");
+        Assert.True(bundle.Success, "over-long LibelleConsigneChutage is only rejected by the database, not by the mapper.");
 
         ImportResult result = Persist(bundle);
 
@@ -365,6 +369,49 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
         Assert.Single(verify.CouleeRows.AsNoTracking().Where(row => row.IdCoulee.Trim() == coulee.Trim()));
     }
 
+    // C-9 (Épic 4 retro #3): the test above seeds the Coulee row directly through EF, proving only the
+    // read side of the guard. This one closes the gap it documents: two genuine, sequential Persist calls
+    // on two separate DbContext instances (the shared Persist helper opens a fresh
+    // fixture.NewAscoLsiContext() per call), dispatching two different OFs of the same hot Coulee. The
+    // second dispatch must reuse the Coulee row the first one created - not duplicate it, and not
+    // overwrite it with the second bundle's own (deliberately different) Nuance.
+    [SkippableFact]
+    [Trait("AC", "C-9")]
+    public void Persist_TwoRealDispatchesShareOneHotCoulee_SecondReusesWithoutModifyingTheFirstsCouleeRow_AcC9()
+    {
+        Ready();
+        Kape22ImportBundle first = MapReferenceBundle();
+        string coulee = first.Kape22!.Coulee;
+        string firstOf = first.OF!;
+        string firstNuance = first.Coulee!.Nuance;
+        string secondOf = firstOf[..^1] + (firstOf[^1] == '9' ? '8' : '9');
+        string secondNuance = firstNuance == "ACIERX" ? "ACIERY" : "ACIERX";
+
+        Kape22ImportBundle second = MapMutatedBundle(d =>
+        {
+            SetChamp(d, "message", "Coulee", "065718");
+            SetChamp(d, "message", "OF", secondOf);
+            SetChamp(d, "message", "Nuance", secondNuance);
+        });
+        Assert.True(second.Success, "the OF/Nuance-only mutation must not trip any FR-20 control.");
+        Assert.Equal(coulee, second.Kape22!.Coulee);
+        Assert.NotEqual(firstNuance, second.Coulee!.Nuance);
+
+        ImportResult firstResult = Persist(first);
+        ImportResult secondResult = Persist(second);
+
+        Assert.True(firstResult.Success, string.Join("; ", firstResult.Errors.Select(error => error.Message)));
+        Assert.True(secondResult.Success, string.Join("; ", secondResult.Errors.Select(error => error.Message)));
+
+        using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
+        Assert.Equal(2, verify.Kape22Rows.AsNoTracking().Count(row => row.Coulee.Trim() == coulee.Trim()));
+        L_D_COULEE couleeRow = Assert.Single(
+            verify.CouleeRows.AsNoTracking().Where(row => row.IdCoulee.Trim() == coulee.Trim()));
+
+        // Nuance is a fixed-width CHAR column, so a real round-trip pads the read-back value.
+        Assert.Equal(firstNuance, couleeRow.Nuance.Trim());
+    }
+
     // AC-FR21-1 (AD-1): a bundle that passes the guard with a hot Coulee (the existence check skipped)
     // commits L_D_KAPE22 + the OK log row + every non-null downstream entity from the bundle - Story
     // 4.3/4.4's OrdreFabrication, Coulee and per-OF-applicable SectionCharge*/Consignes - in one
@@ -496,6 +543,101 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
         Assert.Empty(verify.SectionChargeRefroidissoirsRows.AsNoTracking());
         Assert.Empty(verify.SectionChargeSvtRows.AsNoTracking());
         Assert.Empty(verify.ConsignesRows.AsNoTracking());
+    }
+
+    // C-6 (Épic 4 retro #3): the Matrix's "Simultaneous A-5 + B-5 violation" row - a bundle failing both
+    // the Consignes-collision (A-5) and magnitude-overflow (B-5) pre-checks at once must come back as one
+    // REJETÉ log row / ConversionError naming both causes, not two sequential ones. Reuses
+    // ConsignesCollisionBundle's own CodeOpeDecoupe-onto-CodeOpeChutage forcing technique for A-5, adding
+    // an out-of-gabarit ChutageTete (same DECIMAL(3,2)/bound-10 shape C-1 already covers) for B-5.
+    // Category=Unit (AR-12, EF InMemory provider): both pre-checks are pure in-memory computation before
+    // SaveChanges, so no real SQL Server round-trip is needed. Written test-first (CC-1).
+    [Fact]
+    [Trait("Category", TestCategory.Unit)]
+    [Trait("AC", "C-6")]
+    public void Persist_SimultaneousConsignesCollisionAndMagnitudeOverflow_RejectsWithOneMessageNamingBothCauses_AcC6()
+    {
+        InMemoryContextFactory contexts = new();
+        Kape22ImportBundle bundle = MapMutatedBundle(d =>
+        {
+            SetChamp(d, "message", "Coulee", "065718");
+            string codeOpeChutage = d.Root!.Element("message")!.Element("CodeOpeChutage")!.Value;
+            SetChamp(d, "message", "CodeOpeDecoupe", codeOpeChutage);
+            SetChamp(d, "message", "ChutageTete", "99999");
+        });
+        Assert.True(bundle.Success, "the mutations must only trip the A-5/B-5 pre-checks, not an upstream FR-20 control.");
+        Assert.NotNull(bundle.SectionChargeChutage);
+        Assert.NotNull(bundle.SectionChargeDecoupe);
+        Assert.Equal(
+            bundle.SectionChargeChutage!.CodeOperation, bundle.SectionChargeDecoupe!.CodeOperation, StringComparer.Ordinal);
+
+        using AscoLsiDbContext context = contexts.Next();
+        ImportResult result = new Kape22Persister(context, Configuration(), WinterClock()).Persist(bundle);
+
+        Assert.False(result.Success);
+
+        // C-6: one accumulated ConversionError, not two sequential ones.
+        ConversionError error = Assert.Single(result.Errors);
+        Assert.Equal(Block.File, error.Block);
+        Assert.Equal(ErrorCode.BusinessRuleViolation, error.Code);
+        Assert.Contains(bundle.SectionChargeChutage!.CodeOperation, error.Message, StringComparison.Ordinal);
+        Assert.Contains("ChutageTete", error.Message, StringComparison.Ordinal);
+
+        using AscoLsiDbContext verify = contexts.Reader();
+        Assert.Empty(verify.Kape22Rows);
+        L_D_LOG_COMMANDE log = Assert.Single(verify.LogCommandeRows);
+        Assert.Contains("REJETÉ", log.Message);
+        Assert.Empty(verify.SectionChargeChutageRows);
+        Assert.Empty(verify.SectionChargeDecoupeRows);
+        Assert.Empty(verify.ConsignesRows);
+    }
+
+    // C-6 code-review patch (Épic 4 retro #3): C-4 originally sat after the A-5/B-5 accumulation as its
+    // own separate early return, silently reintroducing the "only report whichever fired first" symptom
+    // C-6 exists to eliminate - one guard later, undocumented. This proves C-4 now accumulates alongside
+    // A-5/B-5 too: a bundle failing both the Consignes-collision (A-5) and length-overflow (C-4)
+    // pre-checks at once must come back as one REJETÉ log row / ConversionError naming both causes.
+    // Category=Unit (AR-12, EF InMemory provider): both pre-checks are pure in-memory computation before
+    // SaveChanges, so no real SQL Server round-trip is needed. Written test-first (CC-1).
+    [Fact]
+    [Trait("Category", TestCategory.Unit)]
+    [Trait("AC", "C-6")]
+    public void Persist_SimultaneousConsignesCollisionAndLengthOverflow_RejectsWithOneMessageNamingBothCauses_AcC6()
+    {
+        InMemoryContextFactory contexts = new();
+        Kape22ImportBundle bundle = MapMutatedBundle(d =>
+        {
+            SetChamp(d, "message", "Coulee", "065718");
+            string codeOpeChutage = d.Root!.Element("message")!.Element("CodeOpeChutage")!.Value;
+            SetChamp(d, "message", "CodeOpeDecoupe", codeOpeChutage);
+            SetChamp(d, "message", "MarqueCommerciale", new string('A', 20));
+        });
+        Assert.True(bundle.Success, "the mutations must only trip the A-5/C-4 pre-checks, not an upstream FR-20 control.");
+        Assert.NotNull(bundle.SectionChargeChutage);
+        Assert.NotNull(bundle.SectionChargeDecoupe);
+        Assert.Equal(
+            bundle.SectionChargeChutage!.CodeOperation, bundle.SectionChargeDecoupe!.CodeOperation, StringComparer.Ordinal);
+
+        using AscoLsiDbContext context = contexts.Next();
+        ImportResult result = new Kape22Persister(context, Configuration(), WinterClock()).Persist(bundle);
+
+        Assert.False(result.Success);
+
+        // C-6: one accumulated ConversionError, not two sequential ones.
+        ConversionError error = Assert.Single(result.Errors);
+        Assert.Equal(Block.File, error.Block);
+        Assert.Equal(ErrorCode.BusinessRuleViolation, error.Code);
+        Assert.Contains(bundle.SectionChargeChutage!.CodeOperation, error.Message, StringComparison.Ordinal);
+        Assert.Contains("MarqueCommerciale", error.Message, StringComparison.Ordinal);
+
+        using AscoLsiDbContext verify = contexts.Reader();
+        Assert.Empty(verify.Kape22Rows);
+        Assert.Empty(verify.OrdreFabricationRows);
+        L_D_LOG_COMMANDE log = Assert.Single(verify.LogCommandeRows);
+        Assert.Contains("REJETÉ", log.Message);
+        Assert.Empty(verify.SectionChargeChutageRows);
+        Assert.Empty(verify.SectionChargeDecoupeRows);
+        Assert.Empty(verify.ConsignesRows);
     }
 
     // A-4 (Epic 4 retro) non-regression: Kape22Persister and Kape22ImportBundleMapper both read the one
