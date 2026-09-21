@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 16:00
-last_updated: 09-21-2026 (code review)
+last_updated: 09-21-2026 11:24
 project: TextToXml
 project_key: NOKEY
 tracking_system: file-system
@@ -104,10 +104,10 @@ action_items:
       consistently into a mapper and its test would pass silently. Build a mapper-source-
       vs-annex consistency check."
     owner: "Dev"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/deferred-work.md#deferred-from-code-review-of-story-43-bis-2026-09-17
-      -> story 4-10-hardening-epic-4-b (was mis-routed to 4-9-hardening-epic-4,
-      corrected by epic-4-retro-2026-09-18.md)"
+      -> story 4-10-hardening-epic-4-b (was mis-routed to 4-9-hardening-epic-4, corrected
+      by epic-4-retro-2026-09-18.md)"
   - id: "story-4-3-bis-review-item-2-no-anti-bypass-guard"
     epic: 4
     action: "Nothing prevents a future 6th mapper from assigning a raw KAPE22 int/int?
@@ -115,10 +115,10 @@ action_items:
       -- no analyzer or reflection-based completeness test guards against a regression
       of the exact defect Story 4.3-bis fixes."
     owner: "Dev"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/deferred-work.md#deferred-from-code-review-of-story-43-bis-2026-09-17
-      -> story 4-10-hardening-epic-4-b (was mis-routed to 4-9-hardening-epic-4,
-      corrected by epic-4-retro-2026-09-18.md)"
+      -> story 4-10-hardening-epic-4-b (was mis-routed to 4-9-hardening-epic-4, corrected
+      by epic-4-retro-2026-09-18.md)"
   - id: "story-4-3-bis-review-item-3-production-parity-scope-gap"
     epic: 4
     action: "Kape22ProductionDataParityTests only round-trips L_D_KAPE22; it never
@@ -127,10 +127,10 @@ action_items:
       a known-correct real production value. Extend production parity to the downstream
       decimal-scale tables."
     owner: "Dev"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/deferred-work.md#deferred-from-code-review-of-story-43-bis-2026-09-17
-      -> story 4-10-hardening-epic-4-b (was mis-routed to 4-9-hardening-epic-4,
-      corrected by epic-4-retro-2026-09-18.md)"
+      -> story 4-10-hardening-epic-4-b (was mis-routed to 4-9-hardening-epic-4, corrected
+      by epic-4-retro-2026-09-18.md)"
   - id: "story-4-3-bis-review-item-4-e2e-script-exit-code-gap"
     epic: 4
     action: "scripts/e2e-worker-import.ps1's final dotnet test ... Kape22ProductionDataParityTests
@@ -138,10 +138,10 @@ action_items:
       in the same script. A failing production-parity comparison would not fail the
       wrapping process, so GpaoImportP60WorkerEndToEndTests could not detect it."
     owner: "Dev"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/deferred-work.md#deferred-from-code-review-of-story-43-bis-2026-09-17
-      -> story 4-10-hardening-epic-4-b (was mis-routed to 4-9-hardening-epic-4,
-      corrected by epic-4-retro-2026-09-18.md)"
+      -> story 4-10-hardening-epic-4-b (was mis-routed to 4-9-hardening-epic-4, corrected
+      by epic-4-retro-2026-09-18.md)"
   - id: "epic-1-retro-item-1-passe-hygiene-story-0-epic-2-testsupport"
     epic: 1
     action: "Passe hygiene story-0 Epic 2: TestSupport partage (Windows1252 corrige
@@ -392,6 +392,104 @@ action_items:
       (2026-09-18, deferred-work.md) but never promoted to a sprint-status action
       item until this retro."
     owner: "Dev / Lead Architecte"
+    status: done
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-18.md -> story
+      4-10-hardening-epic-4-b"
+  - id: "epic-4-retro3-item-c1-magnitude-guard-branch-coverage"
+    epic: 4
+    action: "Extend DecimalMagnitudeGuardTests (Category=Unit) to exercise SectionChargeChutage/Decoupe/Pits,
+      not only OrdreFabrication/SectionChargeLingot - the B-5 magnitude guard has
+      Unit-tier coverage proving only 2 of its 5 registered entity branches actually
+      fire the rejection; a regression on the other 3 would surface only as a raw,
+      undiagnosed SQL overflow, undetected by unattended CI."
+    owner: "Dev"
     status: open
-    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-18.md
-      -> story 4-10-hardening-epic-4-b"
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-21.md"
+  - id: "epic-4-retro3-item-c2-consignes-collision-case-sensitivity"
+    epic: 4
+    action: "Match the A-5 Consignes-collision GroupBy (Kape22Persister.cs:126) to
+      a case-insensitive CodeOperation comparison - it compares ordinally today while
+      SQL Server's default collation on L_D_CONSIGNES is case-insensitive, so a same-OF
+      collision differing only by case would bypass the in-memory pre-check and surface
+      as a raw PK-violation instead of a diagnosed REJETE message. Not independently
+      confirmed against the live database (none reachable this session)."
+    owner: "Dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-21.md"
+  - id: "epic-4-retro3-item-c3-mapper-file-list-consistency"
+    epic: 4
+    action: "Derive the mapper-file lists behind B-1/B-2/B-5 generically instead of
+      three separately hand-maintained 5-file lists (DownstreamColumnMagnitudesParityTests.TableByMapperFile,
+      MappingAnnexSchema's mapper-file list, DownstreamColumnMagnitudes.MaxAbsoluteValues'
+      own key set) - a future 6th mapper's DecimalScale.Apply call site could silently
+      escape one or more of them."
+    owner: "Dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-21.md"
+  - id: "epic-4-retro3-item-c4-string-length-overflow-guard"
+    epic: 4
+    action: "Add a pre-persist string-length overflow guard mirroring B-5's magnitude
+      guard, for the ~45 DownstreamColumnLengths-bounded string columns across the
+      10 downstream tables - today an oversized string only surfaces as a raw SQL
+      truncation PersistenceError, unlike the diagnosed BusinessRuleViolation/REJETE
+      treatment B-5 gives an oversized decimal. Needs an Ask-First design choice on
+      where the check lives, same shape as B-5's own."
+    owner: "Dev / Lead Architecte"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-21.md"
+  - id: "epic-4-retro3-item-c5-rejection-atomicity-coverage-breadth"
+    epic: 4
+    action: "Extend RejectionAtomicityIntegrationTests to the remaining rejection
+      causes not yet proven at the full atomicity/double-journal E2E tier: AC-FR20-3
+      (hot-Coulee malformed), AC-FR20-4 (missing Pits), A-5 (Consignes collision),
+      B-5 (magnitude overflow). Only 3 of ~7 distinct rejection causes are covered
+      at this tier today."
+    owner: "Dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-21.md"
+  - id: "epic-4-retro3-item-c6-accumulate-a5-b5-checks"
+    epic: 4
+    action: "Accumulate, rather than early-return, the A-5 (Consignes-collision) and
+      B-5 (magnitude-overflow) pre-checks in Kape22Persister.PersistMapped - extends
+      the already-accepted missing-Coulee/A-5 non-accumulation note (Story 4.9 review)
+      to the newer A-5/B-5 pair, which postdates that note and is not covered by it."
+    owner: "Dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-21.md"
+  - id: "epic-4-retro3-item-c7-pits-invariant-visibility"
+    epic: 4
+    action: "Make SectionChargePits' AC-FR20-4 non-null guarantee visible at its Kape22Persister.AddIfPresent
+      use site (comment or assert) - it is currently treated identically to the 6
+      genuinely-optional SectionCharge* tables even though its absence is already
+      structurally impossible two stories earlier."
+    owner: "Dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-21.md"
+  - id: "epic-4-retro3-item-c8-stale-nfr-comment"
+    epic: 4
+    action: "Update EndToEndPerformanceTests.cs's stale line-105 comment, which still
+      describes the pre-Epic-4 single-mapper pipeline - the NFR-1/NFR-2 budgets themselves
+      are confirmed still passing this session against the current, much heavier Epic
+      4 pipeline, so this is documentation-only."
+    owner: "Dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-21.md"
+  - id: "epic-4-retro3-item-c9-hot-coulee-reuse-test"
+    epic: 4
+    action: "Add a hot-Coulee, sequential-cross-Persist-call test (two different OFs
+      sharing the same real Coulee, processed as two separate Persist calls against
+      two fresh DbContexts) - the only existing Coulee-reuse coverage seeds the row
+      directly into the database rather than via a prior real insert, so the realistic
+      'insert once, reuse for the second Fichier' flow that motivated the couleeAlreadyExists
+      design is never exercised end-to-end."
+    owner: "Dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-21.md"
+  - id: "epic-4-retro3-item-c10-architecture-spine-9-vs-10-wording"
+    epic: 4
+    action: "Fix ARCHITECTURE-SPINE.md:124's stale '9 entites avales' wording (should
+      be 10) - unreconciled since the Story 4.2 code review (2026-09-15); the code
+      has always correctly modeled 10 downstream entities."
+    owner: "Dev / PM"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-21.md"
