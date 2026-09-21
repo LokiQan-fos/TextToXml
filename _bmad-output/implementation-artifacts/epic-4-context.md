@@ -4,57 +4,109 @@
 
 ## Goal
 
-Complete the P60 pipeline after the `L_D_KAPE22` insert (Epic 2, FR-11) by dispatching — explicitly, with no reflection — into `L_D_ORDRE_FABRICATION` (Ordre de Fabrication / OF), `L_D_COULEE` (Coulée), `L_D_CONSIGNES`, and the seven `L_D_SECTIONCHARGE_*` tables (Chutage, Lingot, Decoupe, Pits, PoidsMetrique, Refroidissoirs, SVT), replacing the legacy `MappingTemplate`/reflection-based procedure (`Ascometal.LSI.DAL`, legacy repo — never modified, never called at runtime). A valid File writes exactly one transaction covering all 10 tables; any business or SQL failure blocks the whole set, logs the precise cause through the existing circuit (`L_D_LOG_COMMANDE` + `MQTTnetServices.Logs`), and moves the File to `error/` — never leaving an orphaned `L_D_KAPE22` row (preserves NFR-7 and the anti-duplicate guard `AC-FR11-6/7`). The epic's 7 original stories were retrospectively accepted-with-open-items (2026-09-17): a decimal-scale defect and 4 hardening gaps were found and are closed by 3 additional correction stories below, under the same FR-17..FR-21 scope — no new requirement, no new epic.
+Complete the P60 pipeline after `L_D_KAPE22` insertion (Epic 2) by dispatching
+explicitly — without reflection — to `L_D_ORDRE_FABRICATION`, `L_D_COULEE`,
+`L_D_CONSIGNES` and the 7 `L_D_SECTIONCHARGE_*` tables (Chutage, Lingot,
+Decoupe, Pits, PoidsMetrique, Refroidissoirs, Svt), replacing the legacy
+`MappingTemplate`/reflection procedure (`Ascometal.LSI.DAL`, legacy repo,
+never modified, never called at runtime). A valid Fichier must write **one
+single transaction** covering all 10 tables; any business or SQL failure
+blocks the whole set, logs the precise cause through the existing circuit, and
+moves the Fichier to `error/`, never leaving an orphan `L_D_KAPE22` row.
 
 ## Stories
 
-- Story 4.1: EF database-first entities + extend the SQL harness to the 10 downstream tables
-- Story 4.2: Extract & document the legacy mapping annex (column-by-column, mechanically verifiable completeness)
-- Story 4.3: OF + Coulée mapper (pure structural mapping)
-- Story 4.4: Consignes + the 7 SectionCharge mappers (pure structural mapping, OF applicability rule)
-- Story 4.5: `Kape22ImportBundleMapper` (orchestrator) + pure business controls
-- Story 4.6: `Kape22Persister` replaced (bundle, single transaction, Coulée control) + `Kape22FichierProcessor` updated
+- Story 4.1: EF entities (database-first) + extend SQL test harness for the 10 downstream tables
+- Story 4.2: Extract & document the legacy mapping (verifiable column-by-column annex)
+- Story 4.3: OF + Coulee mapper (pure structural mapping)
+- Story 4.4: Consignes + the 7 SectionCharge mappers (pure structural mapping, per-OF applicability rule)
+- Story 4.5: `Kape22ImportBundleMapper` (orchestrator) + pure business checks
+- Story 4.6: `Kape22Persister` replaced (bundle, single transaction, Coulee existence check) + `Kape22FichierProcessor` updated
 - Story 4.7: Extend the E2E suite to the 10 downstream tables
-- Story 4.2-bis: Extend the mapping annex with a decimal `scale` field (root-cause guard for the defect below)
-- Story 4.3-bis: Decimal-scale correction across the 5 affected mappers
-- Story 4.9: Epic 4 hardening — downstream-table Unit assertions, OF/Coulée trim at the source, shared hot/cold Coulée marker, Consignes natural-key collision pre-check
-
-**Sequencing (original 7):** 4.1 → 4.2 → {4.3, 4.4} → 4.5 → 4.6 → 4.7; 4.2 is a transverse prerequisite for 4.3/4.4.
-**Sequencing (post-retro corrections, strict, no parallelization):** 4.2-bis → 4.3-bis → 4.9.
+- Story 4.2-bis: Extend the mapping annex with a `scale` field
+- Story 4.3-bis: Decimal scaling fix (5 mappers)
+- Story 4.9: Hardening (A-2..A-5: downstream DbSet assertions, OF/Coulee trim-at-source, shared hot/cold Coulee marker, Consignes natural-key collision pre-check)
+- Story 4.10: Hardening (B-1..B-5: mapper/annex scale-drift guard, `DecimalScale.Apply` bypass guard, production parity round-trip for scaled columns, e2e-worker script exit-code guard, out-of-range decimal guard)
 
 ## Requirements & Constraints
 
-- FR-17: extraction/documentation of the legacy column-by-column mapping annex, with a status per column (`sourcée` / `règle` / `à_clarifier`); an `à_clarifier` entry must be backed by a `deferred-work.md` note or the completeness test fails.
-- FR-18/FR-19: explicit mapping (no reflection) from `L_D_KAPE22` to OF/Coulée, and to Consignes + the 7 SectionCharge tables, including the per-OF applicability rule (a non-applicable SectionCharge mapper returns `null`, no default row).
-- FR-20: blocking business controls before persistence — cold Coulée must exist in DB, hot Coulée number format (`'0'` prefix), ingot/furnace distribution consistency vs. the OF's half-product count, presence of an enfournement instruction (Pits).
-- FR-21: extended transactional persistence — one `Kape22ImportBundle`, one commit for `L_D_KAPE22` + the 9 downstream tables; failure cause logged via the existing FR-14 circuit.
-- The legacy annex at `_bmad-output/implementation-artifacts/annexe-mapping-dispatch-epic4.md` is the single source of truth for every mapper in 4.3/4.4/4.5 — no mapper may encode a rule absent from it.
-- Downstream entity schemas come exclusively from `sys.columns` on `AFV004-LSI` (never written from memory), same provenance discipline as `L_D_KAPE22`/Annexe C (R-3).
-- Cross-epic reuse, extended not replaced: the AR-12 local SQL Server harness (Story 2.1), the double-journal circuit (Story 3.3/FR-14), the anti-duplicate guard (`AC-FR11-6/7`, Story 2.8).
-- Story 4.6 stays confined to `Kape22Importer` (Git repo), no `MicroServices.sln` (SVN) commit, conditional on `IFichierProcessor.Process`/`FichierProcessingResult` keeping an unchanged signature — verified, held for the whole epic.
-- **Post-retro correction requirements**, still under FR-17/FR-21, not new FRs: any annex row for a `decimal`-target column sourced from a KAPE22 `int`/`int?` must carry an explicit `scale` field (integer, no unit/free text) — enforced by extending the existing `AC-FR17-5` completeness-test family, with no distinction between the 5 already-known offending columns and any newly detected one. The 5 affected mappers (`OrdreFabricationMapper`, `SectionChargeLingotMapper`, `SectionChargeChutageMapper`, `SectionChargeDecoupeMapper`, `SectionChargePitsMapper`) must apply that scale instead of writing the raw KAPE22 integer; `SectionChargeRefroidissoirsMapper`/`PoidsMetriqueMapper`/`SvtMapper` are confirmed out of scope (no `decimal` column). Once fixed, the `TestSupport.ZeroOutOfScaleDimensions`/`InsertableFichier` test workaround (introduced by Story 4.6 across 4 integration suites) is removed and `GpaoImportP60WorkerEndToEndTests` must stop being skipped.
+- FR-17: extract/document the legacy column-by-column mapping annex, with a
+  mechanical completeness test against the EF model (no undocumented column;
+  `à_clarifier` entries require a `deferred-work.md` note).
+- FR-18/FR-19: explicit, reflection-free mappers per target table; a
+  `SectionCharge_*` mapper returns `null` when its table does not apply to the
+  current OF (no default row created); `L_D_CONSIGNES` carries its owning
+  section-of-charge key as an explicit scalar FK.
+- FR-20: pure business checks with no DB read (lingots/fours distribution
+  consistency, hot-coulee number format, missing Pits enfournement consigne),
+  plus one DB-reading check (cold-Coulee existence) that stays in the
+  Persister because it needs the open context.
+- FR-21: `Kape22ImportBundle` replaces `MapResult<L_D_KAPE22>` at the
+  Persister boundary (same metadata, plus the 9 nullable downstream entities);
+  a single `Persist` surface, no second method kept in parallel.
+- Preserves NFR-7 (replay = redrop the corrected Fichier, zero DB action) and
+  the anti-duplicate guard `AC-FR11-6/7`, both unchanged by this epic.
+- AR-12 test harness (local SQL Server, `scripts/schema/` generated from
+  `AFV004-LSI`) is extended, not replaced, to cover the 10 new tables.
+- CC-2 comment-language exemption extends, from this epic on, to the domain
+  nouns `Ordre de Fabrication`/`OF`, `Coulee`, `Chutage`, `Decoupe`, `Lingot`,
+  `PoidsMetrique`, `Refroidissoirs`.
+- CC-4 (alphabetical property order) applies to the new EF entities; CC-7 (no
+  hard-coded secrets) applies to this epic's `Kape22Importer` code.
 
 ## Technical Decisions
 
-Governed by `_bmad-output/planning-artifacts/architecture/architecture-kape22-dispatch-2026-09-14/ARCHITECTURE-SPINE.md` (AD-1..AD-7), unchanged by the correction stories:
+Pipeline: pure per-table mappers → `Kape22ImportBundleMapper` (composes
+`Kape22Mapper.Map` + table mappers + DB-free business checks) →
+`Kape22ImportBundle` → `Kape22Persister` (sole I/O point: DB-reading checks,
+`context.Add` for every non-null entity, then **one** `SaveChanges()`).
+Atomicity comes from that single `SaveChanges()`, not an explicit
+`TransactionScope`.
 
-- **AD-1** — Single extended transaction: `L_D_KAPE22`, `L_D_LOG_COMMANDE`, and the 9 downstream entities go into the same `DbContext`, one `SaveChanges()`. No explicit `TransactionScope`; atomicity is the existing EF Core single-`SaveChanges()` behavior (unchanged since Story 2.8).
-- **AD-2** — One mapper per target table, properties read/written by explicit name. No `System.Reflection`, no `Activator.CreateInstance`, no runtime-interpreted mapping table.
-- **AD-3** — Legacy wall: `Ascometal.LSI.DAL`/`BLL` is read-only reference material — never modified, never assembly-referenced, never called at runtime.
-- **AD-4** — Every dispatch failure (SQL or business) becomes a distinct `ConversionError{Block:File, Code}` feeding the existing circuit. No new logging channel — this is exactly what Story 4.9/A-5 must preserve: a real `L_D_CONSIGNES` natural-key collision must surface as a journalized `ConversionError`, not an uncaught EF Core `InvalidOperationException`; the fix is a pre-check before `AddRange`, **not** widening the persister's `catch (... when DbUpdateException or DbException)` filter (that would risk swallowing unrelated `InvalidOperationException`s and violate the `UnexpectedFailure` boundary from Story 3.5).
-- **AD-5** — Database-first, no EF migrations; entities mirror `L_D_KAPE22.cs`, one file per entity; `scripts/schema/` extended so AR-12 tests cover the 10 new tables.
-- **AD-6** — `Kape22ImportBundle` carries `MapResult<L_D_KAPE22>`'s metadata (`Success`, `Errors`, `Warnings`, `NumeroFichier`, `OF`) plus the 9 nullable downstream entities. `Kape22Persister.Persist` is replaced, not overloaded.
-- **AD-7** — Inter-table links via explicit scalar FK columns, assigned directly by mappers — no EF navigation properties. This is why the pre-existing (Epic 2) untrimmed `entity.OF`/`entity.Coulee` in `Kape22Mapper.Map` became a live risk only in this epic: it now fans out into 9 downstream tables' scalar key columns. Story 4.9/A-3 trims both fields once, at the source, inside `Kape22Mapper.Map`'s existing per-Champ loop — not at each of the 9 downstream read sites.
-- Story 4.9/A-4: the hot/cold Coulée marker (`CodeConsignePits == "1"` means cold; `!= "1"` means hot — same direction `Kape22Persister.ColdConsignePits` and `Kape22ImportBundleMapper.AddHotCouleeFormatViolation` already use) must exist as exactly one shared constant referenced by both — an extraction of the existing `Kape22Persister` constant, not a new one.
-- Mapper naming: `<TableNameNoPrefix>Mapper` (e.g. `OrdreFabricationMapper`, `SectionChargeChutageMapper`).
-- CC-1..CC-5 and CC-7 apply as in prior epics; CC-6 (zero runtime deps) does not apply — this is `Kape22Importer`, not `TextToXml`.
+- AD-1 — one `SaveChanges()` commits `L_D_KAPE22` + `L_D_LOG_COMMANDE` + all
+  applicable downstream entities together; never partial writes.
+- AD-2 — no `System.Reflection`/`Activator.CreateInstance`/interpreted mapping
+  table; one mapper class per target table, explicit named properties.
+- AD-3 — legacy `Ascometal.LSI.*` code is read-only reference only: never
+  modified, never assembly-referenced, never called at runtime.
+- AD-4 — every dispatch failure (SQL or business) becomes a distinct
+  `ConversionError{Block:File, Code}` and reuses the existing circuit
+  (`L_D_LOG_COMMANDE` "REJETÉ", `MQTTnetServices.Logs`, move to `error/`) — no
+  new logging channel.
+- AD-5 — the 10 new entities are database-first from `AFV004-LSI`
+  (`sys.columns`), one file per entity under `Persistence/`, no EF migration.
+- AD-6 — `Kape22ImportBundle` carries the same metadata as
+  `MapResult<L_D_KAPE22>` plus the 9 nullable downstream entities;
+  `Kape22Persister.Persist` is replaced (not overloaded).
+- AD-7 — inter-table links are explicit scalar FK columns (e.g. `OF`, owning
+  section-of-charge key); no EF navigation properties tie bundle entities
+  together.
+- Naming: `<TableNameNoPrefix>Mapper` (mirrors `Kape22Mapper`); entities named
+  after their table. No new dependency: built with what `Kape22Importer`
+  already references (`TextToXml`, `PortalSharedLibrary`, EF Core).
+- Decimal scaling (4.2-bis/4.3-bis/4.10): columns of CLR type `decimal`
+  sourced from a KAPE22 `int`/`int?` carry an explicit `scale` field in the
+  mapping annex (`MappingAnnexEntry.Scale`) and must be written through the
+  single sanctioned path `DecimalScale.Apply(rawValue, scale)` — never a raw
+  integer write. `L_D_SECTIONCHARGE_REFROIDISSOIRS`, `_POIDSMETRIQUE` and
+  `_SVT` have no `decimal` columns and are out of scope.
+- The cold/hot Coulee marker (`ColdConsignePits = "1"`) must live in one
+  shared location referenced by both `Kape22Persister` and
+  `Kape22ImportBundleMapper` — not duplicated as separate literals.
 
 ## Cross-Story Dependencies
 
-- Story 4.1 (entities + schema) is a hard prerequisite for 4.2's completeness test and for 4.3/4.4 mappers; it does **not** depend on 4.2 — schema comes from `sys.columns`, not from the mapping annex.
-- Story 4.2's annex is the single reference cited by 4.3, 4.4, and 4.5.
-- Story 4.5 composes `Kape22Mapper.Map` (Epic 2) with the 4.3/4.4 mappers into `Kape22ImportBundle`, and owns the pure (no-DB-read) business controls.
-- Story 4.6 consumes the 4.5 bundle, adds the one DB-read control (cold Coulée existence), and replaces `Kape22Persister`/updates `Kape22FichierProcessor` in the same story.
-- Story 4.7 replays the Story 3.6 E2E harness against the new tables; it adds coverage on top of 4.6's own integration proof, it does not replace it.
-- Story 4.2-bis must land before 4.3-bis: the extended annex is the completeness guard 4.3-bis relies on to prove no `decimal←int` column beyond the 5 known ones shares the same defect.
-- Story 4.3-bis must land before 4.9: Story 4.9's A-3 (trimming `OF`/`Coulee` in `Kape22Mapper.Map`) changes the exact values 4.3-bis's fixtures and assertions manipulate — doing both in parallel would mean rewriting 4.3-bis's tests twice. A-2/A-4/A-5 (bundled into 4.9) have no technical dependency on each other or on 4.2-bis/4.3-bis, but stay grouped for one review cycle.
+- Internal sequencing: 4.1 → {4.3, 4.4} → 4.5 → 4.6 → 4.7; Story 4.2 (mapping
+  annex) is a cross-cutting prerequisite for 4.3 and 4.4 — no mapper may code
+  a rule absent from the annex.
+- Post-retro #1, strict series (no parallelization): 4.2-bis → 4.3-bis → 4.9
+  (4.9 depends on 4.3-bis because A-3 changes the value source 4.3-bis tests).
+- Post-retro #2: Story 4.10 (B-1..B-5) has no prerequisite and no internal
+  order — independent of 4.2-bis/4.3-bis/4.9 and of each other, grouped into
+  one story purely for a single review cycle.
+- Story 4.6 explicitly must NOT change `IFichierProcessor.Process` signature
+  or `FichierProcessingResult` shape, to avoid triggering a `MicroServices.sln`
+  (SVN) commit; verified before closing the story.
+- Story 4.7 (E2E) reuses Story 3.6's 10-file `P60/` fixture suite; adds
+  dedicated faulty fixtures per new failure cause.
+- No UX/design artifacts exist or apply to this epic (v1 ships no UI).

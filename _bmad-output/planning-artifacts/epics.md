@@ -2199,3 +2199,94 @@ une collision `CodeOperation` → `ConversionError` + ligne REJETÉ, zéro
 exception non catchée).
 
 **Critères transverses :** CC-1, CC-2, CC-3, CC-4, CC-5.
+
+---
+
+## Corrections post-rétrospective Épic 4 (rétro #2)
+
+> Issues de la rétrospective Épic 4 #2 (`epic-4-retro-2026-09-18.md`, verdict
+> accepted-with-open-items) et du Sprint Change Proposal
+> `_bmad-output/planning-artifacts/sprint-change-proposal-2026-09-18.md`
+> (approuvé). Périmètre FR-17..FR-21 inchangé — B-1..B-4 sont une correction
+> de routage (déjà tracés depuis la revue de Story 4.3-bis, à tort rattachés
+> à Story 4.9) ; B-5 est une découverte nouvelle. Aucun ordre imposé entre
+> B-1..B-5 — regroupés en une seule story pour un seul cycle de revue.
+
+### Story 4.10 : Hardening Épic 4 (B-1..B-5)
+
+As a `Kape22Importer`,
+I want fermer les 5 items de hardening restants identifiés par la rétro Épic 4
+#2 autour de `DecimalScale.Apply` et de la couverture de parité production,
+So that la mise à l'échelle décimale (Story 4.3-bis) reste garantie dans le
+temps par des garde-fous automatiques plutôt que par vigilance manuelle.
+
+**Prérequis :** aucun — B-1..B-5 sont indépendants entre eux et des stories
+4.2-bis/4.3-bis/4.9 déjà livrées ; regroupés en une seule story pour un seul
+cycle de revue de code (même rationale que Story 4.9 pour A-2/A-4/A-5).
+
+**Acceptance Criteria:**
+
+**Given** les 21 appels `DecimalScale.Apply(source.X, N)` codés en dur dans
+  les 5 mappers (`OrdreFabricationMapper.cs`, `SectionChargeChutageMapper.cs`,
+  `SectionChargeDecoupeMapper.cs`, `SectionChargeLingotMapper.cs`,
+  `SectionChargePitsMapper.cs`) et la colonne `Scale` de l'annexe de mapping
+  (`MappingAnnexEntry.Scale`, Story 4.2-bis)
+**When** un nouveau contrôle de complétude s'exécute (extension ou sibling de
+  `MappingAnnexCompleteness.Check`, `MappingAnnexSchema.cs`)
+**Then** il échoue si le littéral `N` passé par un mapper à
+  `DecimalScale.Apply` diverge de la valeur `Scale` de l'annexe pour la même
+  colonne — l'existant `MappingAnnexCompletenessTests` (famille AC-FR17-5) ne
+  vérifie aujourd'hui que la présence d'un `Scale` dans l'annexe, jamais sa
+  conformité au code mappeur réellement livré (B-1)
+
+**Given** `DecimalScale.Apply(int rawValue, int scale)` /
+  `Apply(int? rawValue, int scale)` (`DecimalScale.cs`), seul chemin
+  sanctionné d'un `int`/`int?` KAPE22 brut vers une colonne `decimal` EF
+**When** un test de complétude réflectif (ou dérivé de l'annexe) s'exécute
+**Then** il échoue si une propriété EF `decimal` cible référencée par
+  l'annexe et sourcée d'un `int`/`int?` est assignée sans passer par
+  `DecimalScale.Apply` — garde-fou contre un futur 6e mapper reproduisant le
+  défaut fixé par Story 4.3-bis (B-2)
+
+**Given** `Kape22ProductionDataParityTests` (`RoundTripThroughTestDatabase`),
+  qui ne round-trip aujourd'hui que `L_D_KAPE22`
+**When** la suite est étendue
+**Then** elle round-trip également `L_D_ORDRE_FABRICATION` et les tables
+  `L_D_SECTIONCHARGE_*` mises à l'échelle par `DecimalScale`, chaque colonne
+  scaled persistée étant comparée à la valeur de production réelle lue via
+  `ReadProductionRows` (connexion `AscoLSI_Production`) — pas de fixture
+  statique de substitution (B-3)
+
+**Given** `scripts/e2e-worker-import.ps1`, dont l'étape `dotnet build`
+  (lignes 105-106) vérifie déjà `$LASTEXITCODE` et lève si non nul
+**When** la même exécution atteint l'invocation finale
+  `dotnet ... Kape22ProductionDataParityTests` (boucle
+  `$SkipProductionCompare`, ligne 188)
+**Then** cette invocation est gardée de la même façon — un `$LASTEXITCODE`
+  non nul fait échouer le script englobant au lieu de continuer
+  silencieusement (B-4)
+
+**Given** `DecimalScale.Apply`, qui corrige le placement décimal (`scale`)
+  mais ne connaît la précision totale `p` d'aucune colonne cible
+  `DECIMAL(p,s)` — `p` n'est aujourd'hui capturé nulle part, ni dans l'annexe
+  (`MappingAnnexEntry` ne porte que `Scale`) ni ailleurs
+**When** un entier KAPE22 brut hors gabarit, une fois mis à l'échelle,
+  dépasse encore la magnitude de sa colonne cible
+**Then** un garde-fou pré-persistance détecte le dépassement et produit un
+  `ConversionError` diagnostiqué (circuit AD-4 existant) au lieu de laisser
+  remonter un débordement SQL brut non diagnostiqué — l'emplacement du
+  garde-fou (nouvelle donnée `Precision` dans l'annexe vs. lecture directe de
+  `scripts/schema/01-ascolsi-tables.sql`) est une décision de conception
+  tranchée au spec figé de `bmad-build` (step-02), pas dans cette AC (B-5)
+
+**Tests xUnit (TDD — écrits en premier, CC-1) :** un test par AC (B-1 :
+extension `MappingAnnexCompletenessTests` cas divergence mapper/annexe ; B-2 :
+cas bypass simulé détecté ; B-3 : au moins une colonne scaled par table aval
+concernée comparée à une valeur de production réelle ; B-4 : vérification que
+le `$LASTEXITCODE` de l'étape est gardé ; B-5 : un cas hors gabarit →
+`ConversionError`, zéro exception SQL non catchée).
+
+**Critères transverses :** CC-1, CC-2, CC-3, CC-4, CC-5.
+
+Owner : Dev (B-5 : Dev / Lead Architecte pour le choix d'emplacement du
+garde-fou).

@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 16:00
-last_updated: 09-18-2026 15:19
+last_updated: 09-21-2026 09:00
 project: TextToXml
 project_key: NOKEY
 tracking_system: file-system
@@ -67,7 +67,7 @@ development_status:
   3-6-validation-de-bout-en-bout-harnais-de-couverture-sm-1-2-3: done
   epic-3-retrospective: done
 
-  epic-4: done
+  epic-4: in-progress
   4-1-entités-ef-database-first-extension-du-harnais-sql-pour-les: done
   4-2-extraction-documentation-du-mapping-legacy-annexe-colonne-pa: done
   4-3-mapper-of-coulée-mapping-structurel-pur: done
@@ -79,6 +79,7 @@ development_status:
   4-2-bis-extension-annexe-mapping-scale-precision: done
   4-3-bis-correctif-mise-a-l-echelle-decimale: done
   4-9-hardening-epic-4: done
+  4-10-hardening-epic-4-b: review
 action_items:
   - id: "story-4-6-decimal-scale-defect-story-4-3-bis"
     epic: 4
@@ -105,7 +106,8 @@ action_items:
     owner: "Dev"
     status: open
     ref: "_bmad-output/implementation-artifacts/deferred-work.md#deferred-from-code-review-of-story-43-bis-2026-09-17
-      -> story 4-9-hardening-epic-4"
+      -> story 4-10-hardening-epic-4-b (was mis-routed to 4-9-hardening-epic-4,
+      corrected by epic-4-retro-2026-09-18.md)"
   - id: "story-4-3-bis-review-item-2-no-anti-bypass-guard"
     epic: 4
     action: "Nothing prevents a future 6th mapper from assigning a raw KAPE22 int/int?
@@ -115,7 +117,8 @@ action_items:
     owner: "Dev"
     status: open
     ref: "_bmad-output/implementation-artifacts/deferred-work.md#deferred-from-code-review-of-story-43-bis-2026-09-17
-      -> story 4-9-hardening-epic-4"
+      -> story 4-10-hardening-epic-4-b (was mis-routed to 4-9-hardening-epic-4,
+      corrected by epic-4-retro-2026-09-18.md)"
   - id: "story-4-3-bis-review-item-3-production-parity-scope-gap"
     epic: 4
     action: "Kape22ProductionDataParityTests only round-trips L_D_KAPE22; it never
@@ -126,7 +129,8 @@ action_items:
     owner: "Dev"
     status: open
     ref: "_bmad-output/implementation-artifacts/deferred-work.md#deferred-from-code-review-of-story-43-bis-2026-09-17
-      -> story 4-9-hardening-epic-4"
+      -> story 4-10-hardening-epic-4-b (was mis-routed to 4-9-hardening-epic-4,
+      corrected by epic-4-retro-2026-09-18.md)"
   - id: "story-4-3-bis-review-item-4-e2e-script-exit-code-gap"
     epic: 4
     action: "scripts/e2e-worker-import.ps1's final dotnet test ... Kape22ProductionDataParityTests
@@ -136,7 +140,8 @@ action_items:
     owner: "Dev"
     status: open
     ref: "_bmad-output/implementation-artifacts/deferred-work.md#deferred-from-code-review-of-story-43-bis-2026-09-17
-      -> story 4-9-hardening-epic-4"
+      -> story 4-10-hardening-epic-4-b (was mis-routed to 4-9-hardening-epic-4,
+      corrected by epic-4-retro-2026-09-18.md)"
   - id: "epic-1-retro-item-1-passe-hygiene-story-0-epic-2-testsupport"
     epic: 1
     action: "Passe hygiene story-0 Epic 2: TestSupport partage (Windows1252 corrige
@@ -388,4 +393,5 @@ action_items:
       item until this retro."
     owner: "Dev / Lead Architecte"
     status: open
-    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-18.md"
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-18.md
+      -> story 4-10-hardening-epic-4-b"
