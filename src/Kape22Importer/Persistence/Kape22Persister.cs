@@ -160,18 +160,18 @@ public sealed class Kape22Persister(AscoLsiDbContext context, IConfiguration con
             List<string> businessRuleMessages = [];
             if (collidingGroup is not null)
             {
-                businessRuleMessages.Add($"OF '{of}' : plusieurs consignes partagent le même "
+                businessRuleMessages.Add("plusieurs consignes partagent le même "
                     + $"CodeOperation '{collidingGroup[0].CodeOperation}'.");
             }
 
             if (magnitudeOverflow is not null)
             {
-                businessRuleMessages.Add($"OF '{of}' : la valeur convertie {magnitudeOverflow} dépasse le gabarit de sa colonne.");
+                businessRuleMessages.Add($"la valeur convertie {magnitudeOverflow} dépasse le gabarit de sa colonne.");
             }
 
             if (lengthOverflow is not null)
             {
-                businessRuleMessages.Add($"OF '{of}' : la valeur '{lengthOverflow}' dépasse la longueur maximale de sa colonne.");
+                businessRuleMessages.Add($"la valeur '{lengthOverflow}' dépasse la longueur maximale de sa colonne.");
             }
 
             if (businessRuleMessages.Count > 0)
@@ -262,7 +262,7 @@ public sealed class Kape22Persister(AscoLsiDbContext context, IConfiguration con
     // causes into the one ConversionError/REJETÉ row a simultaneous failure of both must produce.
     private ImportResult RejectWithBusinessRuleViolation(string of, string numeroFichier, IReadOnlyList<string> messages)
     {
-        string message = string.Join(" ; ", messages);
+        string message = $"OF '{of}' : " + string.Join(" ; ", messages);
         ConversionError error = new() { Block = Block.File, Code = ErrorCode.BusinessRuleViolation, Message = message };
         context.LogCommandeRows.Add(BuildLogRow(of, $"{numeroFichier} — REJETÉ : {message}"));
 
@@ -472,29 +472,4 @@ public sealed class Kape22Persister(AscoLsiDbContext context, IConfiguration con
     // The rejection summary carried in L_D_LOG_COMMANDE, shaped "<count> erreur(s) : <message> ; ...".
     private static string Summarize(IReadOnlyList<ConversionError> errors) =>
         $"{errors.Count} erreur(s) : {string.Join(" ; ", errors.Select(error => error.Message))}";
-}
-
-// C-2 (Épic 4 retro #3): the A-5 pre-check's natural-key equality - CodeOperation collides
-// case-insensitively at the real SQL Server (case-insensitive collation), so the in-memory GroupBy must
-// match that instead of plain Ordinal tuple equality, which would let "XC1" and "xc1" sail through as two
-// distinct groups. OF, TypeConsigne and ConsigneGPAO stay Ordinal/exact - only CodeOperation is
-// case-insensitive.
-internal sealed class ConsignesNaturalKeyComparer : IEqualityComparer<(string OF, string CodeOperation, int TypeConsigne, bool ConsigneGPAO)>
-{
-    public static readonly ConsignesNaturalKeyComparer Instance = new();
-
-    public bool Equals(
-        (string OF, string CodeOperation, int TypeConsigne, bool ConsigneGPAO) x,
-        (string OF, string CodeOperation, int TypeConsigne, bool ConsigneGPAO) y) =>
-        x.OF == y.OF
-        && string.Equals(x.CodeOperation, y.CodeOperation, StringComparison.OrdinalIgnoreCase)
-        && x.TypeConsigne == y.TypeConsigne
-        && x.ConsigneGPAO == y.ConsigneGPAO;
-
-    public int GetHashCode((string OF, string CodeOperation, int TypeConsigne, bool ConsigneGPAO) key) =>
-        HashCode.Combine(
-            key.OF,
-            StringComparer.OrdinalIgnoreCase.GetHashCode(key.CodeOperation),
-            key.TypeConsigne,
-            key.ConsigneGPAO);
 }

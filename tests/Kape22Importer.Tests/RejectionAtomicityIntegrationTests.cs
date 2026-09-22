@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
-using System.Text;
 using Kape22Importer.Persistence;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -271,14 +270,6 @@ public class RejectionAtomicityIntegrationTests(SqlServerIntegrationFixture fixt
         Assert.Empty(verify.SectionChargeSvtRows.AsNoTracking());
         Assert.Empty(verify.ConsignesRows.AsNoTracking());
     }
-
-    // Code-review patch (Épic 4 retro #3): reads a fixed-width Detail-block Champ back out of a raw
-    // Fichier's bytes by its own Templates/P60.xml Position/Size, the read-side counterpart of
-    // TestSupport.WithDetailChamp - lets a test force one field onto another field's own current value
-    // (the A-5 collision below) instead of a hardcoded literal that would go stale silently if the
-    // reference Fichier's fixture value ever changed.
-    private static string ReadDetailChamp(byte[] source, int position, int size) =>
-        Encoding.Latin1.GetString(source).Split("\r\n")[1].Substring(position, size);
 
     // Processes one Fichier with an ILogger backed by the real Serilog MSSqlServer sink, then flushes the
     // sink so ReadMqttLogs sees the row (DoubleJournalIntegrationTests' own RunWithSerilog, parameterized

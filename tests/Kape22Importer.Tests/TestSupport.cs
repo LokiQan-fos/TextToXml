@@ -127,6 +127,22 @@ internal static class TestSupport
         return Encoding.Latin1.GetBytes(string.Join("\r\n", lines));
     }
 
+    // Code-review patch (Épic 4 retro #3, story 4.11): the read-side counterpart of WithDetailChamp -
+    // reads a fixed-width Detail-block Champ back out of a raw Fichier's bytes by its own
+    // Templates/P60.xml Position/Size, so a test can force one field onto another field's own current
+    // value instead of a hardcoded literal that would go stale silently if the fixture's value ever
+    // changed.
+    public static string ReadDetailChamp(byte[] source, int position, int size)
+    {
+        string[] lines = Encoding.Latin1.GetString(source).Split("\r\n");
+        if (lines.Length < 2)
+        {
+            throw new ArgumentException("Fichier has no Detail block (fewer than 2 lines).", nameof(source));
+        }
+
+        return lines[1].Substring(position, size);
+    }
+
     // The bytes of source with every occurrence of find replaced by replacement. Latin-1 round-trips
     // every byte 1:1, so an ASCII substring swap keeps a fixed-width Fichier's layout intact.
     public static byte[] WithText(byte[] source, string find, string replacement) =>
