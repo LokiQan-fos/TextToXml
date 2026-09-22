@@ -74,6 +74,7 @@ public class AscoLsiDbContext(DbContextOptions<AscoLsiDbContext> options) : DbCo
             entity.ToTable("L_D_ORDRE_FABRICATION");
             entity.HasKey(row => row.OF);
             ApplyDownstreamColumnLengths(entity);
+            ApplyDownstreamColumnPrecisions(entity);
         });
 
         modelBuilder.Entity<L_D_COULEE>(entity =>
@@ -81,6 +82,7 @@ public class AscoLsiDbContext(DbContextOptions<AscoLsiDbContext> options) : DbCo
             entity.ToTable("L_D_COULEE");
             entity.HasKey(row => row.IdCoulee);
             ApplyDownstreamColumnLengths(entity);
+            ApplyDownstreamColumnPrecisions(entity);
         });
 
         modelBuilder.Entity<L_D_CONSIGNES>(entity =>
@@ -95,6 +97,7 @@ public class AscoLsiDbContext(DbContextOptions<AscoLsiDbContext> options) : DbCo
             entity.ToTable("L_D_SECTIONCHARGE_CHUTAGE");
             entity.HasKey(row => new { row.OF, row.CodeOperation });
             ApplyDownstreamColumnLengths(entity);
+            ApplyDownstreamColumnPrecisions(entity);
         });
 
         modelBuilder.Entity<L_D_SECTIONCHARGE_DECOUPE>(entity =>
@@ -102,6 +105,7 @@ public class AscoLsiDbContext(DbContextOptions<AscoLsiDbContext> options) : DbCo
             entity.ToTable("L_D_SECTIONCHARGE_DECOUPE");
             entity.HasKey(row => new { row.OF, row.CodeOperation });
             ApplyDownstreamColumnLengths(entity);
+            ApplyDownstreamColumnPrecisions(entity);
         });
 
         modelBuilder.Entity<L_D_SECTIONCHARGE_LINGOT>(entity =>
@@ -109,6 +113,7 @@ public class AscoLsiDbContext(DbContextOptions<AscoLsiDbContext> options) : DbCo
             entity.ToTable("L_D_SECTIONCHARGE_LINGOT");
             entity.HasKey(row => new { row.OF, row.CodeOperation });
             ApplyDownstreamColumnLengths(entity);
+            ApplyDownstreamColumnPrecisions(entity);
         });
 
         modelBuilder.Entity<L_D_SECTIONCHARGE_PITS>(entity =>
@@ -116,6 +121,7 @@ public class AscoLsiDbContext(DbContextOptions<AscoLsiDbContext> options) : DbCo
             entity.ToTable("L_D_SECTIONCHARGE_PITS");
             entity.HasKey(row => new { row.OF, row.CodeOperation });
             ApplyDownstreamColumnLengths(entity);
+            ApplyDownstreamColumnPrecisions(entity);
         });
 
         modelBuilder.Entity<L_D_SECTIONCHARGE_POIDSMETRIQUE>(entity =>
@@ -159,6 +165,22 @@ public class AscoLsiDbContext(DbContextOptions<AscoLsiDbContext> options) : DbCo
             if (entity.Metadata.FindProperty(column) is not null)
             {
                 entity.Property(column).HasMaxLength(maxLength);
+            }
+        }
+    }
+
+    // Without an explicit precision/scale, EF Core falls back to decimal(18,2) for every unconfigured
+    // decimal property - silently rounding a scale-3 column (PoidsDemiProduitUnitaire, LongueurCD, ...)
+    // to 2 decimals in the outbound SqlParameter before it ever reaches the real, wider column. Same
+    // shared-map-restricted-to-this-entity pattern as ApplyDownstreamColumnLengths above.
+    private static void ApplyDownstreamColumnPrecisions<TEntity>(EntityTypeBuilder<TEntity> entity)
+        where TEntity : class
+    {
+        foreach ((string column, (int precision, int scale)) in DownstreamColumnPrecisions.Precisions)
+        {
+            if (entity.Metadata.FindProperty(column) is not null)
+            {
+                entity.Property(column).HasPrecision(precision, scale);
             }
         }
     }

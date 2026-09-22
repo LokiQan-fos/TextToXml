@@ -77,6 +77,13 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
 
     private static string P60Directory => RepoLayout.ProjectFile("P60");
 
+    // Legacy quirk, confirmed against production: L_D_KAPE22.OF stays unpadded, but every downstream
+    // table (L_D_ORDRE_FABRICATION, L_D_SECTIONCHARGE_*, L_D_CONSIGNES) stores OF explicitly zero-padded
+    // to 12 digits. The current mappers don't reproduce that padding (they copy KAPE22.OF verbatim), so
+    // this is needed only to find the right production row to compare against - not a statement that the
+    // new pipeline's own (unpadded) output is correct.
+    private static string PadOf(string of) => of.PadLeft(12, '0');
+
     public static TheoryData<string> P60Fichiers()
     {
         TheoryData<string> data = new();
@@ -228,10 +235,11 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
         string of = mapped.OF.Trim();
 
         L_D_ORDRE_FABRICATION? productionOrdre = ReadProductionRow<L_D_ORDRE_FABRICATION>(
-            rows => rows.FirstOrDefault(row => row.OF == of));
+            rows => rows.FirstOrDefault(row => row.OF == PadOf(of)));
         Skip.If(
             productionOrdre is null,
-            $"{fichierName}: aucune ligne L_D_ORDRE_FABRICATION en production pour OF '{of}'.");
+            $"{fichierName}: aucune ligne L_D_ORDRE_FABRICATION en production pour OF '{of}' " +
+            $"(paddé '{PadOf(of)}').");
 
         List<string> regressions = [];
         L_D_ORDRE_FABRICATION testOrdre = RoundTrip(
@@ -264,7 +272,7 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
             return;
         }
 
-        List<TEntity> candidates = ReadProductionRows<TEntity>(rows => WithOf(rows, of).ToList());
+        List<TEntity> candidates = ReadProductionRows<TEntity>(rows => WithOf(rows, PadOf(of)).ToList());
         if (candidates.Count == 0)
         {
             return;
@@ -275,6 +283,9 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
             $"{fichierName}: {candidates.Count} lignes de production {typeof(TEntity).Name} pour OF '{of}' " +
             "- impossible de désigner la ligne de référence.");
 
+        // Reloaded from the TEST database, where the current mapper still writes OF unpadded (the bug
+        // this padding is here to detect) - so the round-trip lookup key must stay unpadded to match
+        // what was actually just inserted, unlike the production lookup above.
         TEntity testRow = RoundTrip(mapped, rows => WithOf(rows, of).Single());
         regressions.AddRange(ScaledRegressions(testRow, candidates[0]));
     }
@@ -287,13 +298,28 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
         where TEntity : class =>
         rows.Where(row => EF.Property<string>(row, "OF") == of);
 
+    // L_D_SECTIONCHARGE_CHUTAGE.ChutageTete/ChutagePied are updated by a later, non-P60 GPAO event (the
+    // actual post-lamination measurement), confirmed against production 2026-09-22: both real P60
+    // re-submissions of the same OF (124, then 128) carry identical raw digits, yet the current
+    // production row holds neither - so comparing this test's freshly-dispatched value against
+    // production's current row is comparing against a value the P60 dispatch never wrote. Same category
+    // as L_D_ORDRE_FABRICATION's non-scaled columns (class doc comment on
+    // MappedFichier_ScaledDownstreamColumns_MatchLegacyProductionRow), just not previously known to
+    // extend to a scale-guarded column.
+    private static readonly HashSet<string> KnownPostDispatchOverwrites = new(StringComparer.Ordinal)
+    {
+        nameof(L_D_SECTIONCHARGE_CHUTAGE.ChutageTete),
+        nameof(L_D_SECTIONCHARGE_CHUTAGE.ChutagePied),
+    };
+
     // Compares only the DownstreamColumnMagnitudes-registered (scale-guarded) decimal columns of two
     // same-typed entities - the columns B-3 exists to check, never the full row.
     private static IEnumerable<string> ScaledRegressions<TEntity>(TEntity testRow, TEntity productionRow)
     {
         foreach (PropertyInfo property in typeof(TEntity).GetProperties())
         {
-            if (!DownstreamColumnMagnitudes.MaxAbsoluteValues.ContainsKey(property.Name))
+            if (!DownstreamColumnMagnitudes.MaxAbsoluteValues.ContainsKey(property.Name)
+                || KnownPostDispatchOverwrites.Contains(property.Name))
             {
                 continue;
             }
