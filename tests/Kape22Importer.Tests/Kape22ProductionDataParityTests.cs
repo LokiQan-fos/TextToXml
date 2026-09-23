@@ -254,6 +254,116 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
             string.Join("\n", regressions));
     }
 
+    // Story 4.4-bis (AC-4): L_D_CONSIGNES carries several rows per OF - its own natural key is
+    // (OF, CodeOperation, TypeConsigne, ConsigneGPAO), not OF alone (Story 4.1) - which is exactly the
+    // gap that let ConsignesMapper silently under-produce before this story (5 rows vs 60 in production
+    // for one real OF, never caught because this table had no parity test at all). Only the
+    // ConsigneGPAO=1 rows are in this mapper's own scope (AC-2, sprint-change-proposal-2026-09-23) -
+    // ConsigneGPAO=0 belongs to an earlier, out-of-scope process this mapper never produces or checks
+    // for. For every row ConsignesMapper actually produces, its exact natural-key match must exist in
+    // production with the same CodeConsigne/SizeCodeConsigne; a row with no production match at all is a
+    // real regression. LibelleConsigne is excluded from the comparison (out of scope, stays null here -
+    // Boundaries & Constraints).
+    [SkippableTheory]
+    [MemberData(nameof(P60Fichiers))]
+    public void MappedFichier_ConsignesRows_MatchLegacyProductionRows(string fichierName)
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason ?? "SQL Server test instance unavailable.");
+        Skip.If(
+            string.IsNullOrWhiteSpace(ProductionConnectionString),
+            "No production database configured. Set ConnectionStrings:AscoLSI_Production in " +
+            "tests/Kape22Importer.Tests/appsettings.Test.json or KAPE22_TEST_ConnectionStrings__AscoLSI_Production.");
+
+        byte[] bytes = File.ReadAllBytes(Path.Combine(P60Directory, fichierName));
+        ConversionResult conversion = Converter.Convert(bytes, EmbeddedDescriptor.Xml);
+        Assert.True(conversion.Success, $"Step 1 failed for {fichierName}: {Describe(conversion.Errors)}");
+
+        MapResult<L_D_KAPE22> mapping = new Kape22Mapper(StableClock()).Map(conversion.Xml!, fichierName);
+        Assert.True(mapping.Success, $"Step 2 mapping failed for {fichierName}: {Describe(mapping.Errors)}");
+        L_D_KAPE22 mapped = mapping.Value!;
+        string of = mapped.OF.Trim();
+
+        List<L_D_CONSIGNES> consignes = ConsignesMapper.Map(
+            mapped,
+            SectionChargeChutageMapper.Map(mapped),
+            SectionChargeDecoupeMapper.Map(mapped),
+            SectionChargeLingotMapper.Map(mapped),
+            SectionChargePitsMapper.Map(mapped),
+            SectionChargePoidsMetriqueMapper.Map(mapped),
+            SectionChargeRefroidissoirsMapper.Map(mapped),
+            SectionChargeSvtMapper.Map(mapped));
+
+        Skip.If(consignes.Count == 0, $"{fichierName}: aucune section décodable applicable pour cet OF, rien à comparer.");
+
+        List<L_D_CONSIGNES> productionRows = ReadProductionRows<L_D_CONSIGNES>(
+            rows => WithOf(rows, PadOf(of)).Where(row => row.ConsigneGPAO).ToList());
+        Skip.If(
+            productionRows.Count == 0,
+            $"{fichierName}: aucune ligne L_D_CONSIGNES (ConsigneGPAO=1) en production pour OF '{of}' (paddé '{PadOf(of)}').");
+
+        List<L_D_CONSIGNES> testRows = RoundTripConsignes(consignes);
+
+        List<string> regressions = [];
+        foreach (L_D_CONSIGNES row in testRows)
+        {
+            // FirstOrDefault, not SingleOrDefault: a data-quality surprise in production (more than one
+            // row for this (CodeOperation, TypeConsigne) pair) must still produce the descriptive
+            // regression message below, not an opaque InvalidOperationException.
+            L_D_CONSIGNES? match = productionRows.FirstOrDefault(
+                p => p.CodeOperation.Trim() == row.CodeOperation.Trim() && p.TypeConsigne == row.TypeConsigne);
+
+            if (match is null)
+            {
+                regressions.Add(
+                    $"  CodeOperation={row.CodeOperation}, TypeConsigne={row.TypeConsigne}: aucune ligne de production correspondante.");
+                continue;
+            }
+
+            if (!Equals(Normalize(match.CodeConsigne), Normalize(row.CodeConsigne)))
+            {
+                regressions.Add(
+                    $"  CodeOperation={row.CodeOperation}, TypeConsigne={row.TypeConsigne}.CodeConsigne: " +
+                    $"production={Format(match.CodeConsigne)}, nouveau traitement={Format(row.CodeConsigne)}");
+            }
+
+            if (match.SizeCodeConsigne != row.SizeCodeConsigne)
+            {
+                regressions.Add(
+                    $"  CodeOperation={row.CodeOperation}, TypeConsigne={row.TypeConsigne}.SizeCodeConsigne: " +
+                    $"production={match.SizeCodeConsigne}, nouveau traitement={row.SizeCodeConsigne}");
+            }
+        }
+
+        Assert.True(
+            regressions.Count == 0,
+            $"{fichierName} (OF {of}) diverge de la production sur L_D_CONSIGNES (ConsigneGPAO=1) :\n" +
+            string.Join("\n", regressions));
+    }
+
+    // Inserts every row ConsignesMapper produced for this OF under one rolled-back TransactionScope, then
+    // reads them all back by OF + ConsigneGPAO - the multi-row-per-OF counterpart of RoundTrip (which
+    // reloads by a single-row key) and RoundTripThroughTestDatabase (which reloads by Id).
+    private List<L_D_CONSIGNES> RoundTripConsignes(List<L_D_CONSIGNES> entities)
+    {
+        using TransactionScope scope = new(TransactionScopeAsyncFlowOption.Enabled);
+        using AscoLsiDbContext context = fixture.NewAscoLsiContext();
+        context.Database.OpenConnection();
+
+        context.ConsignesRows.AddRange(entities);
+        context.SaveChanges();
+
+        string of = entities[0].OF;
+        List<string> codeOperations = entities.Select(e => e.CodeOperation).Distinct().ToList();
+
+        // No scope.Complete(): the insert rolls back here, same as RoundTrip/RoundTripThroughTestDatabase.
+        // Scoped to the CodeOperations just inserted for this call, not just OF: a shared test database
+        // carrying other ConsigneGPAO=1 rows for the same OF from an unrelated source would otherwise be
+        // silently included.
+        return context.ConsignesRows.AsNoTracking()
+            .Where(row => row.OF == of && row.ConsigneGPAO && codeOperations.Contains(row.CodeOperation))
+            .ToList();
+    }
+
     // A section-charge table is per-OF applicable or not (Story 4.4): a null mapped entity, or no
     // matching production row, means nothing to compare here - not a regression. Unlike
     // L_D_ORDRE_FABRICATION (whose key IS OF, so at most one production row can ever exist), a

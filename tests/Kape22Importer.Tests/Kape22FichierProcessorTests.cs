@@ -225,8 +225,9 @@ public class Kape22FichierProcessorTests
         Assert.Single(verify.SectionChargeRefroidissoirsRows);
         Assert.Empty(verify.SectionChargeSvtRows);
 
-        // One L_D_CONSIGNES row per applicable section above (Chutage/Decoupe/Lingot/Pits/Refroidissoirs
-        // - PoidsMetrique/SVT contribute none, ConsignesMapper.Map).
-        Assert.Equal(5, verify.ConsignesRows.Count());
+        // Story 4.4-bis: one full-code row plus one row per decoded sub-field, per applicable section
+        // above (Chutage 6, Decoupe 3 - its raw code is too short for the size-18 block, Lingot 5,
+        // Pits 6, Refroidissoirs 4 - PoidsMetrique/SVT contribute none), all ConsigneGPAO=true.
+        Assert.Equal(6 + 3 + 5 + 6 + 4, verify.ConsignesRows.Count());
     }
 }

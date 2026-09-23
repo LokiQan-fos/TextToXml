@@ -116,16 +116,20 @@ public sealed class Kape22Persister(AscoLsiDbContext context, IConfiguration con
             }
 
             // A-5 (Epic 4 retro): a same-bundle L_D_CONSIGNES natural-key collision - two sections
-            // sharing the same CodeOperation for this OF (today's TypeConsigne/ConsigneGPAO defaults,
-            // 0/false, make CodeOperation the effective discriminant - see ConsignesMapper's own
-            // comment) - would otherwise throw an uncaught InvalidOperationException at AddRange time.
-            // Caught here, in-memory, before anything is staged on the context, and routed through the
-            // same ConversionError/REJETÉ-log shape as the missing-Coulee check above - never widening
-            // the DbUpdateException/DbException catch filter to cover it.
-            // The full 4-part tuple mirrors L_D_CONSIGNES' real natural key, but OF is bundle-constant
-            // today (every ConsignesMapper.Build call passes the same source.OF), so this grouping is
-            // today effectively just CodeOperation, since TypeConsigne/ConsigneGPAO are always 0/false
-            // (spec Design Notes). C-2 (Épic 4 retro #3): CodeOperation collides case-insensitively at
+            // sharing the same CodeOperation for this OF - would otherwise throw an uncaught
+            // InvalidOperationException at AddRange time. Caught here, in-memory, before anything is
+            // staged on the context, and routed through the same ConversionError/REJETÉ-log shape as the
+            // missing-Coulee check above - never widening the DbUpdateException/DbException catch filter
+            // to cover it.
+            // The full 4-part tuple mirrors L_D_CONSIGNES' real natural key. OF is bundle-constant today
+            // (every ConsignesMapper.Build call passes the same source.OF) and ConsigneGPAO is always
+            // true since Story 4.4-bis, but TypeConsigne now varies per row (0-29, one full-code row plus
+            // one row per decoded sub-field per applicable section - see ConsignesMapper): every
+            // decodable section's own TypeConsigne=13 full-code row still shares the same (OF,
+            // CodeOperation, TypeConsigne, ConsigneGPAO) key whenever two sections share one
+            // CodeOperation, so the collision this check exists for remains reachable through that row,
+            // not through the whole tuple degenerating to CodeOperation alone. C-2 (Épic 4 retro #3):
+            // CodeOperation collides case-insensitively at
             // the real SQL Server (case-insensitive collation) even though plain tuple equality would
             // treat "XC1" and "xc1" as distinct - ConsignesNaturalKeyComparer makes only CodeOperation
             // case-insensitive, OF/TypeConsigne/ConsigneGPAO stay ordinal, and the message below still

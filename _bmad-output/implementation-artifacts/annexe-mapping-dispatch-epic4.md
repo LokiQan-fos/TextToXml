@@ -193,19 +193,22 @@ Note (Story 4.2-bis) : `L_D_CONSIGNES` ne porte aucune colonne `decimal` (7 colo
 
 Table partagée par les 7 sections de charge (un sous-objet `Consignes*` par section dans le
 MappingTemplate, tous `type="Consignes"`). `OF`/`CodeOperation`/`CodeConsigne` sont sourcés
-directement ; `LibelleConsigne` et `TypeConsigne` sont `mapping=""` dans les 7 sous-objets du
-template et alimentés par du code applicatif complexe (décodage d'un code composite,
-`CompleteConsignes2`), pas par une règle unique.
+directement. `TypeConsigne`/`SizeCodeConsigne` sont désormais une règle documentée par section
+(Story 4.4-bis, ci-dessous) pour les 6 sections dont `OrdreDeFabricationManager.CompleteConsignes2`
+décode un code composite (Chutage, Lingot, Pits, Decoupe, PoidsMetrique, Refroidissoir) ; SVT reste
+`à_clarifier` (CLR default), aucune règle de décomposition legacy trouvée pour cette section
+(commentaire mort uniquement, lignes 1668-1669). `LibelleConsigne` reste `à_clarifier`, alimenté par du
+code applicatif complexe (`LibelleConsigneController.GetLibelle`), hors périmètre de Story 4.4-bis.
 
 | Colonne | Statut | Source / Règle | Scale |
 | --- | --- | --- | --- |
 | CodeConsigne | sourcée | KAPE22, champ variable selon la section (ex. `CodeConsigneLingot` pour ConsignesLingot, `CodeConsigneChutage` pour ConsignesChutage — cf. OrdreFabrication.xml, sous-objets `ConsignesL/C/D/R/P/S/PM`) | - |
 | CodeOperation | sourcée | KAPE22, champ variable selon la section (ex. `CodeOpeLingot`, `CodeOpeChutage`...), même famille que le CodeOperation de la section parente | - |
-| ConsigneGPAO | règle | false pour la consigne "réelle", true pour sa consigne miroir GPAO ; `AddOrModifyConsigne` (OrdreDeFabricationManager.cs:1362-1435) crée les deux lignes en parallèle quand gpao=true | - |
+| ConsigneGPAO | règle | `true` pour toute ligne produite par `ConsignesMapper` — la valeur telle qu'injectée par le dispatch P60, potentiellement déjà ajustée par un opérateur pour une contrainte de production temporaire (confirmé par le donneur d'ordre, 2026-09-23, sprint-change-proposal-2026-09-23.md). `false` porte la valeur initiale prévue par l'OF, un processus antérieur au dispatch P60 et hors périmètre de ce mapper (pas un doublon "miroir" à dédupliquer, ni une ligne dont ce mapper vérifie l'existence — AD-2/AD-7) | - |
 | LibelleConsigne | à_clarifier | Calculé par `LibelleConsigneController.GetLibelle(...)` (OrdreDeFabricationManager.cs:1408,1412,1424,1428) ; fichier LibelleConsigneController.cs non fourni | - |
 | OF | sourcée | KAPE22.OF | - |
-| SizeCodeConsigne | à_clarifier | Paramètre `tailleconsigne` (12 ou 18) passé par `CompleteConsignes2` selon le type de consigne décodé (OrdreDeFabricationManager.cs:1442-1682) ; pas une règle unique pour toute la table | - |
-| TypeConsigne | à_clarifier | Constante par sous-champ décodé, définie au cas par cas dans `CompleteConsignes2` (OrdreDeFabricationManager.cs:1442-1682, ex. type 13 = consigne globale, type 12 = code enfournement...) ; pas une règle unique pour toute la table | - |
+| SizeCodeConsigne | règle | 12 pour la ligne de code complet et chaque sous-champ des 6 sections décodées, sauf le bloc XP1 sur 18 (`ConsignesDecoupeLingot`, type 24 et ses sous-champs 25-29) qui vaut 18 — paramètre `tailleconsigne` de `CompleteConsignes2` (OrdreDeFabricationManager.cs:1442-1682). SVT reste `à_clarifier` (CLR default 0), aucune règle de décomposition trouvée. Détail par section : Code Map de `spec-4-4-bis-decomposition-l-d-consignes-sous-champs-consignegpao.md` | - |
+| TypeConsigne | règle | Constante par sous-champ décodé, une par section et par offset `Substring` de son code consigne brut (Chutage `OrdreDeFabricationManager.cs:1520-1547`, Lingot `:1488-1514`, Pits `:1452-1482`, Decoupe `:1557-1599`, PoidsMetrique `:1612-1636`, Refroidissoir `:1642-1664`) ; `13` = code complet de chaque section (`24` pour le bloc Decoupe sur 18). SVT reste `à_clarifier` (CLR default 0), aucune règle de décomposition legacy trouvée. Détail par section : Code Map de `spec-4-4-bis-decomposition-l-d-consignes-sous-champs-consignegpao.md` | - |
 
 ---
 

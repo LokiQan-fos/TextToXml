@@ -67,7 +67,7 @@ development_status:
   3-6-validation-de-bout-en-bout-harnais-de-couverture-sm-1-2-3: done
   epic-3-retrospective: done
 
-  epic-4: done
+  epic-4: in-progress
   4-1-entités-ef-database-first-extension-du-harnais-sql-pour-les: done
   4-2-extraction-documentation-du-mapping-legacy-annexe-colonne-pa: done
   4-3-mapper-of-coulée-mapping-structurel-pur: done
@@ -81,6 +81,7 @@ development_status:
   4-9-hardening-epic-4: done
   4-10-hardening-epic-4-b: done
   4-11-hardening-epic-4-c: done
+  4-4-bis-decomposition-l-d-consignes-sous-champs-consignegpao: backlog
 action_items:
   - id: "story-4-6-decimal-scale-defect-story-4-3-bis"
     epic: 4

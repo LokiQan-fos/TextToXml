@@ -13,10 +13,13 @@ modified or called at runtime). A valid Fichier must write exactly one
 transaction covering all 10 tables; any business or SQL failure blocks the
 whole batch, logs the precise cause through the existing circuit, and moves
 the Fichier to `error/`, never leaving an orphaned `L_D_KAPE22` row. The epic
-went through three retrospectives that surfaced hardening gaps closed by
-follow-up stories (4.2-bis/4.3-bis/4.9/4.10/4.11); the latest (4.11) closes the
-remaining coverage/documentation items and records two business notes as
-one-line code comments rather than new behavior.
+has been reopened four times after retrospectives/production-parity testing
+surfaced gaps, each closed by a follow-up story
+(4.2-bis/4.3-bis/4.9/4.10/4.11/4.4-bis). The latest, 4.4-bis, corrects
+`ConsignesMapper`: production-parity testing on a real OF found the mapper
+producing only 1/12th of the real `L_D_CONSIGNES` row count, because it never
+decoded the per-section sub-fields legacy derives from the raw consigne code,
+and tagged its rows with the wrong `ConsigneGPAO` value.
 
 ## Stories
 
@@ -32,6 +35,7 @@ one-line code comments rather than new behavior.
 - Story 4.9: Hardening (A-2..A-5: DbSet assertions, OF/Coulee trim-at-source, shared hot/cold marker, Consignes collision pre-check)
 - Story 4.10: Hardening (B-1..B-5: scale/annex conformance guard, `DecimalScale.Apply` bypass guard, production parity extended, script exit-code guard, magnitude overflow guard)
 - Story 4.11: Hardening (C-1..C-10) + business notes Q-3/Q-5
+- Story 4.4-bis: Decompose `L_D_CONSIGNES` into per-section decoded sub-fields + correct `ConsigneGPAO` semantics
 
 ## Requirements & Constraints
 
@@ -67,6 +71,28 @@ one-line code comments rather than new behavior.
 - The Consignes natural-key collision pre-check `(OF, CodeOperation,
   TypeConsigne, ConsigneGPAO)` must compare `CodeOperation` case-insensitively,
   matching the real primary key's SQL Server collation.
+- `L_D_CONSIGNES` decomposition (4.4-bis): each of the 7 sections decodes its
+  raw consigne code into several positional sub-fields (`Substring` offsets),
+  each a distinct `L_D_CONSIGNES` row with its own `TypeConsigne`, in addition
+  to the already-produced "full code" row. Offsets must be read directly from
+  the legacy source per section rather than reconstructed from memory (same
+  no-guessing discipline as the mapping annex). `Decoupe` (XP1) has a second,
+  optional consigne code with its own sub-fields, present only if non-empty.
+  `SVT` may legitimately have no discoverable decomposition rule — document as
+  `à_clarifier` rather than invent one; this does not block the story.
+- `ConsigneGPAO` semantics (confirmed by the business owner, not previously
+  known): `0` = the value initially planned by the OF; `1` = the value as
+  possibly adjusted by an operator for a temporary production constraint —
+  these are two distinct, both-needed values, not a mirror/duplicate. Every
+  row this pipeline produces (P60 dispatch) is a `1`-value; producing or
+  assuming the existence of a matching `0`-value row is out of scope for this
+  mapper and for downstream code (no cross-mapper existence check).
+- Production-parity testing (`Kape22ProductionDataParityTests`) did not
+  previously cover `L_D_CONSIGNES` or `L_D_COULEE` column-by-column against
+  real data — only `L_D_KAPE22` and the `decimal` columns of
+  `L_D_ORDRE_FABRICATION`/`L_D_SECTIONCHARGE_*` were checked, which is why the
+  `L_D_CONSIGNES` under-population went undetected. Closing this coverage gap
+  for `L_D_CONSIGNES` (`ConsigneGPAO=1` rows only) is part of this epic.
 
 ## Technical Decisions
 
@@ -92,7 +118,9 @@ one-line code comments rather than new behavior.
   replaced, not overloaded.
 - **FK by explicit scalar column**: each bundle entity carries its business
   key as a scalar column (e.g. `OF`); no EF navigation properties
-  (`ICollection<T>`) link bundle entities.
+  (`ICollection<T>`) link bundle entities. `ConsignesMapper`/`Kape22Persister`
+  must not add a cross-mapper existence check for the (out-of-scope)
+  `ConsigneGPAO=0` counterpart rows — consistent with this no-navigation rule.
 - **Failure cause reuses the existing circuit**: any dispatch failure (SQL or
   business) becomes a distinct `ConversionError{Block:File, Code}` feeding
   `L_D_LOG_COMMANDE` (`"<NumeroFichier> — REJETÉ : <cause>"`) and
@@ -112,6 +140,10 @@ one-line code comments rather than new behavior.
   building on the fixes and tests of the previous one; 4.11 is independent
   internally (C-1..C-10 have no ordering) but depends on all prior Epic 4
   stories being delivered.
+- Story 4.4-bis has no prerequisite and is independent of
+  4.2-bis/4.3-bis/4.9/4.10/4.11 (already delivered); it solely corrects
+  `ConsignesMapper` (Story 4.4) and extends the mapping annex + production
+  parity suite it depends on (Stories 4.2/4.2-bis).
 - Depends on Epic 2 (`L_D_KAPE22` insert, FR-11) as the upstream write this
   epic extends, and on Epic 3's dual-logging/error-routing circuit (FR-14,
   FR-12) which this epic's failure handling reuses rather than replacing.
