@@ -23,7 +23,7 @@ public static class SectionChargePitsMapper
             H2Coulee = DecimalScale.Apply(source.H2Coulee, 1),
             NumeroFour1 = source.NumeroFour1,
             NumeroFour2 = source.NumeroFour2,
-            OF = source.OF,
+            OF = DownstreamOf.Pad(source.OF),
             RangOperation = source.RangOpePits!,
 
             // DateEnfournementFour1, DateEnfournementFour2: NULL by rule - deliberately not mapped in the

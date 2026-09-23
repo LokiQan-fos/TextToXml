@@ -15,13 +15,9 @@ namespace Kape22Importer.Tests;
 [Trait("Category", TestCategory.Unit)]
 public class Kape22ImportBundleMapperTests
 {
-    // AC-FR20-1: a valid Fichier where all 3 FR-20 controls pass. The reference Fichier's own
-    // CodeConsignePits ("1 205 00 999", a real 12-char consigne code, never the literal "1") makes it
-    // "hot" under AC-FR20-3's rule, and its Coulee ("165718") does not start with '0' - so the untouched
-    // reference is deliberately not this test's fixture (see HotCouleeMalformed below, which uses that
-    // combination on purpose). Forcing CodeConsignePits to "1" (cold) isolates the happy path from a
-    // control this story adds, leaving the other two Story 4.3/4.4-derived facts (ingot sum, Pits
-    // presence) exactly as the reference Fichier already has them.
+    // AC-FR20-1: a valid Fichier where every FR-20 control passes. Forces CodeConsignePits to "1" (cold)
+    // to isolate the happy path, leaving the other Story 4.3/4.4-derived facts (ingot sum, Pits presence)
+    // exactly as the reference Fichier already has them.
     [Fact]
     [Trait("AC", "FR20-1")]
     public void Map_ValidXmlAllControlsPass_ReturnsSuccessfulBundleWithEveryEntity_AcFr20_1()
@@ -144,8 +140,8 @@ public class Kape22ImportBundleMapperTests
     {
         string mutatedXml = MutatedReferenceXml(document =>
         {
-            SetChamp(document, "message", "CodeConsignePits", "2");
-            SetChamp(document, "message", "Coulee", "155718");
+            SetChamp(document, "message", "CodeOpePits", "   ");
+            SetChamp(document, "message", "RangOpePits", "   ");
             SetChamp(document, "message", "NombreLingotsFour1", "5");
         });
 
@@ -154,7 +150,7 @@ public class Kape22ImportBundleMapperTests
         Assert.False(bundle.Success);
         Assert.Equal(2, bundle.Errors.Count);
         Assert.All(bundle.Errors, error => Assert.Equal(ErrorCode.BusinessRuleViolation, error.Code));
-        Assert.Contains(bundle.Errors, error => error.Message.Contains("155718", StringComparison.Ordinal));
+        Assert.Contains(bundle.Errors, error => error.Message.Contains("enfournement", StringComparison.Ordinal));
         Assert.Contains(bundle.Errors, error => error.Message.Contains("répartition des lingots", StringComparison.Ordinal));
     }
 
@@ -182,45 +178,19 @@ public class Kape22ImportBundleMapperTests
         Assert.Empty(bundle.Errors);
     }
 
-    // AC-FR20-3: a "hot" Coulee (CodeConsignePits != "1") whose Coulee number does not start with '0' is
-    // a dedicated violation. Deliberately mutates both Champs rather than relying on the reference
-    // Fichier's own coincidental values, so the test documents the rule instead of depending on fixture
-    // drift.
+    // AC-FR20-3 removed 2026-09-22 (Kape22ImportBundleMapper.cs Design Notes): the reference Fichier is
+    // hot (CodeConsignePits is a real 12-char consigne code, never literally "1") with an externally-cast
+    // Coulee (165718, does not start with '0') - confirmed by the process owner as a legitimate,
+    // real-world combination, not a data defect. Replaces the two AC-FR20-3 tests that used to assert
+    // this exact case as a rejection: a hot, externally-sourced Coulee must succeed with no violation.
     [Fact]
-    [Trait("AC", "FR20-3")]
-    public void Map_HotCouleeDoesNotStartWithZero_ReturnsDedicatedViolation_AcFr20_3()
-    {
-        string mutatedXml = MutatedReferenceXml(document =>
-        {
-            SetChamp(document, "message", "CodeConsignePits", "2");
-            SetChamp(document, "message", "Coulee", "155718");
-        });
-
-        Kape22ImportBundle bundle = new Kape22ImportBundleMapper(WinterClock()).Map(mutatedXml, ReferenceFichierName);
-
-        Assert.False(bundle.Success);
-        ConversionError error = Assert.Single(bundle.Errors);
-        Assert.Equal(Block.File, error.Block);
-        Assert.Equal(ErrorCode.BusinessRuleViolation, error.Code);
-        Assert.Contains(bundle.OF!, error.Message, StringComparison.Ordinal);
-        Assert.Contains("155718", error.Message, StringComparison.Ordinal);
-    }
-
-    // The untouched reference Fichier happens to already be "hot" (CodeConsignePits is a real 12-char
-    // consigne code, never literally "1") with a Coulee not starting with '0' - so AC-FR20-3 fires on it
-    // as-is, with no other FR-20 control tripped. Kept as a second, independent confirmation alongside
-    // the deliberate variant above.
-    [Fact]
-    [Trait("AC", "FR20-3")]
-    public void Map_UnmutatedReferenceFichier_IsHotCouleeMalformedInIsolation_AcFr20_3()
+    public void Map_UnmutatedReferenceFichier_HotExternalCoulee_Succeeds()
     {
         Kape22ImportBundle bundle = new Kape22ImportBundleMapper(WinterClock())
             .Map(ConvertReferenceFichier(), ReferenceFichierName);
 
-        Assert.False(bundle.Success);
-        ConversionError error = Assert.Single(bundle.Errors);
-        Assert.Equal(ErrorCode.BusinessRuleViolation, error.Code);
-        Assert.Contains("165718", error.Message, StringComparison.Ordinal);
+        Assert.True(bundle.Success);
+        Assert.Empty(bundle.Errors);
     }
 
     // AC-FR20-4: an OF with no applicable L_D_SECTIONCHARGE_PITS (CodeOpePits/RangOpePits blanked) is a

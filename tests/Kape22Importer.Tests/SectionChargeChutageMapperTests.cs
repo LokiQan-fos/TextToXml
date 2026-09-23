@@ -30,7 +30,7 @@ public class SectionChargeChutageMapperTests
         Assert.Equal(DecimalScale.Apply(source.ChutageTete, 2), entity.ChutageTete);
         Assert.Equal(source.CodeOpeChutage, entity.CodeOperation);
         Assert.Equal(source.Destination, entity.Destination);
-        Assert.Equal(source.OF, entity.OF);
+        Assert.Equal(DownstreamOf.Pad(source.OF), entity.OF);
         Assert.Equal(source.RangOpeChutage, entity.RangOperation);
     }
 

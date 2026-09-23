@@ -49,7 +49,6 @@ public sealed class Kape22ImportBundleMapper(TimeProvider? timeProvider = null)
         // reports both in one pass instead of stopping at the first.
         List<ConversionError> errors = [];
         AddIngotFurnaceDistributionViolation(errors, kape22, ordreFabrication, refroidissoirs);
-        AddHotCouleeFormatViolation(errors, kape22);
         AddMissingEnfournementInstructionViolation(errors, kape22, pits);
 
         return new Kape22ImportBundle
@@ -106,24 +105,12 @@ public sealed class Kape22ImportBundleMapper(TimeProvider? timeProvider = null)
         });
     }
 
-    // AC-FR20-3: a "hot" Coulee (CodeConsignePits != "1", read straight off L_D_KAPE22 rather than a
-    // filtered L_D_CONSIGNES row - see spec Design Notes) must carry a Coulee number starting with '0'.
-    private static void AddHotCouleeFormatViolation(List<ConversionError> errors, L_D_KAPE22 kape22)
-    {
-        bool isHot = kape22.CodeConsignePits != Kape22ImportBundle.ColdConsignePits;
-        if (!isHot || kape22.Coulee.StartsWith('0'))
-        {
-            return;
-        }
-
-        errors.Add(new ConversionError
-        {
-            Block = Block.File,
-            Code = ErrorCode.BusinessRuleViolation,
-            Message = $"OF '{kape22.OF}' : la coulée chaude '{kape22.Coulee}' ne commence pas par '0' "
-                + $"(CodeConsignePits '{kape22.CodeConsignePits}' différent de '1').",
-        });
-    }
+    // AC-FR20-3 removed 2026-09-22: hot/cold (does an ingot go straight to rolling from the steelworks,
+    // or was it put into cold storage first) and internal/external (which steelworks cast the Coulee -
+    // '0' local, any other leading digit a specific external supplier) are independent business
+    // dimensions - confirmed with the process owner after this check rejected a real, legitimate P60
+    // Fichier (external Coulee, hot enfournement). No format constraint ties a Coulee's origin digit to
+    // its hot/cold status, so this control never had a valid premise; removed rather than patched.
 
     // AC-FR20-4: every OF needs an enfournement instruction (L_D_SECTIONCHARGE_PITS). A null result from
     // SectionChargePitsMapper - the section not applicable to this OF - is itself the violation.

@@ -28,7 +28,7 @@ public static class SectionChargeRefroidissoirsMapper
             NombreLingotsFour1 = source.NombreLingotsFour1,
             NombreLingotsFour2 = source.NombreLingotsFour2,
             NuanceMarquage = source.NuanceMarquage,
-            OF = source.OF,
+            OF = DownstreamOf.Pad(source.OF),
             OFDestination = source.OFDestination,
             OFOrigin = source.OFOrigin,
             OxygeneInferieur = source.OxygeneInferieur,

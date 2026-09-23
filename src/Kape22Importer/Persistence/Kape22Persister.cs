@@ -455,10 +455,14 @@ public sealed class Kape22Persister(AscoLsiDbContext context, IConfiguration con
     }
 
     // Import:InitiatingServer, length-checked against the L_D_LOG_COMMANDE.User column so a
-    // misconfiguration fails at construction with a clear message instead of on every import.
+    // misconfiguration fails at construction with a clear message instead of on every import. Falls back
+    // to the machine name on a blank/whitespace-only setting too, not just an absent one (GpaoImportP60.json
+    // ships with "InitiatingServer": "" - an empty string, not null - which a bare `??` never catches,
+    // silently leaving L_D_LOG_COMMANDE.User blank on every row).
     private static string ResolveUser(IConfiguration configuration)
     {
-        string user = configuration[InitiatingServerKey] ?? Environment.MachineName;
+        string? configured = configuration[InitiatingServerKey];
+        string user = string.IsNullOrWhiteSpace(configured) ? Environment.MachineName : configured;
         if (user.Length > LogCommandeColumnLengths.User)
         {
             throw new ArgumentException(

@@ -36,7 +36,7 @@ public class SectionChargeRefroidissoirsMapperTests
         Assert.Equal(source.NombreLingotsFour1, entity.NombreLingotsFour1);
         Assert.Equal(source.NombreLingotsFour2, entity.NombreLingotsFour2);
         Assert.Equal(source.NuanceMarquage, entity.NuanceMarquage);
-        Assert.Equal(source.OF, entity.OF);
+        Assert.Equal(DownstreamOf.Pad(source.OF), entity.OF);
         Assert.Equal(source.OFDestination, entity.OFDestination);
         Assert.Equal(source.OFOrigin, entity.OFOrigin);
         Assert.Equal(source.OxygeneInferieur, entity.OxygeneInferieur);

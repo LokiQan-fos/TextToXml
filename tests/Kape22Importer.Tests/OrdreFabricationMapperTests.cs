@@ -33,7 +33,6 @@ public class OrdreFabricationMapperTests
         nameof(L_D_ORDRE_FABRICATION.Nuance),
         nameof(L_D_ORDRE_FABRICATION.NumeroFichier),
         nameof(L_D_ORDRE_FABRICATION.NumeroMontage),
-        nameof(L_D_ORDRE_FABRICATION.OF),
         nameof(L_D_ORDRE_FABRICATION.ProfilProduit),
         nameof(L_D_ORDRE_FABRICATION.Type),
     ];
@@ -91,6 +90,20 @@ public class OrdreFabricationMapperTests
         object? expected = Widen(typeof(L_D_KAPE22).GetProperty(columnName)!.GetValue(source));
         object? actual = Widen(typeof(L_D_ORDRE_FABRICATION).GetProperty(columnName)!.GetValue(entity));
         Assert.Equal(expected, actual);
+    }
+
+    // OF is the one column SourcedColumns excludes: confirmed against production 2026-09-22
+    // (DownstreamOf.cs) - L_D_ORDRE_FABRICATION stores OF zero-padded to 12 digits, unlike L_D_KAPE22's
+    // own unpadded value.
+    [Fact]
+    [Trait("AC", "FR18-1")]
+    public void Map_Of_IsZeroPaddedToTwelveDigits_AcFr18_1()
+    {
+        L_D_KAPE22 source = ReferenceKape22();
+
+        L_D_ORDRE_FABRICATION entity = OrdreFabricationMapper.Map(source);
+
+        Assert.Equal(DownstreamOf.Pad(source.OF), entity.OF);
     }
 
     // Every annex "règle" column that stays NULL at dispatch: each is only positioned by a later,

@@ -77,7 +77,7 @@ public static class ConsignesMapper
         // CouleeMapper.Externe (annex flags this unconfirmed, inference by exclusion, Story 4.3).
         ConsigneGPAO = false,
 
-        OF = of,
+        OF = DownstreamOf.Pad(of),
 
         // LibelleConsigne, SizeCodeConsigne, TypeConsigne: assumed, unverified - à_clarifier per the
         // Story 4.2 annex (annexe-mapping-dispatch-epic4.md § L_D_CONSIGNES); no single column-to-column

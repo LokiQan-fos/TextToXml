@@ -131,7 +131,7 @@ public class EndToEndImportIntegrationTests(SqlServerIntegrationFixture fixture)
             // bundle, matched by OF (the same "count matches bundle.X is null ? 0 : 1" pattern
             // TransactionalPersistenceTests.Persist_FullSuccess_..._AcFr21_1 already proves at the
             // Persister-unit level).
-            string of = expected.OF!.Trim();
+            string of = DownstreamOf.Pad(expected.OF!);
             Assert.Single(verify.OrdreFabricationRows.AsNoTracking(), candidate => candidate.OF.Trim() == of);
             Assert.Single(verify.CouleeRows.AsNoTracking(), candidate => candidate.IdCoulee.Trim() == entity.Coulee.Trim());
             Assert.Equal(
@@ -171,8 +171,8 @@ public class EndToEndImportIntegrationTests(SqlServerIntegrationFixture fixture)
     }
 
     // Story 4.6 (deferred-work.md, decimal-scale defect): the bytes actually fed to the scanner for a
-    // given sample - the reference Fichier needs its Coulee corrected too (AC-FR20-3), every other
-    // sample only needs its out-of-scale dimension Champs zeroed.
+    // given sample - the reference Fichier uses the conventional internal Coulee value (see
+    // TestSupport.InsertableReferenceFichier), every other sample is insertable unmutated.
     private static byte[] Content(string fichierName) =>
         fichierName == ReferenceFichierName ? InsertableReferenceFichier() : InsertableFichier(fichierName);
 

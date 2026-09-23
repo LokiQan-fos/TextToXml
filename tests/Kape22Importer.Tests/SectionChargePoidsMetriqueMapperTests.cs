@@ -43,7 +43,7 @@ public class SectionChargePoidsMetriqueMapperTests
 
         Assert.NotNull(entity);
         Assert.Equal(source.CodeOpePoidMetrique, entity!.CodeOperation);
-        Assert.Equal(source.OF, entity.OF);
+        Assert.Equal(DownstreamOf.Pad(source.OF), entity.OF);
         Assert.Equal(source.RangOpePoidMetrique, entity.RangOperation);
     }
 

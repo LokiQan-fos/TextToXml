@@ -77,12 +77,9 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
 
     private static string P60Directory => RepoLayout.ProjectFile("P60");
 
-    // Legacy quirk, confirmed against production: L_D_KAPE22.OF stays unpadded, but every downstream
-    // table (L_D_ORDRE_FABRICATION, L_D_SECTIONCHARGE_*, L_D_CONSIGNES) stores OF explicitly zero-padded
-    // to 12 digits. The current mappers don't reproduce that padding (they copy KAPE22.OF verbatim), so
-    // this is needed only to find the right production row to compare against - not a statement that the
-    // new pipeline's own (unpadded) output is correct.
-    private static string PadOf(string of) => of.PadLeft(12, '0');
+    // Every downstream mapper now zero-pads OF to 12 digits itself (DownstreamOf.Pad); this local alias
+    // just reads that same production convention at the call sites below.
+    private static string PadOf(string of) => DownstreamOf.Pad(of);
 
     public static TheoryData<string> P60Fichiers()
     {
@@ -243,7 +240,7 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
 
         List<string> regressions = [];
         L_D_ORDRE_FABRICATION testOrdre = RoundTrip(
-            OrdreFabricationMapper.Map(mapped, StableClock()), rows => rows.Single(row => row.OF == of));
+            OrdreFabricationMapper.Map(mapped, StableClock()), rows => rows.Single(row => row.OF == PadOf(of)));
         regressions.AddRange(ScaledRegressions(testOrdre, productionOrdre!));
 
         CompareSectionCharge(regressions, fichierName, of, SectionChargeChutageMapper.Map(mapped));
@@ -283,10 +280,9 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
             $"{fichierName}: {candidates.Count} lignes de production {typeof(TEntity).Name} pour OF '{of}' " +
             "- impossible de désigner la ligne de référence.");
 
-        // Reloaded from the TEST database, where the current mapper still writes OF unpadded (the bug
-        // this padding is here to detect) - so the round-trip lookup key must stay unpadded to match
-        // what was actually just inserted, unlike the production lookup above.
-        TEntity testRow = RoundTrip(mapped, rows => WithOf(rows, of).Single());
+        // The mapper pads OF before this entity is even constructed (DownstreamOf.Pad), so the same
+        // padded key finds it back after the round-trip through the test database.
+        TEntity testRow = RoundTrip(mapped, rows => WithOf(rows, PadOf(of)).Single());
         regressions.AddRange(ScaledRegressions(testRow, candidates[0]));
     }
 

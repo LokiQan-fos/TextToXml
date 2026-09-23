@@ -47,7 +47,7 @@ public static class OrdreFabricationMapper
             Nuance = source.Nuance,
             NumeroFichier = source.NumeroFichier,
             NumeroMontage = source.NumeroMontage ?? string.Empty,
-            OF = source.OF,
+            OF = DownstreamOf.Pad(source.OF),
             PoidsDemiProduitUnitaire = DecimalScale.Apply(source.PoidsDemiProduitUnitaire, 3),
             PoidsPrevuDemiProduit = DecimalScale.Apply(source.PoidsPrevuDemiProduit, 3),
             ProfilProduit = source.ProfilProduit ?? string.Empty,

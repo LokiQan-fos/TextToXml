@@ -21,7 +21,7 @@ public static class SectionChargeDecoupeMapper
         {
             CodeOperation = source.CodeOpeDecoupe!,
             LongueurMoyenne = DecimalScale.Apply(source.LongueurMoyenne, 3),
-            OF = source.OF,
+            OF = DownstreamOf.Pad(source.OF),
             OutilDeDecoupe = source.OutilDecoupe,
             RangOperation = source.RangOpeDecoupe!,
         };

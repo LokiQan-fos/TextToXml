@@ -41,7 +41,7 @@ public class SectionChargeLingotMapperTests
         Assert.NotNull(entity);
         Assert.Equal(source.CodeOpeLingot, entity!.CodeOperation);
         Assert.Equal(DecimalScale.Apply(source.EpaisseurEnLaminage, 1), entity.EpaisseurEnLaminage);
-        Assert.Equal(source.OF, entity.OF);
+        Assert.Equal(DownstreamOf.Pad(source.OF), entity.OF);
         Assert.Equal(source.PriseDeFer, entity.PriseDeFer);
         Assert.Equal(source.ProfileLamine, entity.ProfileLamine);
         Assert.Equal(source.RangOpeLingot, entity.RangOperation);

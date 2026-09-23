@@ -158,33 +158,31 @@ public class RejectionAtomicityIntegrationTests(SqlServerIntegrationFixture fixt
         AssertAllElevenTablesEmpty(verify);
     }
 
-    // C-5 (Épic 4 retro #3): AC-FR20-3 - a hot Coulee (CodeConsignePits != "1") whose number does not
-    // start with '0' - proven only at the Persister-unit level before this story
-    // (Kape22ImportBundleMapperTests.Map_UnmutatedReferenceFichier_IsHotCouleeMalformedInIsolation_AcFr20_3
-    // documents the untouched reference Fichier as exactly this case in isolation). Zero rows in all 11
-    // dispatch tables, a REJETÉ L_D_LOG_COMMANDE row, and an Error line in MQTTnetServices.Logs, proven
-    // through the real Kape22FichierProcessor.Import pipeline this time.
+    // AC-FR20-3 removed 2026-09-22 (Kape22ImportBundleMapper.cs Design Notes): hot/cold and
+    // internal/external Coulee provenance are independent - confirmed by the process owner after this
+    // control rejected the untouched reference Fichier (hot enfournement, externally-cast Coulee
+    // '165718', a real, legitimate combination). Was proven only at the Persister-unit level before Story
+    // 4.7; now proves through the real Kape22FichierProcessor.Import pipeline that this exact case
+    // succeeds rather than being rejected - the positive counterpart of every other test in this file.
     [SkippableFact]
     [Trait("AC", "FR20-3")]
-    public void Import_HotCouleeMalformed_LeavesAllElevenTablesEmptyWithReadableCause_AcFr20_3()
+    public void Import_HotExternalCoulee_SucceedsRatherThanRejects_AcFr20_3()
     {
         Ready();
         byte[] content = ReadValidFixture(ReferenceFichierName);
 
         ImportResult result = RunWithSerilog(ReferenceFichierName, content);
 
-        Assert.False(result.Success);
-        Assert.Contains(result.Errors, error => error.Code == ErrorCode.BusinessRuleViolation);
+        Assert.True(result.Success);
+        Assert.NotNull(result.InsertedId);
 
         LogRow row = Assert.Single(ReadMqttLogs());
-        Assert.Equal("Error", row.Level);
-        Assert.Contains("[Kape22Importer][ImportRejected]", row.Message);
+        Assert.Equal("Information", row.Level);
+        Assert.Contains("[Kape22Importer][ImportSucceeded]", row.Message);
 
         using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
-        L_D_LOG_COMMANDE log = Assert.Single(verify.LogCommandeRows.AsNoTracking());
-        Assert.Contains("REJETÉ", log.Message);
-
-        AssertAllElevenTablesEmpty(verify);
+        Assert.Single(verify.Kape22Rows.AsNoTracking());
+        Assert.EndsWith("— OK", Assert.Single(verify.LogCommandeRows.AsNoTracking()).Message);
     }
 
     // C-5: AC-FR20-4 - every OF needs an enfournement instruction (L_D_SECTIONCHARGE_PITS); a blank

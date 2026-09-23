@@ -23,7 +23,7 @@ public static class SectionChargeChutageMapper
             ChutageTete = DecimalScale.Apply(source.ChutageTete, 2),
             CodeOperation = source.CodeOpeChutage!,
             Destination = source.Destination,
-            OF = source.OF,
+            OF = DownstreamOf.Pad(source.OF),
             RangOperation = source.RangOpeChutage!,
         };
     }

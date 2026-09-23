@@ -31,7 +31,7 @@ public class SectionChargePitsMapperTests
         Assert.Equal(DecimalScale.Apply(source.H2Coulee, 1), entity.H2Coulee);
         Assert.Equal(source.NumeroFour1, entity.NumeroFour1);
         Assert.Equal(source.NumeroFour2, entity.NumeroFour2);
-        Assert.Equal(source.OF, entity.OF);
+        Assert.Equal(DownstreamOf.Pad(source.OF), entity.OF);
         Assert.Equal(source.RangOpePits, entity.RangOperation);
     }
 

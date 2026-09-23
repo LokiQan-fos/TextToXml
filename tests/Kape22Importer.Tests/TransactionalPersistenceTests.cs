@@ -109,6 +109,24 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
         Assert.True(log.Trace == true);
     }
 
+    // A real deployment's GpaoImportP60.json ships with an empty "InitiatingServer" string, not an
+    // absent key - a bare `??` in Kape22Persister.ResolveUser never caught that, silently leaving User
+    // blank on every row (found 2026-09-22 by inspecting a real e2e run's L_D_LOG_COMMANDE). Falls back
+    // to the machine name on blank/whitespace, the same as a genuinely absent setting.
+    [SkippableFact]
+    [Trait("AC", "FR11-8")]
+    public void Persist_BlankInitiatingServer_FallsBackToMachineName_AcFr11_8()
+    {
+        Ready();
+        Kape22ImportBundle bundle = MapReferenceBundle();
+
+        Persist(bundle, initiatingServer: "");
+
+        using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
+        L_D_LOG_COMMANDE log = Assert.Single(verify.LogCommandeRows.AsNoTracking());
+        Assert.Equal(Environment.MachineName, log.User.Trim());
+    }
+
     // AC-FR11-3: when the L_D_LOG_COMMANDE insert fails (an over-long Commande from configuration), the
     // L_D_KAPE22 insert of the same transaction is rolled back too - the entity itself is valid.
     [SkippableFact]
@@ -195,16 +213,16 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
         using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
         Assert.Empty(verify.Kape22Rows.AsNoTracking());
         Assert.Empty(verify.LogCommandeRows.AsNoTracking());
-        Assert.Empty(verify.OrdreFabricationRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Empty(verify.OrdreFabricationRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
         Assert.Empty(verify.CouleeRows.AsNoTracking().Where(row => row.IdCoulee.Trim() == bundle.Kape22!.Coulee.Trim()));
-        Assert.Empty(verify.SectionChargeChutageRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
-        Assert.Empty(verify.SectionChargeDecoupeRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
-        Assert.Empty(verify.SectionChargeLingotRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
-        Assert.Empty(verify.SectionChargePitsRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
-        Assert.Empty(verify.SectionChargePoidsMetriqueRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
-        Assert.Empty(verify.SectionChargeRefroidissoirsRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
-        Assert.Empty(verify.SectionChargeSvtRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
-        Assert.Empty(verify.ConsignesRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Empty(verify.SectionChargeChutageRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
+        Assert.Empty(verify.SectionChargeDecoupeRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
+        Assert.Empty(verify.SectionChargeLingotRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
+        Assert.Empty(verify.SectionChargePitsRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
+        Assert.Empty(verify.SectionChargePoidsMetriqueRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
+        Assert.Empty(verify.SectionChargeRefroidissoirsRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
+        Assert.Empty(verify.SectionChargeSvtRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
+        Assert.Empty(verify.ConsignesRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
     }
 
     // AC-FR11-6 (D22): a prior "<NumeroFichier> — OK" L_D_LOG_COMMANDE row for the same NumeroFichier +
@@ -322,15 +340,15 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
 
         // AC-FR21-1's atomicity cuts both ways: a cold-Coulee rejection must leave every downstream
         // table empty too, not just L_D_KAPE22/L_D_COULEE.
-        Assert.Empty(verify.OrdreFabricationRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
-        Assert.Empty(verify.SectionChargeChutageRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
-        Assert.Empty(verify.SectionChargeDecoupeRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
-        Assert.Empty(verify.SectionChargeLingotRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
-        Assert.Empty(verify.SectionChargePitsRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
-        Assert.Empty(verify.SectionChargePoidsMetriqueRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
-        Assert.Empty(verify.SectionChargeRefroidissoirsRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
-        Assert.Empty(verify.SectionChargeSvtRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
-        Assert.Empty(verify.ConsignesRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Empty(verify.OrdreFabricationRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
+        Assert.Empty(verify.SectionChargeChutageRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
+        Assert.Empty(verify.SectionChargeDecoupeRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
+        Assert.Empty(verify.SectionChargeLingotRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
+        Assert.Empty(verify.SectionChargePitsRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
+        Assert.Empty(verify.SectionChargePoidsMetriqueRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
+        Assert.Empty(verify.SectionChargeRefroidissoirsRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
+        Assert.Empty(verify.SectionChargeSvtRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
+        Assert.Empty(verify.ConsignesRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
     }
 
     // AC-FR20-5 / AC-FR21-1: a cold Coulee (CodeConsignePits == "1") whose L_D_COULEE row already exists
@@ -432,32 +450,32 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
         using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
         Assert.Single(verify.Kape22Rows.AsNoTracking());
         Assert.Single(verify.LogCommandeRows.AsNoTracking());
-        Assert.Single(verify.OrdreFabricationRows.AsNoTracking(), row => row.OF.Trim() == bundle.OF!.Trim());
+        Assert.Single(verify.OrdreFabricationRows.AsNoTracking(), row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!));
         Assert.Single(verify.CouleeRows.AsNoTracking(), row => row.IdCoulee.Trim() == bundle.Kape22!.Coulee.Trim());
         Assert.Equal(
             bundle.SectionChargeChutage is null ? 0 : 1,
-            verify.SectionChargeChutageRows.AsNoTracking().Count(row => row.OF.Trim() == bundle.OF!.Trim()));
+            verify.SectionChargeChutageRows.AsNoTracking().Count(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
         Assert.Equal(
             bundle.SectionChargeDecoupe is null ? 0 : 1,
-            verify.SectionChargeDecoupeRows.AsNoTracking().Count(row => row.OF.Trim() == bundle.OF!.Trim()));
+            verify.SectionChargeDecoupeRows.AsNoTracking().Count(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
         Assert.Equal(
             bundle.SectionChargeLingot is null ? 0 : 1,
-            verify.SectionChargeLingotRows.AsNoTracking().Count(row => row.OF.Trim() == bundle.OF!.Trim()));
+            verify.SectionChargeLingotRows.AsNoTracking().Count(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
         Assert.Equal(
             bundle.SectionChargePits is null ? 0 : 1,
-            verify.SectionChargePitsRows.AsNoTracking().Count(row => row.OF.Trim() == bundle.OF!.Trim()));
+            verify.SectionChargePitsRows.AsNoTracking().Count(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
         Assert.Equal(
             bundle.SectionChargePoidsMetrique is null ? 0 : 1,
-            verify.SectionChargePoidsMetriqueRows.AsNoTracking().Count(row => row.OF.Trim() == bundle.OF!.Trim()));
+            verify.SectionChargePoidsMetriqueRows.AsNoTracking().Count(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
         Assert.Equal(
             bundle.SectionChargeRefroidissoirs is null ? 0 : 1,
-            verify.SectionChargeRefroidissoirsRows.AsNoTracking().Count(row => row.OF.Trim() == bundle.OF!.Trim()));
+            verify.SectionChargeRefroidissoirsRows.AsNoTracking().Count(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
         Assert.Equal(
             bundle.SectionChargeSvt is null ? 0 : 1,
-            verify.SectionChargeSvtRows.AsNoTracking().Count(row => row.OF.Trim() == bundle.OF!.Trim()));
+            verify.SectionChargeSvtRows.AsNoTracking().Count(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
         Assert.Equal(
             bundle.Consignes.Count,
-            verify.ConsignesRows.AsNoTracking().Count(row => row.OF.Trim() == bundle.OF!.Trim()));
+            verify.ConsignesRows.AsNoTracking().Count(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
     }
 
     // A-5 (Epic 4 retro): a same-bundle L_D_CONSIGNES natural-key collision - two sections sharing the
@@ -495,16 +513,16 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
         L_D_LOG_COMMANDE log = Assert.Single(verify.LogCommandeRows.AsNoTracking());
         Assert.Contains("REJETÉ", log.Message);
 
-        Assert.Empty(verify.OrdreFabricationRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Empty(verify.OrdreFabricationRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
         Assert.Empty(verify.CouleeRows.AsNoTracking().Where(row => row.IdCoulee.Trim() == bundle.Kape22!.Coulee.Trim()));
-        Assert.Empty(verify.SectionChargeChutageRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
-        Assert.Empty(verify.SectionChargeDecoupeRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
-        Assert.Empty(verify.SectionChargeLingotRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
-        Assert.Empty(verify.SectionChargePitsRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
-        Assert.Empty(verify.SectionChargePoidsMetriqueRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
-        Assert.Empty(verify.SectionChargeRefroidissoirsRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
-        Assert.Empty(verify.SectionChargeSvtRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
-        Assert.Empty(verify.ConsignesRows.AsNoTracking().Where(row => row.OF.Trim() == bundle.OF!.Trim()));
+        Assert.Empty(verify.SectionChargeChutageRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
+        Assert.Empty(verify.SectionChargeDecoupeRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
+        Assert.Empty(verify.SectionChargeLingotRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
+        Assert.Empty(verify.SectionChargePitsRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
+        Assert.Empty(verify.SectionChargePoidsMetriqueRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
+        Assert.Empty(verify.SectionChargeRefroidissoirsRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
+        Assert.Empty(verify.SectionChargeSvtRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
+        Assert.Empty(verify.ConsignesRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
     }
 
     // A-5 (Epic 4 retro): the collision branch's own REJETÉ-log SaveChanges can itself fail at the DB
@@ -703,9 +721,8 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
     private static Kape22ImportBundle ConsignesCollisionBundle() =>
         MapMutatedBundle(d =>
         {
-            // The untouched reference Fichier is "hot Coulee malformed" (TestSupport.MapReferenceBundle's
-            // own comment) - correct that first so only the CodeOperation collision this test targets
-            // trips a control, not the unrelated AC-FR20-3 hot-Coulee-format one.
+            // Coulee kept at the conventional internal value used throughout this file's fixtures, so
+            // only the CodeOperation collision this test targets trips a control.
             SetChamp(d, "message", "Coulee", "065718");
             string codeOpeChutage = d.Root!.Element("message")!.Element("CodeOpeChutage")!.Value;
             SetChamp(d, "message", "CodeOpeDecoupe", codeOpeChutage);

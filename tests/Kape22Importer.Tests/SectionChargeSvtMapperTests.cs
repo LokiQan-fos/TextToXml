@@ -42,7 +42,7 @@ public class SectionChargeSvtMapperTests
 
         Assert.NotNull(entity);
         Assert.Equal(source.CodeOpeSVT, entity!.CodeOperation);
-        Assert.Equal(source.OF, entity.OF);
+        Assert.Equal(DownstreamOf.Pad(source.OF), entity.OF);
         Assert.Equal(source.RangOpeSVT, entity.RangOperation);
     }
 

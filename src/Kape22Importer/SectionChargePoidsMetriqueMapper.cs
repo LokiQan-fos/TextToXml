@@ -20,7 +20,7 @@ public static class SectionChargePoidsMetriqueMapper
         return new L_D_SECTIONCHARGE_POIDSMETRIQUE
         {
             CodeOperation = source.CodeOpePoidMetrique!,
-            OF = source.OF,
+            OF = DownstreamOf.Pad(source.OF),
             RangOperation = source.RangOpePoidMetrique!,
         };
     }

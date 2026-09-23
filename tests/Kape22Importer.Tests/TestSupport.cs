@@ -59,11 +59,8 @@ internal static class TestSupport
     }
 
     // Story 4.6: a mapped, insertable Kape22ImportBundle from the reference Fichier, mirroring
-    // MapReferenceFichier(). The untouched reference is deliberately "hot Coulee malformed" (its Coulee
-    // "165718" does not start with '0', see Kape22ImportBundleMapperTests'
-    // Map_UnmutatedReferenceFichier_IsHotCouleeMalformedInIsolation_AcFr20_3) - the other 2 FR-20 controls
-    // already pass on the untouched values, so correcting only the Coulee's leading digit is enough to
-    // make every FR-20 control pass. Stays "hot" (CodeConsignePits untouched), so Kape22Persister's
+    // MapReferenceFichier(). Coulee is set to the conventional internal value "065718" used throughout
+    // this assembly's hand-built fixtures. Stays "hot" (CodeConsignePits untouched), so Kape22Persister's
     // AC-FR20-5 cold-Coulee existence check does not apply either.
     public static Kape22ImportBundle MapReferenceBundle() =>
         MapMutatedBundle(document => SetChamp(document, "message", "Coulee", "065718"));
@@ -104,8 +101,8 @@ internal static class TestSupport
     public static byte[] BlankClientReferenceFichier() =>
         WithText(ReadValidFixture(ReferenceFichierName), ReferenceClient, new string(' ', ReferenceClient.Length));
 
-    // Story 4.6: the reference Fichier's raw bytes with its Coulee corrected to start with '0', the
-    // byte-level counterpart of MapReferenceBundle() for tests that run the whole
+    // Story 4.6: the reference Fichier's raw bytes with Coulee set to the conventional internal value
+    // "065718" (see MapReferenceBundle), the byte-level counterpart for tests that run the whole
     // Kape22FichierProcessor.Import pipeline from raw bytes rather than from pre-parsed XML. Story
     // 4.3-bis: no longer zeroes the dimension/tolerance Champs - the mappers now scale them correctly
     // (DecimalScale.Apply), so the raw fixture values are insertable as-is.

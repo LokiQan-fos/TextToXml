@@ -21,7 +21,7 @@ public static class SectionChargeLingotMapper
         {
             CodeOperation = source.CodeOpeLingot!,
             EpaisseurEnLaminage = DecimalScale.Apply(source.EpaisseurEnLaminage, 1),
-            OF = source.OF,
+            OF = DownstreamOf.Pad(source.OF),
             PriseDeFer = source.PriseDeFer,
             ProfileLamine = source.ProfileLamine,
             RangOperation = source.RangOpeLingot!,

@@ -28,7 +28,7 @@ public class ConsignesMapperTests
         List<L_D_CONSIGNES> consignes = MapAll(source);
 
         L_D_CONSIGNES consigne = Assert.Single(consignes, c => c.CodeOperation == chutage.CodeOperation);
-        Assert.Equal(source.OF, consigne.OF);
+        Assert.Equal(DownstreamOf.Pad(source.OF), consigne.OF);
         Assert.Equal(source.CodeConsigneChutage, consigne.CodeConsigne);
     }
 
@@ -42,7 +42,7 @@ public class ConsignesMapperTests
         List<L_D_CONSIGNES> consignes = MapAll(source);
 
         L_D_CONSIGNES consigne = Assert.Single(consignes, c => c.CodeOperation == decoupe.CodeOperation);
-        Assert.Equal(source.OF, consigne.OF);
+        Assert.Equal(DownstreamOf.Pad(source.OF), consigne.OF);
         Assert.Equal(source.CodeConsigneDecoupe, consigne.CodeConsigne);
     }
 
@@ -56,7 +56,7 @@ public class ConsignesMapperTests
         List<L_D_CONSIGNES> consignes = MapAll(source);
 
         L_D_CONSIGNES consigne = Assert.Single(consignes, c => c.CodeOperation == lingot.CodeOperation);
-        Assert.Equal(source.OF, consigne.OF);
+        Assert.Equal(DownstreamOf.Pad(source.OF), consigne.OF);
         Assert.Equal(source.CodeConsigneLingot, consigne.CodeConsigne);
     }
 
@@ -70,7 +70,7 @@ public class ConsignesMapperTests
         List<L_D_CONSIGNES> consignes = MapAll(source);
 
         L_D_CONSIGNES consigne = Assert.Single(consignes, c => c.CodeOperation == pits.CodeOperation);
-        Assert.Equal(source.OF, consigne.OF);
+        Assert.Equal(DownstreamOf.Pad(source.OF), consigne.OF);
         Assert.Equal(source.CodeConsignePits, consigne.CodeConsigne);
     }
 
@@ -104,7 +104,7 @@ public class ConsignesMapperTests
         List<L_D_CONSIGNES> consignes = MapAll(source);
 
         L_D_CONSIGNES consigne = Assert.Single(consignes, c => c.CodeOperation == poidsMetrique.CodeOperation);
-        Assert.Equal(source.OF, consigne.OF);
+        Assert.Equal(DownstreamOf.Pad(source.OF), consigne.OF);
         Assert.Equal(source.CodeConsignePoidMetrique, consigne.CodeConsigne);
     }
 
@@ -118,7 +118,7 @@ public class ConsignesMapperTests
         List<L_D_CONSIGNES> consignes = MapAll(source);
 
         L_D_CONSIGNES consigne = Assert.Single(consignes, c => c.CodeOperation == refroidissoirs.CodeOperation);
-        Assert.Equal(source.OF, consigne.OF);
+        Assert.Equal(DownstreamOf.Pad(source.OF), consigne.OF);
         Assert.Equal(source.CodeConsigneRefroidissoir, consigne.CodeConsigne);
     }
 
@@ -170,7 +170,7 @@ public class ConsignesMapperTests
         List<L_D_CONSIGNES> consignes = MapAll(source);
 
         L_D_CONSIGNES consigne = Assert.Single(consignes, c => c.CodeOperation == svt.CodeOperation);
-        Assert.Equal(source.OF, consigne.OF);
+        Assert.Equal(DownstreamOf.Pad(source.OF), consigne.OF);
         Assert.Equal(source.CodeConsigneSVT, consigne.CodeConsigne);
     }
 

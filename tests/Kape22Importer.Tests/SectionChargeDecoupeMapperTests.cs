@@ -28,7 +28,7 @@ public class SectionChargeDecoupeMapperTests
         Assert.NotNull(entity);
         Assert.Equal(source.CodeOpeDecoupe, entity!.CodeOperation);
         Assert.Equal(DecimalScale.Apply(source.LongueurMoyenne, 3), entity.LongueurMoyenne);
-        Assert.Equal(source.OF, entity.OF);
+        Assert.Equal(DownstreamOf.Pad(source.OF), entity.OF);
         Assert.Equal(source.OutilDecoupe, entity.OutilDeDecoupe);
         Assert.Equal(source.RangOpeDecoupe, entity.RangOperation);
     }

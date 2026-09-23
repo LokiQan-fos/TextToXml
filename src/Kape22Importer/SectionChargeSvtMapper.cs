@@ -20,7 +20,7 @@ public static class SectionChargeSvtMapper
         return new L_D_SECTIONCHARGE_SVT
         {
             CodeOperation = source.CodeOpeSVT!,
-            OF = source.OF,
+            OF = DownstreamOf.Pad(source.OF),
             RangOperation = source.RangOpeSVT!,
         };
     }
