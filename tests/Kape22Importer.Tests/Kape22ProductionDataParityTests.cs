@@ -12,6 +12,7 @@ using Microsoft.Extensions.Configuration;
 using TextToXml;
 using TextToXml.Tests;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Kape22Importer.Tests;
 
@@ -41,7 +42,7 @@ namespace Kape22Importer.Tests;
 //   dotnet test --filter "FullyQualifiedName~Kape22ProductionDataParityTests"
 [Collection(SqlServerIntegrationCollection.Name)]
 [Trait("Category", TestCategory.Integration)]
-public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture)
+public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture, ITestOutputHelper output)
 {
     private static readonly Regex FichierName = new(@"^P60_\d+_\d+_\d+$", RegexOptions.Compiled);
 
@@ -278,6 +279,7 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
     // resolved it against values that no longer exist (same principle as "P60 is a forecast").
     [SkippableTheory]
     [MemberData(nameof(P60Fichiers))]
+    [Trait("AC", "FR19-5")]
     public void MappedFichier_ConsignesRows_MatchLegacyProductionRows(string fichierName)
     {
         Skip.IfNot(fixture.Available, fixture.SkipReason ?? "SQL Server test instance unavailable.");
@@ -323,7 +325,7 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
         Assert.Equal(consignes.Count, testRows.Count);
 
         // The production DateReception of this very Fichier bounds the reference edits the legacy import
-        // could have seen; with no production L_D_KAPE22 row for it, every libellé is compared strictly.
+        // could have seen; with no production L_D_KAPE22 row for it, every label is compared strictly.
         DateTime? dateReception = ReadProductionRows(of, mapped.NumeroFichier.Trim()).FirstOrDefault()?.DateReception;
 
         List<string> regressions = [];
@@ -391,10 +393,10 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
             }
         }
 
-        // Reported, not failed: visible in the test output when the Fichier is run on its own.
+        // Reported, not failed: written to the xUnit test output of this Fichier.
         foreach (string skipped in skippedLibelles)
         {
-            Console.WriteLine($"{fichierName} ignoré : {skipped.Trim()}");
+            output.WriteLine($"{fichierName} ignoré : {skipped.Trim()}");
         }
 
         Assert.True(

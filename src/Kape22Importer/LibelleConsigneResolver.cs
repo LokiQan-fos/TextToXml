@@ -7,12 +7,12 @@ using System.Text.RegularExpressions;
 namespace Kape22Importer;
 
 // Story 4.12 (AC-FR19-5): a pure, line-for-line port of the legacy LibelleConsigneController.GetLibelle
-// (Lsi.Net/Ascometal.LSI.DAL/LibelleConsigneController.cs:14-281, read-only reference, AD-3, never
+// (Lsi.Net/Ascometal.LSI.DAL/LibelleConsigneController.cs:14-285, read-only reference, AD-3, never
 // referenced or called at runtime) plus its call-site rule (Desktop/kape22/OrdreDeFabricationManager.cs:
 // 1405-1416): type 22 also takes ProfilProduit, DiametreProduit and H2Coulee, and a blank result becomes
 // "?". Every legacy database query becomes a lookup in a ConsigneReferenceData snapshot, so this class
 // reads no database (AD-2). The legacy quirks are kept on purpose: any exception gives "?", a PC1 lookup
-// appends " " plus the particular preheating libellé (so a trailing space survives), numbers are formatted
+// appends " " plus the particular preheating label (so a trailing space survives), numbers are formatted
 // with the fr-FR culture the legacy server ran under, and an unmatched section, type or code gives "?".
 // A code is matched the way the legacy SQL WHERE clause matched it on a French_CI_AS column: trailing
 // spaces ignored (the nchar columns are padded) and case ignored; among several matches the first one in
@@ -32,9 +32,10 @@ public static class LibelleConsigneResolver
 
     private static readonly LibelleConsigneResolution Unresolved = new() { Libelle = Unknown };
 
-    // Resolves the libellé of one L_D_CONSIGNES row. section is the row's CodeOperation. profilProduit,
-    // diametreProduit and h2Coulee are only read for type 22, where a missing diametreProduit or h2Coulee
-    // gives "?" exactly like the legacy decimal.Parse of an empty string threw into its catch.
+    // Resolves the label of one L_D_CONSIGNES row. The section argument is the row's CodeOperation. The
+    // profilProduit, diametreProduit and h2Coulee arguments are only read for type 22, where a missing
+    // diametreProduit or h2Coulee gives "?" exactly like the legacy decimal.Parse of an empty string threw
+    // into its catch.
     public static LibelleConsigneResolution Resolve(
         string section,
         int typeConsigne,
@@ -57,7 +58,7 @@ public static class LibelleConsigneResolver
             resolved = Unresolved;
         }
 
-        // The call-site rule (OrdreDeFabricationManager.cs:1415-1416): a blank libellé becomes "?".
+        // The call-site rule (OrdreDeFabricationManager.cs:1405-1416): a blank label becomes "?".
         return string.IsNullOrEmpty(resolved.Libelle.Trim()) ? resolved with { Libelle = Unknown } : resolved;
     }
 
@@ -119,7 +120,7 @@ public static class LibelleConsigneResolver
 
     // PC1 (legacy line 25): types 10 and 11 are computed temperatures, every other type is a
     // L_P_CONSIGNES_PITS lookup; type 6 first swaps a leading digit of 2 or more for "0" and appends that
-    // digit's L_P_CONSIGNES_PRECHAUFFAGE_PARTICULIER libellé.
+    // digit's L_P_CONSIGNES_PRECHAUFFAGE_PARTICULIER label.
     private static LibelleConsigneResolution Pits(string section, int type, string code, ConsigneReferenceData data)
     {
         if (type == 10)
@@ -133,20 +134,20 @@ public static class LibelleConsigneResolver
             return Computed((1000 + (int.Parse(code.Substring(0, 2), French) * 10)).ToString(French));
         }
 
-        string consignePlus = string.Empty;
-        DateTime? particulierDateMaj = null;
+        string particularSuffix = string.Empty;
+        DateTime? particularDateMaj = null;
         string codeConsigne = code;
         if (type == 6)
         {
             if (!string.IsNullOrEmpty(code) && !code[0].Equals('0') && int.Parse(code[0].ToString(), French) >= 2)
             {
-                int particulierCode = int.Parse(code.Substring(0, 1), French);
-                PrechauffageParticulierReference? particulier =
-                    data.PrechauffageParticulier.FirstOrDefault(row => row.Code == particulierCode);
-                if (particulier is not null)
+                int particularCode = int.Parse(code.Substring(0, 1), French);
+                PrechauffageParticulierReference? particular =
+                    data.PrechauffageParticulier.FirstOrDefault(row => row.Code == particularCode);
+                if (particular is not null)
                 {
-                    consignePlus = particulier.Libelle;
-                    particulierDateMaj = particulier.DateMaj;
+                    particularSuffix = particular.Libelle;
+                    particularDateMaj = particular.DateMaj;
                 }
             }
 
@@ -161,8 +162,8 @@ public static class LibelleConsigneResolver
 
         return new LibelleConsigneResolution
         {
-            LatestDateMaj = Latest(match.DateMaj, particulierDateMaj),
-            Libelle = match.Libelle + " " + consignePlus,
+            LatestDateMaj = Latest(match.DateMaj, particularDateMaj),
+            Libelle = match.Libelle + " " + particularSuffix,
         };
     }
 
@@ -175,9 +176,9 @@ public static class LibelleConsigneResolver
         {
             if (!string.IsNullOrEmpty(code) && ChutageDecimal.IsMatch(code))
             {
-                int entier = code[0] == '0' ? 0 : (code[0] - 'A') + 1;
-                int virgule = int.Parse(code[1].ToString(), French);
-                return Computed(string.Format(French, "{0},{1}", entier, virgule));
+                int integerPart = code[0] == '0' ? 0 : (code[0] - 'A') + 1;
+                int decimalPart = int.Parse(code[1].ToString(), French);
+                return Computed(string.Format(French, "{0},{1}", integerPart, decimalPart));
             }
 
             return Unresolved;
@@ -187,8 +188,8 @@ public static class LibelleConsigneResolver
         {
             if (!string.IsNullOrEmpty(code) && ChutageInteger.IsMatch(code))
             {
-                int entier = code[0] == '0' ? 0 : (code[0] - 'A') + 1;
-                return Computed(entier.ToString(French));
+                int integerPart = code[0] == '0' ? 0 : (code[0] - 'A') + 1;
+                return Computed(integerPart.ToString(French));
             }
 
             return Unresolved;
@@ -259,20 +260,20 @@ public static class LibelleConsigneResolver
         decimal? diametreProduit,
         decimal? h2Coulee)
     {
-        int degazageCode = int.Parse(code, French);
-        if (diametreProduit is not decimal diametre || h2Coulee is not decimal h2)
+        int degassingCode = int.Parse(code, French);
+        if (diametreProduit is not decimal diameter || h2Coulee is not decimal h2)
         {
             return Unresolved;
         }
 
-        if (data.DegazageGlobal.Contains(degazageCode))
+        if (data.DegazageGlobal.Contains(degassingCode))
         {
             DegazageDetailReference? detail = data.DegazageDetail.FirstOrDefault(row =>
-                row.Code == degazageCode
+                row.Code == degassingCode
                 && profilProduit is not null
                 && SqlEquals(row.ProfilProduit, profilProduit)
-                && diametre > row.SectionMin
-                && diametre <= row.SectionMax);
+                && diameter > row.SectionMin
+                && diameter <= row.SectionMax);
             if (detail is not null)
             {
                 if (h2 > 2.5m && h2 <= 3m)
@@ -306,8 +307,8 @@ public static class LibelleConsigneResolver
     {
         if (!string.IsNullOrEmpty(code) && Digits.IsMatch(code))
         {
-            int entier = int.Parse(code, French);
-            float value = (float)(entier / 1000.000);
+            int integerPart = int.Parse(code, French);
+            float value = (float)(integerPart / 1000.000);
             return Computed(value.ToString("0.000", French));
         }
 
@@ -341,8 +342,8 @@ public static class LibelleConsigneResolver
         first is null ? second : second is null ? first : (first > second ? first : second);
 }
 
-// The libellé LibelleConsigneResolver computed for one L_D_CONSIGNES row, with the latest DateMaj among
-// the reference rows it consulted (null for a computed libellé or a miss). Properties are declared in
+// The label LibelleConsigneResolver computed for one L_D_CONSIGNES row, with the latest DateMaj among
+// the reference rows it consulted (null for a computed label or a miss). Properties are declared in
 // alphabetical order (CC-4).
 public sealed record LibelleConsigneResolution
 {

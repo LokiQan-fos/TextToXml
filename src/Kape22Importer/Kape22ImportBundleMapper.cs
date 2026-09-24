@@ -13,9 +13,9 @@ namespace Kape22Importer;
 // Story 4.6's Kape22Persister will call this instead of Kape22Mapper.Map directly.
 public sealed class Kape22ImportBundleMapper(TimeProvider? timeProvider = null)
 {
-    // sourceFileName feeds Kape22Mapper's own FR-10 file-name coherence check, unchanged here.
-    // referenceData is the L_P_CONSIGNES_* snapshot the caller loaded (Story 4.12), forwarded to
-    // ConsignesMapper as-is; without it every lookup-based LibelleConsigne resolves to "?".
+    // The sourceFileName argument feeds Kape22Mapper's own FR-10 file-name coherence check, unchanged here.
+    // The referenceData argument is the L_P_CONSIGNES_* snapshot the caller loaded (Story 4.12),
+    // forwarded to ConsignesMapper as-is; without it every lookup-based LibelleConsigne resolves to "?".
     public Kape22ImportBundle Map(string normalizedXml, string sourceFileName, ConsigneReferenceData? referenceData = null)
     {
         MapResult<L_D_KAPE22> mapped = new Kape22Mapper(timeProvider).Map(normalizedXml, sourceFileName);

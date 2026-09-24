@@ -1164,3 +1164,41 @@ s'y trouver et rester à confirmer.
 - source_spec: `spec-4-12-libelle-consigne.md`
   summary: assumed, unverified — type 22 (degassing) with no Pits section or a NULL `H2Coulee` gives `"?"`. Legacy would dereference the missing Pits charge or `decimal.Parse("")` at the call site (`OrdreDeFabricationManager.cs:1407`), outside `GetLibelle`'s own try/catch, so its real behaviour there was an unhandled exception, not a libellé.
   evidence: I/O & Edge-Case Matrix of the spec. No `P60/` fixture reaches this case (parity is green). Revisit if a real Fichier with a type 22 consigne and no Pits section is ever received.
+
+## Deferred from: code review of story-4.12 (2026-09-24)
+
+- source_spec: `spec-4-12-libelle-consigne.md`
+  summary: Any `DbException` raised by `ConsigneReferenceData.Load` (unreachable server, but also a missing `L_P_CONSIGNES_*` table or a denied SELECT) becomes a File-level `PersistenceError`, so `InboxScanner` keeps the Fichier in `processing/` and retries it forever instead of moving it to `error/`.
+  evidence: `Kape22FichierProcessor.cs:82` catch. Same classification as the pre-existing `Kape22Persister` catch (`DbUpdateException or DbException`), which already treats a permanent schema fault as an outage. Revisit both together if a transient/permanent split (for example SQL error 208) is ever needed.
+
+- source_spec: `spec-4-12-libelle-consigne.md`
+  summary: Type 22 (degassing) compares `OrdreFabricationMapper`'s `DiametreProduit` against `L_P_CONSIGNES_DEGAZAGE_DETAIL.SectionMin/SectionMax`; no `P60/` fixture reaches a degassing-hour value, so the unit/scale the resolver receives is unverified against production.
+  evidence: Production has 12 recent OFs whose type-22 label ends in `h` (`9,00h`, `10,00h`), none of them present in `P60/` (checked 2026-09-24, SELECT only). Depends on the open Story 4.3 `DiametreProduit` scale item. Revisit when a Fichier for one of those OFs is added to `P60/`.
+
+- source_spec: `spec-4-12-libelle-consigne.md`
+  summary: `scripts/sync-reference-consignes.ps1` truncates the 13 test tables before copying, with no transaction and no row-count check, so a failed `bcp` leaves the test tables partly empty until the next run.
+  evidence: Test database only; the next run fully reloads. Revisit if the sync is ever used outside local E2E runs.
+
+- source_spec: `spec-4-12-libelle-consigne.md`
+  summary: An empty or incomplete reference snapshot silently yields `"?"` for every lookup-based label, and the resolver's catch drops the exception the legacy code logged; nothing warns or logs.
+  evidence: `LibelleConsigneResolver` is pure (AD-2) and has no logger. Revisit if a misconfigured target database is ever suspected; a count check in `Kape22FichierProcessor` would be the natural seam.
+
+- source_spec: `spec-4-12-libelle-consigne.md`
+  summary: `ConsigneReferenceData.Load` runs 13 separate SELECTs per Fichier outside a transaction, so an operator edit between two of them could mix old and new reference rows within one Fichier.
+  evidence: The tables are edited rarely and by hand. Revisit if an inconsistent label is ever traced to a concurrent edit.
+
+- source_spec: `spec-4-12-libelle-consigne.md`
+  summary: The parity `DateMaj` guard only sees reference rows that still exist; a delta caused by a deleted or re-coded reference row always counts as a regression.
+  evidence: `Kape22ProductionDataParityTests.cs` consignes theory. No such delta on the 354 Fichiers today. Revisit if one appears.
+
+- source_spec: `spec-4-12-libelle-consigne.md`
+  summary: Only 2 of the 13 `SqlQueryRaw` projections (LINGOT, REFROIDISSEMENT) are exercised on SQL Server by the integration tier; the other 11 (including `Code AS Value`, the `Libelle_*` aliases and the DEGAZAGE_DETAIL decimals) are exercised only by the opt-in production parity test and the E2E script.
+  evidence: Both opt-in paths ran green on 2026-09-24 (345 parity passes, E2E on `P60_847_682_351`). Revisit if the opt-in tier stops being run.
+
+- source_spec: `spec-4-12-libelle-consigne.md`
+  summary: `scripts/e2e-worker-import.ps1` always runs the reference sync, so it now needs production reachable even with `-SkipProductionCompare`.
+  evidence: No offline E2E use case today. Revisit by adding a `-SkipReferenceSync` switch if one appears.
+
+## Corrected in: code review of story-4.12 (2026-09-24)
+
+- Correction to the second bullet of "Deferred from: story-4.12 LibelleConsigne (2026-09-24)" above: a NULL `H2Coulee` giving `"?"` is verified legacy behaviour, not an assumption. The call site passes `H2Coulee.ToString()` (`""` for NULL), and the `decimal.Parse` of it runs inside `GetLibelle`'s own try (`LibelleConsigneController.cs:224-225`, try at :21, catch at :280), which returns `"?"`. Only a missing Pits section stays assumed, unverified: legacy dereferences the absent charge at the call site (`OrdreDeFabricationManager.cs:1408`, not :1407), outside that try.

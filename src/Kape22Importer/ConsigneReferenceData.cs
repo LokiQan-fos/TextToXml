@@ -16,15 +16,17 @@ namespace Kape22Importer;
 // declared in alphabetical order (CC-4).
 public sealed record ConsigneReferenceData
 {
-    // The 2 tables keyed by a padded nchar Code alone (REFROIDISSEMENT, SMQ) share this column list.
+    // The ordering of the 2 tables keyed by a padded nchar Code alone (REFROIDISSEMENT, SMQ).
     private const string CodeOrder = " ORDER BY Code";
 
+    // The column list those 2 code-keyed tables share.
     private const string CodeSelect = "SELECT Code, DateMaj, Libelle FROM dbo.";
 
-    // The 7 section-keyed tables share this column list, read in the (Section, Consignes, CodeConsigne)
-    // order the resolver's "first match" rule relies on.
+    // The (Section, Consignes, CodeConsigne) order of the 7 section-keyed tables, which the resolver's
+    // "first match" rule relies on.
     private const string SectionOrder = " ORDER BY Section, Consignes, CodeConsigne";
 
+    // The column list the 7 section-keyed tables share.
     private const string SectionSelect = "SELECT CodeConsigne, Consignes, DateMaj, Libelle, Section FROM dbo.";
 
     public IReadOnlyList<SectionConsigneReference> Chutage { get; init; } = [];
@@ -39,7 +41,7 @@ public sealed record ConsigneReferenceData
     // are kept.
     public IReadOnlyList<int> DegazageGlobal { get; init; } = [];
 
-    // The snapshot of a context with no reference table at all: every lookup-based libellé resolves to
+    // The snapshot of a context with no reference table at all: every lookup-based label resolves to
     // "?", every computed one is still produced.
     public static ConsigneReferenceData Empty { get; } = new();
 
@@ -97,9 +99,9 @@ public sealed record ConsigneReferenceData
         };
     }
 
-    // Every query text is a compile-time constant of this file, never external input. sql is passed
-    // through a parameter only so the 7 section-keyed tables and the 2 code-keyed tables share their
-    // column list and ordering.
+    // Every query text is a compile-time constant of this file, never external input. The sql argument
+    // is passed through a parameter only so the 7 section-keyed tables and the 2 code-keyed tables share
+    // their column list and ordering.
     private static List<T> Query<T>(AscoLsiDbContext context, string sql) => [.. context.Database.SqlQueryRaw<T>(sql)];
 }
 
@@ -136,7 +138,7 @@ public sealed record DegazageDetailReference
     public decimal? SectionMin { get; init; }
 }
 
-// A row of L_P_CONSIGNES_MARQUAGE, whose libellé is spread over 3 columns.
+// A row of L_P_CONSIGNES_MARQUAGE, whose label is spread over 3 columns.
 public sealed record MarquageReference
 {
     public string CodeConsigne { get; init; } = string.Empty;

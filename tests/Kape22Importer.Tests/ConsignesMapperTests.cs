@@ -226,7 +226,7 @@ public class ConsignesMapperTests
         Assert.True(consigne.ConsigneGPAO);
         Assert.Equal(0, consigne.SizeCodeConsigne);
         Assert.Equal(0, consigne.TypeConsigne);
-        // Story 4.12: the legacy GetLibelle has no SVT branch, so its libellé is "?".
+        // Story 4.12: the legacy GetLibelle has no SVT branch, so its label is "?".
         Assert.Equal("?", consigne.LibelleConsigne);
     }
 

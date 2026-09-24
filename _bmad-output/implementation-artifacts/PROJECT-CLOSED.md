@@ -8,6 +8,10 @@ last_commit: '8f6e79edd7fa8829b7946cbd998999b1c843cde2'
 
 # TextToXml / Kape22Importer — Project Closure
 
+> **Reopened 2026-09-24 (test/correction session 2).** Story 4.12 (`L_D_CONSIGNES.LibelleConsigne`,
+> `spec-4-12-libelle-consigne.md`) is open. Sections 1–6 below describe the project as closed on
+> 2026-09-22 (commit `8f6e79e`); their test counts and "no story in progress" statement are not updated.
+
 **Decision:** the project is functionally complete. All planned Epics (1–4), including every
 post-retrospective hardening story, are `done`. No Epic 5 is planned — confirmed by the donneur
 d'ordre. No story is in progress.

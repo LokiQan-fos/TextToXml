@@ -189,7 +189,7 @@ public class Kape22FichierProcessorIntegrationTests(SqlServerIntegrationFixture 
     }
 
     // Story 4.12 (AC-FR19-5): the processor loads the L_P_CONSIGNES_* snapshot from the Fichier's own
-    // context, so seeded reference rows reach the persisted libellés; an unseeded lookup gives "?" and a
+    // context, so seeded reference rows reach the persisted labels; an unseeded lookup gives "?" and a
     // computed type needs no reference row at all.
     [SkippableFact]
     [Trait("AC", "FR19-5")]
@@ -219,6 +219,10 @@ public class Kape22FichierProcessorIntegrationTests(SqlServerIntegrationFixture 
         Assert.Equal("Refroidissement à l'air", Libelle("XA1", 21));
         Assert.Equal("?", Libelle("LA1", 9));
         Assert.Equal("1250", Libelle("PC1", 10));
+
+        // Type 22 needs the OF and Pits inputs the bundle mapper forwards; with empty degassing tables it
+        // resolves to "0", while a dropped input would give "?".
+        Assert.Equal("0", Libelle("XA1", 22));
         Assert.All(rows, row => Assert.NotNull(row.LibelleConsigne));
     }
 }

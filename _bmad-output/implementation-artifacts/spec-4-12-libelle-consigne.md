@@ -2,7 +2,7 @@
 title: '4.12 — Populate L_D_CONSIGNES.LibelleConsigne (port of legacy GetLibelle)'
 type: 'bugfix'
 created: '2026-09-24'
-status: 'review'
+status: 'done'
 review_loop_iteration: 0
 baseline_commit: '4abad8c8318203e53fa62efc357dc39774998a3b'
 context: []
@@ -59,8 +59,8 @@ context: []
 
 ## Code Map
 
-- `C:\Users\Administrateur\Documents\Lsi.Net\Ascometal.LSI.DAL\LibelleConsigneController.cs:14-281` -- read-only source of truth to port.
-- `Desktop/kape22/OrdreDeFabricationManager.cs:1405-1415` -- call-site semantics: type 22 arguments and the `"?"` fallback.
+- `C:\Users\Administrateur\Documents\Lsi.Net\Ascometal.LSI.DAL\LibelleConsigneController.cs:14-285` -- read-only source of truth to port.
+- `Desktop/kape22/OrdreDeFabricationManager.cs:1405-1416` -- call-site semantics: type 22 arguments and the `"?"` fallback.
 - `src/Kape22Importer/ConsignesMapper.cs:19-107,176-188` -- `Map` and `Row`. `Row` currently leaves `LibelleConsigne` null (comment at `:185`). The snapshot is passed as an optional last parameter, defaulting to empty, so the ~20 existing callers keep compiling.
 - `src/Kape22Importer/Kape22ImportBundleMapper.cs:17,44` -- forwards the snapshot. `OrdreFabricationMapper` output (`DiametreProduit` decimal, `ProfilProduit`) and pits `H2Coulee` (decimal?) supply the type 22 inputs.
 - `src/Kape22Importer/Kape22FichierProcessor.cs:71,81` -- the context is created after mapping. Move context creation before `Map` and load the snapshot from it.
@@ -104,3 +104,29 @@ context: []
 - `dotnet test TextToXml.sln --filter Category=Unit` -- expected: all green
 - `dotnet test TextToXml.sln --filter Category=Integration` -- expected: all green, including consignes parity with `LibelleConsigne`
 - `pwsh scripts/e2e-worker-import.ps1 -Fichiers P60_847_682_001 -KeepArtifacts` -- expected: 30 rows with production-equal libellés
+
+### Review Findings
+
+Code review 2026-09-24, range `21075e5^..HEAD`, report `reviews/story-4-12/aggregated-report.md`.
+
+- [x] [Review][Decision] D1 French local identifiers copied from legacy — resolved 2026-09-24: rename to English (became P12, applied). `entier`, `virgule`, `consignePlus`, `particulierCode`, `degazageCode` vs the project-profile rule "identifiers in English"; the line-for-line port rule does not say whether names are exempt.
+- [x] [Review][Patch] P1 deferred-work entry misstates legacy type-22 behaviour for a NULL H2Coulee [_bmad-output/implementation-artifacts/deferred-work.md:1165]
+- [x] [Review][Patch] P2 DateMaj-skipped labels written with Console.WriteLine, never captured by xUnit v2 [tests/Kape22Importer.Tests/Kape22ProductionDataParityTests.cs:395]
+- [x] [Review][Patch] P3 Production parity test proving AC-FR19-5 carries no AC trait [tests/Kape22Importer.Tests/Kape22ProductionDataParityTests.cs:281]
+- [x] [Review][Patch] P4 Type-22 label on the bundle/processor path never asserted [tests/Kape22Importer.Tests/Kape22FichierProcessorIntegrationTests.cs:219]
+- [x] [Review][Patch] P5 E2E NULL-label gate passes silently on sqlcmd failure or zero rows [scripts/e2e-worker-import.ps1:157]
+- [x] [Review][Patch] P6 Sync script has no guard against the test target being the production source [scripts/sync-reference-consignes.ps1:93]
+- [x] [Review][Patch] P7 CC-2: French noun "libellé(s)" used in English comments [src/Kape22Importer/LibelleConsigneResolver.cs:35]
+- [x] [Review][Patch] P8 CC-2: comment sentences starting with a lowercase identifier [src/Kape22Importer/LibelleConsigneResolver.cs:35]
+- [x] [Review][Patch] P9 CC-3: "share this column list" comments sit above the ORDER BY constants [src/Kape22Importer/ConsigneReferenceData.cs:19]
+- [x] [Review][Patch] P10 PROJECT-CLOSED.md body contradicts its reopened status [_bmad-output/implementation-artifacts/PROJECT-CLOSED.md:11]
+- [x] [Review][Patch] P11 Legacy line ranges cited inconsistently (14-281/14-285, 1405-1408/1415/1416) [src/Kape22Importer/LibelleConsigneResolver.cs:10]
+- [x] [Review][Patch] P12 Rename the legacy French local identifiers to English (from D1) [src/Kape22Importer/LibelleConsigneResolver.cs:137]
+- [x] [Review][Defer] F1 Any DbException on the reference read is routed to retry, including a permanent schema fault [src/Kape22Importer/Kape22FichierProcessor.cs:82] — deferred, same classification as the pre-existing persister catch
+- [x] [Review][Defer] F2 Type-22 DiametreProduit scale vs DEGAZAGE_DETAIL range unverified by any fixture [src/Kape22Importer/LibelleConsigneResolver.cs:274] — deferred, depends on the open Story 4.3 scale item
+- [x] [Review][Defer] F3 Sync is not atomic and does not check row counts [scripts/sync-reference-consignes.ps1:104] — deferred, test database only
+- [x] [Review][Defer] F4 Degraded snapshot and swallowed resolver exceptions leave no trace [src/Kape22Importer/LibelleConsigneResolver.cs:54] — deferred, needs a logging seam the pure resolver does not have
+- [x] [Review][Defer] F5 Snapshot read as 13 non-transactional SELECTs per Fichier [src/Kape22Importer/ConsigneReferenceData.cs:64] — deferred, reference edits are rare
+- [x] [Review][Defer] F6 DateMaj guard cannot see deleted or re-coded reference rows [tests/Kape22Importer.Tests/Kape22ProductionDataParityTests.cs:327] — deferred, known limit
+- [x] [Review][Defer] F7 11 of 13 Load projections exercised on SQL Server only by opt-in tests [src/Kape22Importer/ConsigneReferenceData.cs:73] — deferred, AR-12 opt-in tier
+- [x] [Review][Defer] F8 E2E script now always needs production reachable [scripts/e2e-worker-import.ps1:88] — deferred, no offline use case today

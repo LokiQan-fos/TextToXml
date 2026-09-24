@@ -91,6 +91,11 @@ $settings = [System.IO.File]::ReadAllText($TestSettingsPath) | ConvertFrom-Json
 $test = Get-SqlTarget $settings.ConnectionStrings.AscoLSI 'AscoLSI'
 $production = Get-SqlTarget $settings.ConnectionStrings.AscoLSI_Production 'AscoLSI_Production'
 
+# Production is read-only: refuse to run when the write target is the production source itself.
+if ($test.Server -eq $production.Server -and $test.Database -eq $production.Database) {
+    throw "ConnectionStrings:AscoLSI points at the production source ($($production.Server)/$($production.Database)); refusing to write to it."
+}
+
 function Invoke-TestSql([string[]] $Arguments) {
     & sqlcmd -S $test.Server -d $test.Database @($test.SqlcmdLogin) -C -b @Arguments
     if ($LASTEXITCODE -ne 0) { throw "sqlcmd failed against the test database ($($test.Server)/$($test.Database))." }

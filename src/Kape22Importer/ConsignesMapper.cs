@@ -105,11 +105,11 @@ public static class ConsignesMapper
             consignes.Add(Row(source.OF, svt.CodeOperation, source.CodeConsigneSVT ?? string.Empty, typeConsigne: 0, sizeCodeConsigne: 0));
         }
 
-        // Story 4.12 (AC-FR19-5): every row gets its libellé from the pure port of the legacy
+        // Story 4.12 (AC-FR19-5): every row gets its label from the pure port of the legacy
         // LibelleConsigneController.GetLibelle, over the reference snapshot the caller loaded. With no
-        // snapshot it is empty, so a lookup-based libellé becomes "?" and a computed one is still produced.
+        // snapshot it is empty, so a lookup-based label becomes "?" and a computed one is still produced.
         // Type 22 also reads the Ordre de Fabrication's ProfilProduit and DiametreProduit and the Pits
-        // H2Coulee, the legacy call-site arguments (OrdreDeFabricationManager.cs:1405-1408).
+        // H2Coulee, the legacy call-site arguments (OrdreDeFabricationManager.cs:1405-1416).
         ConsigneReferenceData reference = referenceData ?? ConsigneReferenceData.Empty;
         foreach (L_D_CONSIGNES consigne in consignes)
         {

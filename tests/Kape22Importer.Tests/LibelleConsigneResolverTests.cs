@@ -135,7 +135,7 @@ public class LibelleConsigneResolverTests
         Assert.Equal("?", LibelleConsigneResolver.Resolve("XC1", type, code, Snapshot).Libelle);
     }
 
-    // PC1 standard lookup: the legacy appends " " + consignePlus even when consignePlus is empty.
+    // PC1 standard lookup: the legacy appends " " plus the particular suffix even when that suffix is empty.
     [Fact]
     [Trait("AC", "FR19-5")]
     public void Resolve_PitsLookup_KeepsLegacyTrailingSpace_AcFr19_5()
@@ -143,7 +143,7 @@ public class LibelleConsigneResolverTests
         Assert.Equal("Préchauffage normal ", LibelleConsigneResolver.Resolve("PC1", 6, "012", Snapshot).Libelle);
     }
 
-    // PC1 type 6 "particulier": a leading digit >= 2 is swapped for "0" and its particular libellé is
+    // PC1 type 6 particular preheating: a leading digit >= 2 is swapped for "0" and its particular label is
     // appended; the reported DateMaj is the later of the two rows consulted.
     [Fact]
     [Trait("AC", "FR19-5")]
@@ -163,7 +163,7 @@ public class LibelleConsigneResolverTests
         Assert.Equal("Préchauffage normal ", LibelleConsigneResolver.Resolve("PC1", 6, "112", Snapshot).Libelle);
     }
 
-    // The call-site rule: a blank libellé (here a PITS row whose Libelle is only spaces) becomes "?".
+    // The call-site rule: a blank label (here a PITS row whose Libelle is only spaces) becomes "?".
     [Fact]
     [Trait("AC", "FR19-5")]
     public void Resolve_BlankLibelle_BecomesQuestionMark_AcFr19_5()
@@ -226,7 +226,7 @@ public class LibelleConsigneResolverTests
         Assert.Equal("?", resolved.Libelle);
     }
 
-    // AC "empty snapshot": lookup-based libellés are "?", computed ones are still produced.
+    // AC "empty snapshot": lookup-based labels are "?", computed ones are still produced.
     [Fact]
     [Trait("AC", "FR19-5")]
     public void Resolve_EmptySnapshot_LookupsGiveQuestionMarkComputedStillWork_AcFr19_5()

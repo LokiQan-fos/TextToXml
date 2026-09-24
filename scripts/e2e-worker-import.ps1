@@ -150,11 +150,16 @@ try {
     Write-Host "--- L_D_LOG_COMMANDE rows inserted this run ---"
     Invoke-Sql "SELECT Id, Commande, Message, [OF], [Date] FROM L_D_LOG_COMMANDE WHERE [OF] IN (SELECT RTRIM([OF]) FROM L_D_KAPE22 WHERE NumeroFichier IN ('$($numeros -join "','")'))"
 
-    # Story 4.12: every persisted L_D_CONSIGNES row of these OFs must carry a libellé.
+    # Story 4.12: every persisted L_D_CONSIGNES row of these OFs must carry a label.
     $consignesFilter = "[OF] IN (SELECT RIGHT('000000000000' + RTRIM([OF]), 12) FROM L_D_KAPE22 WHERE NumeroFichier IN ('$($numeros -join "','")'))"
-    Write-Host "--- L_D_CONSIGNES libellés ---"
+    Write-Host "--- L_D_CONSIGNES labels ---"
     Invoke-Sql "SELECT [OF], CodeOperation, TypeConsigne, CodeConsigne, LibelleConsigne FROM L_D_CONSIGNES WHERE $consignesFilter ORDER BY [OF], CodeOperation, TypeConsigne"
-    $nullLibelles = (& sqlcmd -S localhost -d AscoLSI_Test -C -h -1 -W -Q "SET NOCOUNT ON; SELECT COUNT(*) FROM L_D_CONSIGNES WHERE $consignesFilter AND LibelleConsigne IS NULL") | Select-Object -First 1
+    # -b and the exit code check keep a failed query from reading as a zero count; the row total makes a
+    # run that persisted nothing fail too.
+    $counts = & sqlcmd -S localhost -d AscoLSI_Test -C -b -h -1 -W -s ',' -Q "SET NOCOUNT ON; SELECT COUNT(*), SUM(CASE WHEN LibelleConsigne IS NULL THEN 1 ELSE 0 END) FROM L_D_CONSIGNES WHERE $consignesFilter"
+    if ($LASTEXITCODE -ne 0) { throw 'The L_D_CONSIGNES label check query failed.' }
+    $total, $nullLibelles = ($counts | Select-Object -First 1).Split(',')
+    if ([int]$total -eq 0) { throw 'No L_D_CONSIGNES row was persisted for the Fichiers of this run.' }
     if ([int]$nullLibelles -ne 0) { throw "$nullLibelles L_D_CONSIGNES row(s) persisted with a NULL LibelleConsigne." }
 }
 finally {
