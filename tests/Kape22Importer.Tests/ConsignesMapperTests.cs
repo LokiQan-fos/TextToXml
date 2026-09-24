@@ -226,7 +226,8 @@ public class ConsignesMapperTests
         Assert.True(consigne.ConsigneGPAO);
         Assert.Equal(0, consigne.SizeCodeConsigne);
         Assert.Equal(0, consigne.TypeConsigne);
-        Assert.Null(consigne.LibelleConsigne);
+        // Story 4.12: the legacy GetLibelle has no SVT branch, so its libellé is "?".
+        Assert.Equal("?", consigne.LibelleConsigne);
     }
 
     // XP1 (OrdreDeFabricationManager.cs:1557-1599), both blocks, on the reference Fichier's real data: the
@@ -371,8 +372,8 @@ public class ConsignesMapperTests
         Assert.DoesNotContain("DbContext", source, StringComparison.Ordinal);
     }
 
-    // AC-FR19-4: the mapper documents the columns it still leaves à_clarifier (LibelleConsigne on every
-    // row, TypeConsigne/SizeCodeConsigne on the SVT row) with the same "assumed, unverified" marker citing
+    // AC-FR19-4: the mapper documents the columns it still leaves à_clarifier (TypeConsigne/SizeCodeConsigne
+    // on the SVT row; LibelleConsigne is a rule since Story 4.12) with the same "assumed, unverified" marker citing
     // deferred-work.md, instead of leaving the gap silent.
     [Fact]
     [Trait("AC", "FR19-4")]
@@ -385,7 +386,7 @@ public class ConsignesMapperTests
     }
 
     // AC-FR19-4 (reworded from Story 4.4): every row this mapper produces carries ConsigneGPAO=true and
-    // leaves LibelleConsigne untouched (null); SizeCodeConsigne is no longer left at its CLR default for
+    // carries a LibelleConsigne (Story 4.12); SizeCodeConsigne is no longer left at its CLR default for
     // any row this reference Fichier's applicable sections produce (none of them is SVT) - 18 for the
     // Decoupe size-18 block (TypeConsigne 24-29), 12 for every other row.
     [Fact]
@@ -398,7 +399,7 @@ public class ConsignesMapperTests
         Assert.All(consignes, consigne =>
         {
             Assert.True(consigne.ConsigneGPAO);
-            Assert.Null(consigne.LibelleConsigne);
+            Assert.NotNull(consigne.LibelleConsigne);
             Assert.Equal(consigne.TypeConsigne >= 24 ? 18 : 12, consigne.SizeCodeConsigne);
         });
     }

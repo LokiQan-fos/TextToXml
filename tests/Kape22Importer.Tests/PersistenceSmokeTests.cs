@@ -34,6 +34,24 @@ public class PersistenceSmokeTests(SqlServerIntegrationFixture fixture)
         "L_D_SECTIONCHARGE_SVT",
     ];
 
+    // The 13 read-only L_P_CONSIGNES_* reference tables added in Story 4.12 (scripts/schema/03-ascolsi-reference-consignes.sql).
+    private static readonly string[] ReferenceTables =
+    [
+        "L_P_CONSIGNES_CHUTAGE",
+        "L_P_CONSIGNES_CODEOUTIL_COUPE",
+        "L_P_CONSIGNES_DECOUPE",
+        "L_P_CONSIGNES_DEGAZAGE_DETAIL",
+        "L_P_CONSIGNES_DEGAZAGE_GLOBAL",
+        "L_P_CONSIGNES_LINGOT",
+        "L_P_CONSIGNES_MARQUAGE",
+        "L_P_CONSIGNES_PITS",
+        "L_P_CONSIGNES_POIDSMETRIQUE",
+        "L_P_CONSIGNES_PRECHAUFFAGE_PARTICULIER",
+        "L_P_CONSIGNES_REFROIDISSEMENT",
+        "L_P_CONSIGNES_REFROIDISSOIRS",
+        "L_P_CONSIGNES_SMQ",
+    ];
+
     [SkippableFact]
     [Trait("AC", "2.1")]
     [Trait("AC", "4.1")]
@@ -48,13 +66,14 @@ public class PersistenceSmokeTests(SqlServerIntegrationFixture fixture)
         Assert.True(TableExists(fixture.AscoLsiConnectionString, "L_D_LOG_COMMANDE"));
         Assert.True(TableExists(fixture.MqttConnectionString, "Logs"));
 
-        // Story 4.1: the 10 downstream dispatch tables (AFV004-LSI, sys.columns/sys.indexes, 2026-09-14).
-        foreach (string table in DownstreamTables)
+        // Story 4.1: the 10 downstream dispatch tables (AFV004-LSI, sys.columns/sys.indexes, 2026-09-14),
+        // plus the Story 4.12 reference tables.
+        foreach (string table in DownstreamTables.Concat(ReferenceTables))
         {
             Assert.True(TableExists(fixture.AscoLsiConnectionString, table), $"Missing table dbo.{table}.");
         }
 
-        Assert.Equal(2 + DownstreamTables.Length, UserTableCount(fixture.AscoLsiConnectionString));
+        Assert.Equal(2 + DownstreamTables.Length + ReferenceTables.Length, UserTableCount(fixture.AscoLsiConnectionString));
         Assert.Equal(1, UserTableCount(fixture.MqttConnectionString));
     }
 

@@ -32,7 +32,8 @@ public class AcCoverageCompletenessTests
         [15] = 4,
         [17] = 5,
         [18] = 4,
-        [19] = 4,
+        // FR19-1..4 (Story 4.4) + FR19-5 (Story 4.12, LibelleConsigneResolverTests.cs) = 5.
+        [19] = 5,
         [20] = 5,
         // FR21-1/2/3 (pre-existing) + FR21-4 (this story, EndToEndImportIntegrationTests.cs)
         // + FR21-5 (this story, RejectionAtomicityIntegrationTests.cs) = 5.

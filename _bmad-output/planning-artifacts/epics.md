@@ -307,7 +307,7 @@ microservices à UI et ne s'appliquent à aucune story v1.
 | FR-16 | Épic 1 — 1.8 | AC-FR16-1 … AC-FR16-4 |
 | FR-17 | Épic 4 — 4.2 | AC-FR17-1 … AC-FR17-5 |
 | FR-18 | Épic 4 — 4.3 | AC-FR18-1 … AC-FR18-4 |
-| FR-19 | Épic 4 — 4.4 | AC-FR19-1 … AC-FR19-4 |
+| FR-19 | Épic 4 — 4.4 (`AC-FR19-1..4`), 4.12 (`AC-FR19-5`, `LibelleConsigne`) | AC-FR19-1 … AC-FR19-5 |
 | FR-20 | Épic 4 — 4.5 (contrôles purs), 4.6 (`AC-FR20-5`, existence coulée) | AC-FR20-1 … AC-FR20-5 |
 | FR-21 | Épic 4 — 4.6 (persister), 4.7 (E2E) | AC-FR21-1 … AC-FR21-5 |
 | CTR-1/2/3 | Épic 1 — 1.8 | contrat `decimal`/`datetime`/`convert` + round‑trip typé |
@@ -2568,5 +2568,48 @@ une colonne structurée ; les nouveaux cas `Kape22ProductionDataParityTests`
 
 **Critères transverses :** CC-1, CC-2, CC-3, CC-4, CC-5. *(CC-6/CC-7 sans
 objet : pas de nouvel accès base, `ConsignesMapper` reste pur.)*
+
+Owner : Dev.
+
+## Corrections post-clôture (session de test n° 2, 2026-09-24)
+
+> Écart constaté en session de test n° 2 (OF `2039771`, `P60_847_682_001`) :
+> `L_D_CONSIGNES.LibelleConsigne` toujours `NULL`, alors que la production porte
+> une valeur sur les 30 lignes `ConsigneGPAO=1`. Le calcul avait été laissé
+> `à_clarifier` faute de source legacy ; celle-ci a été retrouvée
+> (`Lsi.Net/Ascometal.LSI.DAL/LibelleConsigneController.cs`, `GetLibelle`).
+> Périmètre FR-19 inchangé, un AC ajouté (`AC-FR19-5`).
+
+### Story 4.12 : Alimentation de `L_D_CONSIGNES.LibelleConsigne` (port de `GetLibelle`)
+
+As a `Kape22Importer`,
+I want que chaque ligne `L_D_CONSIGNES` produite porte le libellé que le legacy
+calcule par `LibelleConsigneController.GetLibelle`,
+So that `LibelleConsigne` soit égal à la production au lieu de rester `NULL`.
+
+**Acceptance Criteria:**
+
+**AC-FR19-5 :**
+Given un Fichier `P60/` et l'instantané de production des 13 tables
+  `L_P_CONSIGNES_*`
+When il est mappé
+Then chaque `LibelleConsigne` des lignes `ConsigneGPAO=1` est égal à la
+  production (port pur `LibelleConsigneResolver`, fonctions pures AD-2 ;
+  instantané chargé une fois par Fichier par `Kape22FichierProcessor`, SELECT
+  uniquement)
+And une ligne dont une référence consultée a un `DateMaj` postérieur à la
+  `DateReception` de production du Fichier est signalée comme ignorée, pas en
+  échec
+And avec un instantané vide, les libellés issus d'une table valent `?` et les
+  libellés calculés restent corrects
+And `scripts/e2e-worker-import.ps1` recharge d'abord les 13 tables de test
+  depuis la production (`scripts/sync-reference-consignes.ps1`) et échoue si un
+  libellé persisté est `NULL`
+
+**Tests xUnit :** `LibelleConsigneResolverTests` (matrice I/O et une branche
+legacy par test), `Kape22FichierProcessorIntegrationTests` (références seedées),
+`Kape22ProductionDataParityTests` (parité `LibelleConsigne`).
+
+**Critères transverses :** CC-1, CC-2, CC-3, CC-4, CC-5.
 
 Owner : Dev.

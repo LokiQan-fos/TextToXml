@@ -187,4 +187,38 @@ public class Kape22FichierProcessorIntegrationTests(SqlServerIntegrationFixture 
         Assert.NotNull(result.NormalizedXml);
         Assert.Equal(ExpectedXmlArchivePath, result.XmlArchivePath);
     }
+
+    // Story 4.12 (AC-FR19-5): the processor loads the L_P_CONSIGNES_* snapshot from the Fichier's own
+    // context, so seeded reference rows reach the persisted libellés; an unseeded lookup gives "?" and a
+    // computed type needs no reference row at all.
+    [SkippableFact]
+    [Trait("AC", "FR19-5")]
+    public void Import_SeededReferenceRows_PersistResolvedLibelles_AcFr19_5()
+    {
+        Ready();
+        using (AscoLsiDbContext seed = fixture.NewAscoLsiContext())
+        {
+            seed.Database.ExecuteSqlRaw(
+                """
+                INSERT INTO dbo.L_P_CONSIGNES_LINGOT (Section, Consignes, CodeConsigne, Libelle, DateMaj)
+                VALUES (N'LA1', 7, N'0', N'Pas de scarfing', '2020-01-01');
+                INSERT INTO dbo.L_P_CONSIGNES_REFROIDISSEMENT (Code, Libelle, DateMaj)
+                VALUES (N'00', N'Refroidissement à l''air', NULL);
+                """);
+        }
+
+        ImportResult result = Processor().Import(ReferenceFichierName, InsertableReferenceFichier());
+        Assert.True(result.Success);
+
+        using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
+        List<L_D_CONSIGNES> rows = [.. verify.ConsignesRows.AsNoTracking()];
+        string? Libelle(string codeOperation, int type) =>
+            Assert.Single(rows, row => row.CodeOperation.Trim() == codeOperation && row.TypeConsigne == type).LibelleConsigne;
+
+        Assert.Equal("Pas de scarfing", Libelle("LA1", 7));
+        Assert.Equal("Refroidissement à l'air", Libelle("XA1", 21));
+        Assert.Equal("?", Libelle("LA1", 9));
+        Assert.Equal("1250", Libelle("PC1", 10));
+        Assert.All(rows, row => Assert.NotNull(row.LibelleConsigne));
+    }
 }

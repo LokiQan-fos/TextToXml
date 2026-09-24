@@ -442,7 +442,7 @@ public sealed class Kape22Persister(AscoLsiDbContext context, IConfiguration con
     // Fichier was rejected) are kept ahead of it here. The caller Kape22FichierProcessor.Import then
     // re-sorts the ImportResult by LineNumber, which moves this File-level entry (LineNumber 0) to the
     // front (AC-FR6-4 extended to ImportResult).
-    private static ImportResult PersistenceFailure(Exception exception, IReadOnlyList<ConversionError>? priorErrors = null)
+    internal static ImportResult PersistenceFailure(Exception exception, IReadOnlyList<ConversionError>? priorErrors = null)
     {
         string cause = (exception.InnerException ?? exception).Message;
         ConversionError persistenceError = new()

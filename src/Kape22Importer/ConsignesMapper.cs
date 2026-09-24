@@ -26,7 +26,9 @@ public static class ConsignesMapper
         L_D_SECTIONCHARGE_PITS? pits,
         L_D_SECTIONCHARGE_POIDSMETRIQUE? poidsMetrique,
         L_D_SECTIONCHARGE_REFROIDISSOIRS? refroidissoirs,
-        L_D_SECTIONCHARGE_SVT? svt)
+        L_D_SECTIONCHARGE_SVT? svt,
+        L_D_ORDRE_FABRICATION? ordreFabrication = null,
+        ConsigneReferenceData? referenceData = null)
     {
         List<L_D_CONSIGNES> consignes = [];
 
@@ -101,6 +103,24 @@ public static class ConsignesMapper
             // at their CLR default (see deferred-work.md, "Deferred from: story-4.4-bis decomposition of
             // L_D_CONSIGNES", for the collision risk this leaves open).
             consignes.Add(Row(source.OF, svt.CodeOperation, source.CodeConsigneSVT ?? string.Empty, typeConsigne: 0, sizeCodeConsigne: 0));
+        }
+
+        // Story 4.12 (AC-FR19-5): every row gets its libellé from the pure port of the legacy
+        // LibelleConsigneController.GetLibelle, over the reference snapshot the caller loaded. With no
+        // snapshot it is empty, so a lookup-based libellé becomes "?" and a computed one is still produced.
+        // Type 22 also reads the Ordre de Fabrication's ProfilProduit and DiametreProduit and the Pits
+        // H2Coulee, the legacy call-site arguments (OrdreDeFabricationManager.cs:1405-1408).
+        ConsigneReferenceData reference = referenceData ?? ConsigneReferenceData.Empty;
+        foreach (L_D_CONSIGNES consigne in consignes)
+        {
+            consigne.LibelleConsigne = LibelleConsigneResolver.Resolve(
+                consigne.CodeOperation,
+                consigne.TypeConsigne,
+                consigne.CodeConsigne,
+                reference,
+                ordreFabrication?.ProfilProduit,
+                ordreFabrication?.DiametreProduit,
+                pits?.H2Coulee).Libelle;
         }
 
         return consignes;
@@ -181,8 +201,5 @@ public static class ConsignesMapper
         OF = DownstreamOf.Pad(of),
         SizeCodeConsigne = sizeCodeConsigne,
         TypeConsigne = typeConsigne,
-
-        // LibelleConsigne: assumed, unverified - à_clarifier per the Story 4.2 annex (see deferred-work.md),
-        // out of scope for spec-4-4-bis, stays null (CLR default).
     };
 }

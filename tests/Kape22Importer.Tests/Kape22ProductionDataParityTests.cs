@@ -272,8 +272,10 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
     // ConsigneGPAO=0 belongs to an earlier, out-of-scope process this mapper never produces or checks
     // for. For every row ConsignesMapper actually produces, its exact natural-key match must exist in
     // production with the same CodeConsigne/SizeCodeConsigne; a row with no production match at all is a
-    // real regression. LibelleConsigne is excluded from the comparison (out of scope, stays null here -
-    // Boundaries & Constraints).
+    // real regression. Story 4.12 (AC-FR19-5): LibelleConsigne is compared too, resolved against the
+    // production L_P_CONSIGNES_* snapshot. A row whose consulted reference rows were edited (DateMaj) after
+    // this Fichier's production DateReception is reported as skipped, not failed: the legacy application
+    // resolved it against values that no longer exist (same principle as "P60 is a forecast").
     [SkippableTheory]
     [MemberData(nameof(P60Fichiers))]
     public void MappedFichier_ConsignesRows_MatchLegacyProductionRows(string fichierName)
@@ -293,15 +295,19 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
         L_D_KAPE22 mapped = mapping.Value!;
         string of = mapped.OF.Trim();
 
+        L_D_ORDRE_FABRICATION ordreFabrication = OrdreFabricationMapper.Map(mapped, StableClock());
+        L_D_SECTIONCHARGE_PITS? pits = SectionChargePitsMapper.Map(mapped);
         List<L_D_CONSIGNES> consignes = ConsignesMapper.Map(
             mapped,
             SectionChargeChutageMapper.Map(mapped),
             SectionChargeDecoupeMapper.Map(mapped),
             SectionChargeLingotMapper.Map(mapped),
-            SectionChargePitsMapper.Map(mapped),
+            pits,
             SectionChargePoidsMetriqueMapper.Map(mapped),
             SectionChargeRefroidissoirsMapper.Map(mapped),
-            SectionChargeSvtMapper.Map(mapped));
+            SectionChargeSvtMapper.Map(mapped),
+            ordreFabrication,
+            ProductionReferenceData.Value);
 
         Skip.If(consignes.Count == 0, $"{fichierName}: aucune section décodable applicable pour cet OF, rien à comparer.");
 
@@ -316,7 +322,12 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
         // A read-back missing rows would otherwise make the loop below compare nothing and pass vacuously.
         Assert.Equal(consignes.Count, testRows.Count);
 
+        // The production DateReception of this very Fichier bounds the reference edits the legacy import
+        // could have seen; with no production L_D_KAPE22 row for it, every libellé is compared strictly.
+        DateTime? dateReception = ReadProductionRows(of, mapped.NumeroFichier.Trim()).FirstOrDefault()?.DateReception;
+
         List<string> regressions = [];
+        List<string> skippedLibelles = [];
 
         // Reverse direction (code-review patch): every production ConsigneGPAO=1 row of a CodeOperation this
         // mapper produced must have its own mapped counterpart - under-production (5 rows produced vs 60 in
@@ -359,6 +370,31 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
                     $"  CodeOperation={row.CodeOperation}, TypeConsigne={row.TypeConsigne}.SizeCodeConsigne: " +
                     $"production={match.SizeCodeConsigne}, nouveau traitement={row.SizeCodeConsigne}");
             }
+
+            if (!Equals(match.LibelleConsigne, row.LibelleConsigne))
+            {
+                // Re-resolved only for the DateMaj of the reference rows it consulted, same inputs as the mapper.
+                DateTime? consulted = LibelleConsigneResolver.Resolve(
+                    row.CodeOperation, row.TypeConsigne, row.CodeConsigne, ProductionReferenceData.Value,
+                    ordreFabrication.ProfilProduit, ordreFabrication.DiametreProduit, pits?.H2Coulee).LatestDateMaj;
+                string difference =
+                    $"  CodeOperation={row.CodeOperation}, TypeConsigne={row.TypeConsigne}.LibelleConsigne: " +
+                    $"production={Format(match.LibelleConsigne)}, nouveau traitement={Format(row.LibelleConsigne)}";
+                if (consulted > dateReception)
+                {
+                    skippedLibelles.Add($"{difference} (référence modifiée le {Format(consulted)}, après la réception)");
+                }
+                else
+                {
+                    regressions.Add(difference);
+                }
+            }
+        }
+
+        // Reported, not failed: visible in the test output when the Fichier is run on its own.
+        foreach (string skipped in skippedLibelles)
+        {
+            Console.WriteLine($"{fichierName} ignoré : {skipped.Trim()}");
         }
 
         Assert.True(
@@ -366,6 +402,18 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
             $"{fichierName} (OF {of}) diverge de la production sur L_D_CONSIGNES (ConsigneGPAO=1) :\n" +
             string.Join("\n", regressions));
     }
+
+    // The production L_P_CONSIGNES_* snapshot, read once for the whole class (SELECT only, the same
+    // read-only discipline as ReadProductionRows).
+    private static readonly Lazy<ConsigneReferenceData> ProductionReferenceData = new(() =>
+    {
+        DbContextOptions<AscoLsiDbContext> options = new DbContextOptionsBuilder<AscoLsiDbContext>()
+            .UseSqlServer(ProductionConnectionString)
+            .Options;
+
+        using AscoLsiDbContext production = new(options);
+        return ConsigneReferenceData.Load(production);
+    });
 
     // Inserts every row ConsignesMapper produced for this OF under one rolled-back TransactionScope, then
     // reads them all back by OF + ConsigneGPAO - the multi-row-per-OF counterpart of RoundTrip (which

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Data.Common;
 using System.Linq;
 using System.Xml.Linq;
 using Kape22Importer.Persistence;
@@ -67,8 +68,32 @@ public sealed class Kape22FichierProcessor(
         // not short-circuited here: Kape22Persister.Persist is still called with the failed bundle so it
         // writes the "<NumeroFichier> — REJETÉ" L_D_LOG_COMMANDE line when the OF is readable
         // (AC-FR11-4). The normalized XML rides along on the result so InboxScanner can drop <nom>.xml
-        // next to the Fichier in error/ for diagnosis (AC-FR13-3).
-        Kape22ImportBundle bundle = new Kape22ImportBundleMapper(timeProvider).Map(normalizedXml, fichierName);
+        // next to the Fichier in error/ for diagnosis (AC-FR13-3). The context belongs to this Fichier
+        // alone, so its transaction and EF change tracker never touch another Fichier's (AC-FR13-4).
+        // Story 4.12: it is created before mapping so the L_P_CONSIGNES_* reference snapshot is read once
+        // from it (SELECT only) and handed to the pure mappers, which never read the database themselves
+        // (AD-2).
+        using AscoLsiDbContext context = newContext();
+        ConsigneReferenceData referenceData;
+        try
+        {
+            referenceData = ConsigneReferenceData.Load(context);
+        }
+        catch (DbException exception)
+        {
+            // This read is now the first database access, so an unreachable AscoLSI surfaces here
+            // instead of in the persister. It is reported as the same File-level PersistenceError, so
+            // InboxScanner still leaves the Fichier in processing/ for a retry (AC-FR15-3).
+            ImportResult unreachable = Kape22Persister.PersistenceFailure(exception) with
+            {
+                NormalizedXml = normalizedXml,
+                Warnings = SortedByLine(conversion.Warnings),
+            };
+            Journal(fichierName, unreachable, numeroFichier: null, of: null, normalizedXml, timeProvider.GetElapsedTime(startedAt));
+            return unreachable;
+        }
+
+        Kape22ImportBundle bundle = new Kape22ImportBundleMapper(timeProvider).Map(normalizedXml, fichierName, referenceData);
 
         // The Step 1 Segment warnings and the mapper's FR-10 coherence warnings, kept whichever step the
         // Fichier reaches. A rejected bundle drops its Warnings on the way through Kape22Persister, so
@@ -76,9 +101,7 @@ public sealed class Kape22FichierProcessor(
         // by LineNumber so the two sources interleave correctly (AC-FR6-4 extended to ImportResult).
         IReadOnlyList<ConversionError> warnings = SortedByLine([.. conversion.Warnings, .. bundle.Warnings]);
 
-        // The final stage persists, over a context that belongs to this Fichier alone so its transaction
-        // and EF change tracker never touch another Fichier's (AC-FR13-4).
-        using AscoLsiDbContext context = newContext();
+        // The final stage persists over that same per-Fichier context.
         ImportResult persisted = new Kape22Persister(context, configuration, timeProvider).Persist(bundle);
 
         ImportResult result = persisted with

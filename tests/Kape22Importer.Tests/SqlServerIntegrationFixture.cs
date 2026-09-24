@@ -52,7 +52,9 @@ public sealed class SqlServerIntegrationFixture
 
         try
         {
-            ApplySchema(AscoLsiConnectionString, "01-ascolsi-tables.sql");
+            // Story 4.12: the L_P_CONSIGNES_* reference tables live in the same AscoLSI database, applied
+            // after the target tables in the same pass so the drop-everything step runs only once.
+            ApplySchema(AscoLsiConnectionString, "01-ascolsi-tables.sql", "03-ascolsi-reference-consignes.sql");
             ApplySchema(MqttConnectionString, "02-mqtt-tables.sql");
 
             Available = true;
@@ -80,12 +82,27 @@ public sealed class SqlServerIntegrationFixture
     // 21-2) and therefore cannot run under an ambient TransactionScope. Each such test calls this first.
     // Story 4.6: the Story 4.1 downstream tables Kape22Persister now writes to are truncated too, so a
     // test that reuses the reference Fichier's OF (every downstream table but L_D_COULEE is keyed on it)
-    // never collides with a row an earlier test left committed.
+    // never collides with a row an earlier test left committed. Story 4.12: the 13 L_P_CONSIGNES_*
+    // reference tables are emptied too, so reference rows a test seeds never leak into another test's
+    // ConsigneReferenceData snapshot.
     public void ResetData()
     {
         ExecuteNonQuery(
             AscoLsiConnectionString,
             """
+            TRUNCATE TABLE dbo.L_P_CONSIGNES_CHUTAGE;
+            TRUNCATE TABLE dbo.L_P_CONSIGNES_CODEOUTIL_COUPE;
+            TRUNCATE TABLE dbo.L_P_CONSIGNES_DECOUPE;
+            TRUNCATE TABLE dbo.L_P_CONSIGNES_DEGAZAGE_DETAIL;
+            TRUNCATE TABLE dbo.L_P_CONSIGNES_DEGAZAGE_GLOBAL;
+            TRUNCATE TABLE dbo.L_P_CONSIGNES_LINGOT;
+            TRUNCATE TABLE dbo.L_P_CONSIGNES_MARQUAGE;
+            TRUNCATE TABLE dbo.L_P_CONSIGNES_PITS;
+            TRUNCATE TABLE dbo.L_P_CONSIGNES_POIDSMETRIQUE;
+            TRUNCATE TABLE dbo.L_P_CONSIGNES_PRECHAUFFAGE_PARTICULIER;
+            TRUNCATE TABLE dbo.L_P_CONSIGNES_REFROIDISSEMENT;
+            TRUNCATE TABLE dbo.L_P_CONSIGNES_REFROIDISSOIRS;
+            TRUNCATE TABLE dbo.L_P_CONSIGNES_SMQ;
             TRUNCATE TABLE dbo.L_D_KAPE22;
             TRUNCATE TABLE dbo.L_D_LOG_COMMANDE;
             TRUNCATE TABLE dbo.L_D_CONSIGNES;
@@ -133,28 +150,31 @@ public sealed class SqlServerIntegrationFixture
         command.ExecuteNonQuery();
     }
 
-    private static void ApplySchema(string connectionString, string scriptFileName)
+    private static void ApplySchema(string connectionString, params string[] scriptFileNames)
     {
         EnsureDatabaseExists(connectionString);
         DropExistingUserTables(connectionString);
 
-        string path = RepoLayout.ProjectFile(Path.Combine("scripts", "schema", scriptFileName));
-        string script = File.ReadAllText(path);
-
         using SqlConnection connection = new(WithShortLoginTimeout(connectionString));
         connection.Open();
 
-        foreach (string batch in BatchSeparator.Split(script))
+        foreach (string scriptFileName in scriptFileNames)
         {
-            if (string.IsNullOrWhiteSpace(batch))
-            {
-                continue;
-            }
+            string path = RepoLayout.ProjectFile(Path.Combine("scripts", "schema", scriptFileName));
+            string script = File.ReadAllText(path);
 
-            using SqlCommand command = connection.CreateCommand();
-            command.CommandText = batch;
-            command.CommandType = CommandType.Text;
-            command.ExecuteNonQuery();
+            foreach (string batch in BatchSeparator.Split(script))
+            {
+                if (string.IsNullOrWhiteSpace(batch))
+                {
+                    continue;
+                }
+
+                using SqlCommand command = connection.CreateCommand();
+                command.CommandText = batch;
+                command.CommandType = CommandType.Text;
+                command.ExecuteNonQuery();
+            }
         }
     }
 

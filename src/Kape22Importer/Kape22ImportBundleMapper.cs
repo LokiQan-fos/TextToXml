@@ -14,7 +14,9 @@ namespace Kape22Importer;
 public sealed class Kape22ImportBundleMapper(TimeProvider? timeProvider = null)
 {
     // sourceFileName feeds Kape22Mapper's own FR-10 file-name coherence check, unchanged here.
-    public Kape22ImportBundle Map(string normalizedXml, string sourceFileName)
+    // referenceData is the L_P_CONSIGNES_* snapshot the caller loaded (Story 4.12), forwarded to
+    // ConsignesMapper as-is; without it every lookup-based LibelleConsigne resolves to "?".
+    public Kape22ImportBundle Map(string normalizedXml, string sourceFileName, ConsigneReferenceData? referenceData = null)
     {
         MapResult<L_D_KAPE22> mapped = new Kape22Mapper(timeProvider).Map(normalizedXml, sourceFileName);
         if (mapped.Errors.Count > 0)
@@ -42,7 +44,7 @@ public sealed class Kape22ImportBundleMapper(TimeProvider? timeProvider = null)
         L_D_SECTIONCHARGE_REFROIDISSOIRS? refroidissoirs = SectionChargeRefroidissoirsMapper.Map(kape22);
         L_D_SECTIONCHARGE_SVT? svt = SectionChargeSvtMapper.Map(kape22);
         List<L_D_CONSIGNES> consignes = ConsignesMapper.Map(
-            kape22, chutage, decoupe, lingot, pits, poidsMetrique, refroidissoirs, svt);
+            kape22, chutage, decoupe, lingot, pits, poidsMetrique, refroidissoirs, svt, ordreFabrication, referenceData);
 
         // Accumulate-then-freeze, the same pattern Kape22Mapper.Map and CoherenceChecker already use:
         // every control runs regardless of an earlier one's outcome, so a Fichier failing two controls

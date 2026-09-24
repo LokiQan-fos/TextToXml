@@ -312,7 +312,8 @@ public sealed class InboxScanner(
     }
 
     // AC-FR15-3: a returned result carrying a File-level PersistenceError is Kape22Persister reporting a
-    // caught DbException (AC-FR11-5) - AscoLSI is unreachable. Only Kape22Persister emits PersistenceError
+    // caught DbException (AC-FR11-5), or Kape22FichierProcessor reporting one from its reference-data read
+    // through the same helper (Story 4.12) - AscoLSI is unreachable. Only that helper emits PersistenceError
     // (a P60Deserializer schema failure is SchemaInvalid, an unexpected throw is UnexpectedFailure), so
     // it is a precise signal for "leave the Fichier in processing/ and retry", distinct from a Converter,
     // schema or Mapper rejection (which belongs in error/).

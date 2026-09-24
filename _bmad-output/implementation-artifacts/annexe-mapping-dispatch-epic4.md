@@ -197,8 +197,8 @@ directement. `TypeConsigne`/`SizeCodeConsigne` sont désormais une règle docume
 (Story 4.4-bis, ci-dessous) pour les 6 sections dont `OrdreDeFabricationManager.CompleteConsignes2`
 décode un code composite (Chutage, Lingot, Pits, Decoupe, PoidsMetrique, Refroidissoir) ; SVT reste
 `à_clarifier` (CLR default), aucune règle de décomposition legacy trouvée pour cette section
-(commentaire mort uniquement, lignes 1668-1669). `LibelleConsigne` reste `à_clarifier`, alimenté par du
-code applicatif complexe (`LibelleConsigneController.GetLibelle`), hors périmètre de Story 4.4-bis.
+(commentaire mort uniquement, lignes 1668-1669). `LibelleConsigne` est une règle depuis la Story 4.12 : port
+pur de `LibelleConsigneController.GetLibelle` sur les tables de référence `L_P_CONSIGNES_*` (ligne ci-dessous).
 
 Décodage par section (Story 4.4-bis, offsets lus dans `OrdreDeFabricationManager.CompleteConsignes2`,
 `TypeConsigne = Substring(début, longueur)` sur le code brut complété à droite à sa taille) :
@@ -218,7 +218,7 @@ Décodage par section (Story 4.4-bis, offsets lus dans `OrdreDeFabricationManage
 | CodeConsigne | sourcée | KAPE22, champ variable selon la section (ex. `CodeConsigneLingot` pour ConsignesLingot, `CodeConsigneChutage` pour ConsignesChutage — cf. OrdreFabrication.xml, sous-objets `ConsignesL/C/D/R/P/S/PM`) | - |
 | CodeOperation | sourcée | KAPE22, champ variable selon la section (ex. `CodeOpeLingot`, `CodeOpeChutage`...), même famille que le CodeOperation de la section parente | - |
 | ConsigneGPAO | règle | `true` pour toute ligne produite par `ConsignesMapper` — la valeur telle qu'injectée par le dispatch P60, potentiellement déjà ajustée par un opérateur pour une contrainte de production temporaire (confirmé par le donneur d'ordre, 2026-09-23, sprint-change-proposal-2026-09-23.md). `false` porte la valeur initiale prévue par l'OF, un processus antérieur au dispatch P60 et hors périmètre de ce mapper (pas un doublon "miroir" à dédupliquer, ni une ligne dont ce mapper vérifie l'existence — AD-2/AD-7) | - |
-| LibelleConsigne | à_clarifier | Calculé par `LibelleConsigneController.GetLibelle(...)` (OrdreDeFabricationManager.cs:1408,1412,1424,1428) ; fichier LibelleConsigneController.cs non fourni | - |
+| LibelleConsigne | règle | Story 4.12 : port pur de `LibelleConsigneController.GetLibelle` (`Lsi.Net/Ascometal.LSI.DAL/LibelleConsigneController.cs:14-285`) dans `LibelleConsigneResolver`, sur un instantané des 13 tables `L_P_CONSIGNES_*` chargé une fois par Fichier (`ConsigneReferenceData`) ; type 22 lit aussi `ProfilProduit`/`DiametreProduit` de l’OF et `H2Coulee` des Pits ; libellé vide ou exception = `?` (OrdreDeFabricationManager.cs:1405-1416) | - |
 | OF | sourcée | KAPE22.OF | - |
 | SizeCodeConsigne | règle | 6 sections décodées uniquement : 12 pour la ligne de code complet et chaque sous-champ, sauf le bloc XP1 sur 18 (`LibelleConsigneDecoupe`, type 24 et ses sous-champs 25-29) qui vaut 18 — paramètre `tailleconsigne` de `CompleteConsignes2` (OrdreDeFabricationManager.cs:1442-1682). Détail : liste « Décodage par section » ci-dessus | - |
 | SizeCodeConsigne | à_clarifier | SVT uniquement : CLR default 0, aucune règle de décomposition legacy trouvée (OrdreDeFabricationManager.cs:1668-1669) | - |

@@ -83,6 +83,10 @@ function Read-LiveLog([string] $Path) {
     }
 }
 
+# --- 0. Story 4.12: reload the 13 L_P_CONSIGNES_* reference tables from production (SELECT only) so
+# the worker resolves LibelleConsigne against the same values the legacy application reads. ---
+& (Join-Path $PSScriptRoot 'sync-reference-consignes.ps1') -TestSettingsPath $testSettingsPath
+
 # --- 1. Scratch inbox: drop the requested Fichiers where the worker will see them. ---
 if (Test-Path -LiteralPath $InboxPath) { Remove-Item -LiteralPath $InboxPath -Recurse -Force }
 New-Item -ItemType Directory -Path $InboxPath | Out-Null
@@ -145,6 +149,13 @@ try {
 
     Write-Host "--- L_D_LOG_COMMANDE rows inserted this run ---"
     Invoke-Sql "SELECT Id, Commande, Message, [OF], [Date] FROM L_D_LOG_COMMANDE WHERE [OF] IN (SELECT RTRIM([OF]) FROM L_D_KAPE22 WHERE NumeroFichier IN ('$($numeros -join "','")'))"
+
+    # Story 4.12: every persisted L_D_CONSIGNES row of these OFs must carry a libellé.
+    $consignesFilter = "[OF] IN (SELECT RIGHT('000000000000' + RTRIM([OF]), 12) FROM L_D_KAPE22 WHERE NumeroFichier IN ('$($numeros -join "','")'))"
+    Write-Host "--- L_D_CONSIGNES libellés ---"
+    Invoke-Sql "SELECT [OF], CodeOperation, TypeConsigne, CodeConsigne, LibelleConsigne FROM L_D_CONSIGNES WHERE $consignesFilter ORDER BY [OF], CodeOperation, TypeConsigne"
+    $nullLibelles = (& sqlcmd -S localhost -d AscoLSI_Test -C -h -1 -W -Q "SET NOCOUNT ON; SELECT COUNT(*) FROM L_D_CONSIGNES WHERE $consignesFilter AND LibelleConsigne IS NULL") | Select-Object -First 1
+    if ([int]$nullLibelles -ne 0) { throw "$nullLibelles L_D_CONSIGNES row(s) persisted with a NULL LibelleConsigne." }
 }
 finally {
     # --- 6. Always tear down the Launcher and its broker, and always restore the tracked config. ---
