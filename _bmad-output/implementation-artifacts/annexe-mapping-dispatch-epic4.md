@@ -200,6 +200,19 @@ décode un code composite (Chutage, Lingot, Pits, Decoupe, PoidsMetrique, Refroi
 (commentaire mort uniquement, lignes 1668-1669). `LibelleConsigne` reste `à_clarifier`, alimenté par du
 code applicatif complexe (`LibelleConsigneController.GetLibelle`), hors périmètre de Story 4.4-bis.
 
+Décodage par section (Story 4.4-bis, offsets lus dans `OrdreDeFabricationManager.CompleteConsignes2`,
+`TypeConsigne = Substring(début, longueur)` sur le code brut complété à droite à sa taille) :
+
+- Chutage (XC1, `CodeConsigneChutage`) : 13 = code complet (12) ; 0=Sub(0,2), 1=Sub(3,1), 2=Sub(5,1).Trim, 3=Sub(7,2).Trim, 4=Sub(10,1).Trim — lignes 1520-1547.
+- Lingot (LA1, `CodeConsigneLingot`) : 13 (12) ; 15=Sub(0,3), 7=Sub(4,1), 8=Sub(6,3), 9=Sub(10,2) — lignes 1488-1514.
+- Pits (PC1, `CodeConsignePits`) : 13 (12) ; 12=Sub(0,1), 10=Sub(2,3), 11=Sub(2,3), 5=Sub(6,2).Trim, 6=Sub(9,3).Trim — lignes 1452-1482.
+- Decoupe bloc 12 (XP1, `CodeConsigneDecoupe`) : 13 (12) ; 16=Sub(0,5).Trim, 17=Sub(6,5).Trim — lignes 1557-1573.
+- Decoupe bloc 18 (XP1, `LibelleConsigneDecoupe`, Position 287, Size 18) : 24 = code complet (18) ; 25=Sub(0,1).Trim, 26=Sub(1,5).Trim, 27=Sub(7,2).Trim, 28=Sub(9,4).Trim, 29=Sub(11,1).Trim — lignes 1577-1599. Malgré son nom, ce Champ est la seconde consigne Decoupe : le legacy transforme la seconde consigne ajoutée à cette section au chargement d'un KAPE22 en type 24/taille 18 (`OrdreFabrication.cs:627-634`), et les 324 enregistrements Decoupe des fixtures `P60/` (350 fichiers) y portent tous un code structuré (`.LLLLL BC X.XM`). Chaque bloc Decoupe n'est produit que si son propre code est non vide, indépendamment de l'autre.
+- PoidsMetrique (XP9, `CodeConsignePoidMetrique`) : 13 (12) ; 18=Sub(0,4).Trim, 19=Sub(5,2).Trim, 20=Sub(8,2).Trim — lignes 1612-1636.
+- Refroidissoir (XA1, `CodeConsigneRefroidissoir`) : 13 (12) ; 21=Sub(0,2).Trim, 22=Sub(3,1).Trim, 23=Sub(5,3).Trim — lignes 1642-1664.
+- SVT : aucune règle legacy (lignes 1668-1669, lecture commentée) — ligne unique inchangée, voir les lignes `à_clarifier` ci-dessous.
+
+
 | Colonne | Statut | Source / Règle | Scale |
 | --- | --- | --- | --- |
 | CodeConsigne | sourcée | KAPE22, champ variable selon la section (ex. `CodeConsigneLingot` pour ConsignesLingot, `CodeConsigneChutage` pour ConsignesChutage — cf. OrdreFabrication.xml, sous-objets `ConsignesL/C/D/R/P/S/PM`) | - |
@@ -207,8 +220,10 @@ code applicatif complexe (`LibelleConsigneController.GetLibelle`), hors périmè
 | ConsigneGPAO | règle | `true` pour toute ligne produite par `ConsignesMapper` — la valeur telle qu'injectée par le dispatch P60, potentiellement déjà ajustée par un opérateur pour une contrainte de production temporaire (confirmé par le donneur d'ordre, 2026-09-23, sprint-change-proposal-2026-09-23.md). `false` porte la valeur initiale prévue par l'OF, un processus antérieur au dispatch P60 et hors périmètre de ce mapper (pas un doublon "miroir" à dédupliquer, ni une ligne dont ce mapper vérifie l'existence — AD-2/AD-7) | - |
 | LibelleConsigne | à_clarifier | Calculé par `LibelleConsigneController.GetLibelle(...)` (OrdreDeFabricationManager.cs:1408,1412,1424,1428) ; fichier LibelleConsigneController.cs non fourni | - |
 | OF | sourcée | KAPE22.OF | - |
-| SizeCodeConsigne | règle | 12 pour la ligne de code complet et chaque sous-champ des 6 sections décodées, sauf le bloc XP1 sur 18 (`ConsignesDecoupeLingot`, type 24 et ses sous-champs 25-29) qui vaut 18 — paramètre `tailleconsigne` de `CompleteConsignes2` (OrdreDeFabricationManager.cs:1442-1682). SVT reste `à_clarifier` (CLR default 0), aucune règle de décomposition trouvée. Détail par section : Code Map de `spec-4-4-bis-decomposition-l-d-consignes-sous-champs-consignegpao.md` | - |
-| TypeConsigne | règle | Constante par sous-champ décodé, une par section et par offset `Substring` de son code consigne brut (Chutage `OrdreDeFabricationManager.cs:1520-1547`, Lingot `:1488-1514`, Pits `:1452-1482`, Decoupe `:1557-1599`, PoidsMetrique `:1612-1636`, Refroidissoir `:1642-1664`) ; `13` = code complet de chaque section (`24` pour le bloc Decoupe sur 18). SVT reste `à_clarifier` (CLR default 0), aucune règle de décomposition legacy trouvée. Détail par section : Code Map de `spec-4-4-bis-decomposition-l-d-consignes-sous-champs-consignegpao.md` | - |
+| SizeCodeConsigne | règle | 6 sections décodées uniquement : 12 pour la ligne de code complet et chaque sous-champ, sauf le bloc XP1 sur 18 (`LibelleConsigneDecoupe`, type 24 et ses sous-champs 25-29) qui vaut 18 — paramètre `tailleconsigne` de `CompleteConsignes2` (OrdreDeFabricationManager.cs:1442-1682). Détail : liste « Décodage par section » ci-dessus | - |
+| SizeCodeConsigne | à_clarifier | SVT uniquement : CLR default 0, aucune règle de décomposition legacy trouvée (OrdreDeFabricationManager.cs:1668-1669) | - |
+| TypeConsigne | règle | 6 sections décodées uniquement : Constante par sous-champ décodé, une par section et par offset `Substring` de son code consigne brut (Chutage `OrdreDeFabricationManager.cs:1520-1547`, Lingot `:1488-1514`, Pits `:1452-1482`, Decoupe `:1557-1599`, PoidsMetrique `:1612-1636`, Refroidissoir `:1642-1664`) ; `13` = code complet de chaque section (`24` pour le bloc Decoupe sur 18). Détail : liste « Décodage par section » ci-dessus | - |
+| TypeConsigne | à_clarifier | SVT uniquement : CLR default 0, aucune règle de décomposition legacy trouvée (OrdreDeFabricationManager.cs:1668-1669) | - |
 
 ---
 

@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 16:00
-last_updated: 09-22-2026
+last_updated: 09-23-2026
 project: TextToXml
 project_key: NOKEY
 tracking_system: file-system
@@ -81,7 +81,7 @@ development_status:
   4-9-hardening-epic-4: done
   4-10-hardening-epic-4-b: done
   4-11-hardening-epic-4-c: done
-  4-4-bis-decomposition-l-d-consignes-sous-champs-consignegpao: backlog
+  4-4-bis-decomposition-l-d-consignes-sous-champs-consignegpao: done
 action_items:
   - id: "story-4-6-decimal-scale-defect-story-4-3-bis"
     epic: 4
@@ -220,8 +220,12 @@ action_items:
       branchement garde-fou + traduction DbException->PersistenceError sur provider
       SQLite en Category=Unit"
     owner: "Lead Architecte"
-    status: open
-    ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-09-07.md"
+    status: done
+    ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-09-07.md -> reconduit
+      et clos par epic-3-retro-item-1 (service container Linux SQL Server dans ci.yml,
+      DONE 2026-09-14). Volet SQLite/Category=Unit rendu superflu par ce choix (CI
+      execute directement Category=Integration) - clos a la cloture du projet, aucun
+      Epic 5 planifie."
   - id: "epic-2-retro-item-10-reconciliation-des-ac-reportes-dans-epic"
     epic: 2
     action: "Reconciliation des AC reportes dans epics.md avant stories 3.2/3.3: lister
@@ -243,8 +247,11 @@ action_items:
       cf regression stories 2.5/2.6); corriger les 3 coquilles Description de Templates/P60.xml
       (Rmetteur->Emetteur, tolerence->tolerance)"
     owner: "SM"
-    status: open
-    ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-09-07.md"
+    status: done
+    ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-09-07.md -> reconduit
+      et clos par epic-3-retro-item-2 (DONE 2026-09-14): garde implementee comme etape
+      CI dans ci.yml plutot qu un hook local (cf Q-2 de la retro Epic 3 - un hook non
+      installe ne protege rien); les 3 coquilles de Templates/P60.xml corrigees."
   - id: "epic-2-retro-item-12-basculer-epic-2-de-in-progress-a-done-da"
     epic: 2
     action: "Basculer epic-2 de in-progress a done dans sprint-status.yaml (les 8
@@ -311,8 +318,12 @@ action_items:
       (SVN) des le premier commit d Epic 4 - la discipline n est apparue qu a la revue
       finale r533 sur l Epic 3 (r528-r532 sans message)"
     owner: "Dev"
-    status: open
-    ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-09-11.md"
+    status: done
+    ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-09-11.md -> sans objet
+      sur Epic 4: epic-4-retro-2026-09-17.md ligne 64 constate qu aucun commit SVN n a
+      eu lieu sur cet epic, donc la convention n a jamais ete exercee (ni respectee ni
+      violee). Clos a la cloture du projet: aucun Epic 5 planifie, plus aucun commit
+      SVN a venir sur ce perimetre."
   - id: "epic-3-retro-item-5-purger-entete-pied"
     epic: 3
     action: "Purger Entete/Pied de CoherenceChecker.cs (reserve CC-2 mineure reconduite
@@ -405,8 +416,10 @@ action_items:
       fire the rejection; a regression on the other 3 would surface only as a raw,
       undiagnosed SQL overflow, undetected by unattended CI."
     owner: "Dev"
-    status: open
-    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-21.md"
+    status: done
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-21.md -> story
+      4-11-hardening-epic-4-c (C-1): 3 branches (Chutage/Decoupe/Pits) ajoutees a
+      DecimalMagnitudeGuardTests, DONE 2026-09-22."
   - id: "epic-4-retro3-item-c2-consignes-collision-case-sensitivity"
     epic: 4
     action: "Match the A-5 Consignes-collision GroupBy (Kape22Persister.cs:126) to
@@ -416,8 +429,10 @@ action_items:
       as a raw PK-violation instead of a diagnosed REJETE message. Not independently
       confirmed against the live database (none reachable this session)."
     owner: "Dev"
-    status: open
-    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-21.md"
+    status: done
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-21.md -> story
+      4-11-hardening-epic-4-c (C-2): GroupBy A-5 rendu insensible a la casse sur
+      CodeOperation via un IEqualityComparer dedie, DONE 2026-09-22."
   - id: "epic-4-retro3-item-c3-mapper-file-list-consistency"
     epic: 4
     action: "Derive the mapper-file lists behind B-1/B-2/B-5 generically instead of
@@ -426,8 +441,10 @@ action_items:
       own key set) - a future 6th mapper's DecimalScale.Apply call site could silently
       escape one or more of them."
     owner: "Dev"
-    status: open
-    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-21.md"
+    status: done
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-21.md -> story
+      4-11-hardening-epic-4-c (C-3): source partagee mapper-fichier/table (DownstreamDecimalMapperTables)
+      remplace les 3 listes hardcodees, DONE 2026-09-22."
   - id: "epic-4-retro3-item-c4-string-length-overflow-guard"
     epic: 4
     action: "Add a pre-persist string-length overflow guard mirroring B-5's magnitude
@@ -437,8 +454,11 @@ action_items:
       treatment B-5 gives an oversized decimal. Needs an Ask-First design choice on
       where the check lives, same shape as B-5's own."
     owner: "Dev / Lead Architecte"
-    status: open
-    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-21.md"
+    status: done
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-21.md -> story
+      4-11-hardening-epic-4-c (C-4): garde FindLengthOverflow pre-SaveChanges ajoutee
+      dans Kape22Persister, reutilise DownstreamColumnLengths.MaxLengths tel quel,
+      DONE 2026-09-22."
   - id: "epic-4-retro3-item-c5-rejection-atomicity-coverage-breadth"
     epic: 4
     action: "Extend RejectionAtomicityIntegrationTests to the remaining rejection
@@ -447,8 +467,16 @@ action_items:
       B-5 (magnitude overflow). Only 3 of ~7 distinct rejection causes are covered
       at this tier today."
     owner: "Dev"
-    status: open
-    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-21.md"
+    status: done
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-21.md -> story
+      4-11-hardening-epic-4-c (C-5): 3 des 4 causes couvertes (AC-FR20-3, AC-FR20-4,
+      A-5) ; la 4e (B-5, depassement de magnitude) n est pas reproductible via une
+      fixture reelle a largeur fixe (les 21 champs KAPE22 sources sont par construction
+      trop etroits pour depasser la borne de leur colonne cible) - reduction de
+      perimetre approuvee par l utilisateur en cours d implementation, documentee
+      dans deferred-work.md § 'Deferred from: implementation of story-4.11'. B-5
+      reste prouve au niveau Unit (DecimalMagnitudeGuardTests, depuis Story 4.10).
+      DONE 2026-09-22."
   - id: "epic-4-retro3-item-c6-accumulate-a5-b5-checks"
     epic: 4
     action: "Accumulate, rather than early-return, the A-5 (Consignes-collision) and
@@ -456,8 +484,11 @@ action_items:
       the already-accepted missing-Coulee/A-5 non-accumulation note (Story 4.9 review)
       to the newer A-5/B-5 pair, which postdates that note and is not covered by it."
     owner: "Dev"
-    status: open
-    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-21.md"
+    status: done
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-21.md -> story
+      4-11-hardening-epic-4-c (C-6): A-5 + B-5 (et C-4) accumules en un seul message
+      REJETE au lieu de retours anticipes sequentiels ; le controle Coulee manquante
+      reste inchange en amont. DONE 2026-09-22."
   - id: "epic-4-retro3-item-c7-pits-invariant-visibility"
     epic: 4
     action: "Make SectionChargePits' AC-FR20-4 non-null guarantee visible at its Kape22Persister.AddIfPresent
@@ -465,8 +496,10 @@ action_items:
       genuinely-optional SectionCharge* tables even though its absence is already
       structurally impossible two stories earlier."
     owner: "Dev"
-    status: open
-    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-21.md"
+    status: done
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-21.md -> story
+      4-11-hardening-epic-4-c (C-7): commentaire ajoute au site AddIfPresent de Pits,
+      DONE 2026-09-22."
   - id: "epic-4-retro3-item-c8-stale-nfr-comment"
     epic: 4
     action: "Update EndToEndPerformanceTests.cs's stale line-105 comment, which still
@@ -474,8 +507,10 @@ action_items:
       are confirmed still passing this session against the current, much heavier Epic
       4 pipeline, so this is documentation-only."
     owner: "Dev"
-    status: open
-    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-21.md"
+    status: done
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-21.md -> story
+      4-11-hardening-epic-4-c (C-8): commentaire EndToEndPerformanceTests.cs mis a
+      jour pour decrire le pipeline reel, DONE 2026-09-22."
   - id: "epic-4-retro3-item-c9-hot-coulee-reuse-test"
     epic: 4
     action: "Add a hot-Coulee, sequential-cross-Persist-call test (two different OFs
@@ -485,13 +520,17 @@ action_items:
       'insert once, reuse for the second Fichier' flow that motivated the couleeAlreadyExists
       design is never exercised end-to-end."
     owner: "Dev"
-    status: open
-    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-21.md"
+    status: done
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-21.md -> story
+      4-11-hardening-epic-4-c (C-9): nouveau test avec deux appels Persist sequentiels
+      reels (DbContext distincts) partageant une Coulee, DONE 2026-09-22."
   - id: "epic-4-retro3-item-c10-architecture-spine-9-vs-10-wording"
     epic: 4
     action: "Fix ARCHITECTURE-SPINE.md:124's stale '9 entites avales' wording (should
       be 10) - unreconciled since the Story 4.2 code review (2026-09-15); the code
       has always correctly modeled 10 downstream entities."
     owner: "Dev / PM"
-    status: open
-    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-21.md"
+    status: done
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-21.md -> story
+      4-11-hardening-epic-4-c (C-10): ARCHITECTURE-SPINE.md:123 corrige '9' -> '10'
+      entites avales, DONE 2026-09-22."

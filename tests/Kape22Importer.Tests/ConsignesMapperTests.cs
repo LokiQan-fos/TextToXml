@@ -26,17 +26,16 @@ public class ConsignesMapperTests
     {
         L_D_KAPE22 source = ReferenceKape22();
         L_D_SECTIONCHARGE_CHUTAGE chutage = SectionChargeChutageMapper.Map(source)!;
-        string raw = source.CodeConsigneChutage!;
-        string padded = Pad12(raw);
+        Assert.Equal("00 0 0 00 M", source.CodeConsigneChutage);
 
         List<L_D_CONSIGNES> rows = RowsFor(MapAll(source), chutage.CodeOperation);
 
-        AssertRow(rows, 13, raw, 12);
-        AssertRow(rows, 0, padded.Substring(0, 2), 12);
-        AssertRow(rows, 1, padded.Substring(3, 1), 12);
-        AssertRow(rows, 2, padded.Substring(5, 1).Trim(), 12);
-        AssertRow(rows, 3, padded.Substring(7, 2).Trim(), 12);
-        AssertRow(rows, 4, padded.Substring(10, 1).Trim(), 12);
+        AssertRow(rows, 13, "00 0 0 00 M", 12);
+        AssertRow(rows, 0, "00", 12);
+        AssertRow(rows, 1, "0", 12);
+        AssertRow(rows, 2, "0", 12);
+        AssertRow(rows, 3, "00", 12);
+        AssertRow(rows, 4, "M", 12);
         Assert.Equal(6, rows.Count);
     }
 
@@ -55,16 +54,15 @@ public class ConsignesMapperTests
         Assert.True(result.Success);
         L_D_KAPE22 source = result.Value!;
         L_D_SECTIONCHARGE_CHUTAGE chutage = SectionChargeChutageMapper.Map(source)!;
-        string padded = Pad12(rawCode);
 
         List<L_D_CONSIGNES> rows = RowsFor(MapAll(source), chutage.CodeOperation);
 
         AssertRow(rows, 13, rawCode, 12);
-        AssertRow(rows, 0, padded.Substring(0, 2), 12);
-        AssertRow(rows, 1, padded.Substring(3, 1), 12);
-        AssertRow(rows, 2, padded.Substring(5, 1).Trim(), 12);
-        AssertRow(rows, 3, padded.Substring(7, 2).Trim(), 12);
-        AssertRow(rows, 4, padded.Substring(10, 1).Trim(), 12);
+        AssertRow(rows, 0, "XY", 12);
+        AssertRow(rows, 1, " ", 12);
+        AssertRow(rows, 2, "", 12);
+        AssertRow(rows, 3, "", 12);
+        AssertRow(rows, 4, "", 12);
         Assert.Equal(6, rows.Count);
     }
 
@@ -75,16 +73,15 @@ public class ConsignesMapperTests
     {
         L_D_KAPE22 source = ReferenceKape22();
         L_D_SECTIONCHARGE_LINGOT lingot = SectionChargeLingotMapper.Map(source)!;
-        string raw = source.CodeConsigneLingot!;
-        string padded = Pad12(raw);
+        Assert.Equal("107 0 394 C2", source.CodeConsigneLingot);
 
         List<L_D_CONSIGNES> rows = RowsFor(MapAll(source), lingot.CodeOperation);
 
-        AssertRow(rows, 13, raw, 12);
-        AssertRow(rows, 15, padded.Substring(0, 3), 12);
-        AssertRow(rows, 7, padded.Substring(4, 1), 12);
-        AssertRow(rows, 8, padded.Substring(6, 3), 12);
-        AssertRow(rows, 9, padded.Substring(10, 2), 12);
+        AssertRow(rows, 13, "107 0 394 C2", 12);
+        AssertRow(rows, 15, "107", 12);
+        AssertRow(rows, 7, "0", 12);
+        AssertRow(rows, 8, "394", 12);
+        AssertRow(rows, 9, "C2", 12);
         Assert.Equal(5, rows.Count);
     }
 
@@ -97,17 +94,16 @@ public class ConsignesMapperTests
     {
         L_D_KAPE22 source = ReferenceKape22();
         L_D_SECTIONCHARGE_PITS pits = SectionChargePitsMapper.Map(source)!;
-        string raw = source.CodeConsignePits!;
-        string padded = Pad12(raw);
+        Assert.Equal("1 205 00 999", source.CodeConsignePits);
 
         List<L_D_CONSIGNES> rows = RowsFor(MapAll(source), pits.CodeOperation);
 
-        AssertRow(rows, 13, raw, 12);
-        AssertRow(rows, 12, padded.Substring(0, 1), 12);
-        AssertRow(rows, 10, padded.Substring(2, 3), 12);
-        AssertRow(rows, 11, padded.Substring(2, 3), 12);
-        AssertRow(rows, 5, padded.Substring(6, 2).Trim(), 12);
-        AssertRow(rows, 6, padded.Substring(9, 3).Trim(), 12);
+        AssertRow(rows, 13, "1 205 00 999", 12);
+        AssertRow(rows, 12, "1", 12);
+        AssertRow(rows, 10, "205", 12);
+        AssertRow(rows, 11, "205", 12);
+        AssertRow(rows, 5, "00", 12);
+        AssertRow(rows, 6, "999", 12);
         Assert.Equal(rows.Single(r => r.TypeConsigne == 10).CodeConsigne, rows.Single(r => r.TypeConsigne == 11).CodeConsigne);
         Assert.Equal(6, rows.Count);
     }
@@ -119,20 +115,19 @@ public class ConsignesMapperTests
     {
         L_D_KAPE22 source = ReferenceKape22();
         L_D_SECTIONCHARGE_REFROIDISSOIRS refroidissoirs = SectionChargeRefroidissoirsMapper.Map(source)!;
-        string raw = source.CodeConsigneRefroidissoir!;
-        string padded = Pad12(raw);
+        Assert.Equal("00 1", source.CodeConsigneRefroidissoir);
 
         List<L_D_CONSIGNES> rows = RowsFor(MapAll(source), refroidissoirs.CodeOperation);
 
-        AssertRow(rows, 13, raw, 12);
-        AssertRow(rows, 21, padded.Substring(0, 2).Trim(), 12);
-        AssertRow(rows, 22, padded.Substring(3, 1).Trim(), 12);
-        AssertRow(rows, 23, padded.Substring(5, 3).Trim(), 12);
+        AssertRow(rows, 13, "00 1", 12);
+        AssertRow(rows, 21, "00", 12);
+        AssertRow(rows, 22, "1", 12);
+        AssertRow(rows, 23, "", 12);
         Assert.Equal(4, rows.Count);
     }
 
-    // XP9 (OrdreDeFabricationManager.cs:1612-1636): not applicable in the untouched reference Fichier
-    // (its own mapper already returns null), same per-OF applicability rule as every other section.
+    // The reference Fichier's PoidsMetrique section is not applicable (annex per-OF rule): its own
+    // mapper already returns null, so ConsignesMapper produces no row for it either.
     [Fact]
     [Trait("AC", "FR19-3")]
     public void Map_PoidsMetriqueSectionNotApplicable_ProducesNoConsigne_AcFr19_3()
@@ -194,9 +189,8 @@ public class ConsignesMapperTests
         Assert.DoesNotContain(consignes, c => c.CodeOperation == poidsMetrique.CodeOperation);
     }
 
-    // SVT: legacy has no decode rule (OrdreDeFabricationManager.cs:1668-1669, a dead, commented-out
-    // read) - unchanged single row (TypeConsigne/SizeCodeConsigne stay at their CLR default), not
-    // applicable in the untouched reference Fichier.
+    // The reference Fichier's SVT section is not applicable (annex per-OF rule): its own mapper already
+    // returns null, so ConsignesMapper produces no row for it either.
     [Fact]
     [Trait("AC", "FR19-3")]
     public void Map_SvtSectionNotApplicable_ProducesNoConsigne_AcFr19_3()
@@ -235,107 +229,95 @@ public class ConsignesMapperTests
         Assert.Null(consigne.LibelleConsigne);
     }
 
-    // XP1 (OrdreDeFabricationManager.cs:1557-1573), size-12 block only: the reference Fichier's real raw
-    // Decoupe code is naturally short (11 characters) - too short for the size-18 block's own offsets, so
-    // only the size-12 rows (13/16/17) are produced (Boundaries & Constraints, I/O matrix).
+    // XP1 (OrdreDeFabricationManager.cs:1557-1599), both blocks, on the reference Fichier's real data: the
+    // size-12 block decodes CodeConsigneDecoupe, the size-18 block decodes LibelleConsigneDecoupe
+    // (Position 287, Size 18) - the second Decoupe consigne legacy turns into TypeConsigne 24/size 18 when
+    // it loads a KAPE22 (OrdreFabrication.cs:627-634). Expected values are literals read from the fixture.
+    [Fact]
+    [Trait("AC", "FR19-3")]
+    public void Map_DecoupeSection_ReferenceFichier_ProducesSizeTwelveAndSizeEighteenRows_AcFr19_3()
+    {
+        L_D_KAPE22 source = ReferenceKape22();
+        L_D_SECTIONCHARGE_DECOUPE decoupe = SectionChargeDecoupeMapper.Map(source)!;
+        Assert.Equal("11400 11400", source.CodeConsigneDecoupe);
+        Assert.Equal(".11400 BC SANM", source.LibelleConsigneDecoupe);
+
+        List<L_D_CONSIGNES> rows = RowsFor(MapAll(source), decoupe.CodeOperation);
+
+        AssertRow(rows, 13, "11400 11400", 12);
+        AssertRow(rows, 16, "11400", 12);
+        AssertRow(rows, 17, "11400", 12);
+        AssertRow(rows, 24, ".11400 BC SANM", 18);
+        AssertRow(rows, 25, ".", 18);
+        AssertRow(rows, 26, "11400", 18);
+        AssertRow(rows, 27, "BC", 18);
+        AssertRow(rows, 28, "SAN", 18);
+        AssertRow(rows, 29, "A", 18);
+        Assert.Equal(9, rows.Count);
+    }
+
+    // XP1, size-12 code only: a blank LibelleConsigneDecoupe produces no TypeConsigne 24/25-29 rows (legacy
+    // gates the size-18 block on its own code being non-empty, OrdreDeFabricationManager.cs:1577).
     [Fact]
     [Trait("AC", "FR19-3")]
     public void Map_DecoupeSection_SizeTwelveCodeOnly_ProducesOnlySizeTwelveRows_AcFr19_3()
     {
-        L_D_KAPE22 source = ReferenceKape22();
-        L_D_SECTIONCHARGE_DECOUPE decoupe = SectionChargeDecoupeMapper.Map(source)!;
-        string raw = source.CodeConsigneDecoupe!;
-        string padded = Pad12(raw);
-
-        List<L_D_CONSIGNES> rows = RowsFor(MapAll(source), decoupe.CodeOperation);
-
-        AssertRow(rows, 13, raw, 12);
-        AssertRow(rows, 16, padded.Substring(0, 5).Trim(), 12);
-        AssertRow(rows, 17, padded.Substring(6, 5).Trim(), 12);
-        Assert.Equal(3, rows.Count);
-        Assert.DoesNotContain(rows, r => r.TypeConsigne is 24 or 25 or 26 or 27 or 28 or 29);
-    }
-
-    // XP1 (OrdreDeFabricationManager.cs:1557-1599), both blocks present: a raw code long enough to also
-    // carry the size-18 block's own offsets (Boundaries & Constraints: emitted "independently of the
-    // size-12 block"). Real P60 data never reaches this length (deferred-work.md, story-4.4-bis); driven
-    // directly through a mutated Fichier here since ConsignesMapper is a pure function of L_D_KAPE22.
-    [Fact]
-    [Trait("AC", "FR19-3")]
-    public void Map_DecoupeSection_BothCodesPresent_ProducesSizeTwelveAndSizeEighteenRows_AcFr19_3()
-    {
-        const string rawCode = "ABCDEFGHIJKLMNOPQR";
         MapResult<L_D_KAPE22> result = MapMutatedFichier(document =>
-            SetChamp(document, "message", "CodeConsigneDecoupe", rawCode));
+            SetChamp(document, "message", "LibelleConsigneDecoupe", string.Empty));
         Assert.True(result.Success);
         L_D_KAPE22 source = result.Value!;
         L_D_SECTIONCHARGE_DECOUPE decoupe = SectionChargeDecoupeMapper.Map(source)!;
 
         List<L_D_CONSIGNES> rows = RowsFor(MapAll(source), decoupe.CodeOperation);
 
-        AssertRow(rows, 13, rawCode, 12);
-        AssertRow(rows, 16, "ABCDE", 12);
-        AssertRow(rows, 17, "GHIJK", 12);
+        AssertRow(rows, 13, "11400 11400", 12);
+        AssertRow(rows, 16, "11400", 12);
+        AssertRow(rows, 17, "11400", 12);
+        Assert.Equal(3, rows.Count);
+        Assert.DoesNotContain(rows, r => r.TypeConsigne is 24 or 25 or 26 or 27 or 28 or 29);
+    }
+
+    // XP1, size-18 code only: the size-18 block fires independently of the size-12 block (Boundaries &
+    // Constraints), so a blank CodeConsigneDecoupe still yields rows 24/25-29 and no row 13/16/17.
+    [Fact]
+    [Trait("AC", "FR19-3")]
+    public void Map_DecoupeSection_SizeEighteenCodeOnly_ProducesOnlySizeEighteenRows_AcFr19_3()
+    {
+        MapResult<L_D_KAPE22> result = MapMutatedFichier(document =>
+            SetChamp(document, "message", "CodeConsigneDecoupe", string.Empty));
+        Assert.True(result.Success);
+        L_D_KAPE22 source = result.Value!;
+        L_D_SECTIONCHARGE_DECOUPE decoupe = SectionChargeDecoupeMapper.Map(source)!;
+
+        List<L_D_CONSIGNES> rows = RowsFor(MapAll(source), decoupe.CodeOperation);
+
+        AssertRow(rows, 24, ".11400 BC SANM", 18);
+        AssertRow(rows, 29, "A", 18);
+        Assert.Equal(6, rows.Count);
+        Assert.DoesNotContain(rows, r => r.TypeConsigne is 13 or 16 or 17);
+    }
+
+    // XP1, full-width size-18 code: every size-18 offset reads its own character range, 28 and 29
+    // overlapping on index 11 exactly as legacy does (OrdreDeFabricationManager.cs:1592,1596).
+    [Fact]
+    [Trait("AC", "FR19-3")]
+    public void Map_DecoupeSection_FullWidthSizeEighteenCode_DecodesEveryOffset_AcFr19_3()
+    {
+        const string rawCode = "ABCDEFGHIJKLMNOPQR";
+        MapResult<L_D_KAPE22> result = MapMutatedFichier(document =>
+            SetChamp(document, "message", "LibelleConsigneDecoupe", rawCode));
+        Assert.True(result.Success);
+        L_D_KAPE22 source = result.Value!;
+        L_D_SECTIONCHARGE_DECOUPE decoupe = SectionChargeDecoupeMapper.Map(source)!;
+
+        List<L_D_CONSIGNES> rows = RowsFor(MapAll(source), decoupe.CodeOperation);
+
         AssertRow(rows, 24, rawCode, 18);
         AssertRow(rows, 25, "A", 18);
         AssertRow(rows, 26, "BCDEF", 18);
         AssertRow(rows, 27, "HI", 18);
         AssertRow(rows, 28, "JKLM", 18);
         AssertRow(rows, 29, "L", 18);
-        Assert.Equal(9, rows.Count);
-    }
-
-    // Boundary (code-review patch): a raw Decoupe code of exactly 12 characters - one short of
-    // AddDecoupe's own gate ("if (rawCode.Length < 13) return;") - must still produce only the size-12
-    // rows. Existing tests only cover 11 characters (the reference fixture's natural length) and 18,
-    // never this exact threshold.
-    [Fact]
-    [Trait("AC", "FR19-3")]
-    public void Map_DecoupeSection_RawCodeExactlyTwelveCharacters_ProducesOnlySizeTwelveRows_AcFr19_3()
-    {
-        const string rawCode = "ABCDEFGHIJKL";
-        MapResult<L_D_KAPE22> result = MapMutatedFichier(document =>
-            SetChamp(document, "message", "CodeConsigneDecoupe", rawCode));
-        Assert.True(result.Success);
-        L_D_KAPE22 source = result.Value!;
-        L_D_SECTIONCHARGE_DECOUPE decoupe = SectionChargeDecoupeMapper.Map(source)!;
-        string padded = Pad12(rawCode);
-
-        List<L_D_CONSIGNES> rows = RowsFor(MapAll(source), decoupe.CodeOperation);
-
-        AssertRow(rows, 13, rawCode, 12);
-        AssertRow(rows, 16, padded.Substring(0, 5).Trim(), 12);
-        AssertRow(rows, 17, padded.Substring(6, 5).Trim(), 12);
-        Assert.Equal(3, rows.Count);
-        Assert.DoesNotContain(rows, r => r.TypeConsigne is 24 or 25 or 26 or 27 or 28 or 29);
-    }
-
-    // Boundary (code-review patch): a raw Decoupe code of exactly 13 characters - one character past
-    // AddDecoupe's own gate - must also produce the size-18 rows, unlike the 12-character case above.
-    [Fact]
-    [Trait("AC", "FR19-3")]
-    public void Map_DecoupeSection_RawCodeExactlyThirteenCharacters_ProducesSizeTwelveAndSizeEighteenRows_AcFr19_3()
-    {
-        const string rawCode = "ABCDEFGHIJKLM";
-        MapResult<L_D_KAPE22> result = MapMutatedFichier(document =>
-            SetChamp(document, "message", "CodeConsigneDecoupe", rawCode));
-        Assert.True(result.Success);
-        L_D_KAPE22 source = result.Value!;
-        L_D_SECTIONCHARGE_DECOUPE decoupe = SectionChargeDecoupeMapper.Map(source)!;
-        string padded12 = Pad12(rawCode);
-        string padded18 = rawCode.PadRight(18);
-
-        List<L_D_CONSIGNES> rows = RowsFor(MapAll(source), decoupe.CodeOperation);
-
-        AssertRow(rows, 13, rawCode, 12);
-        AssertRow(rows, 16, padded12.Substring(0, 5).Trim(), 12);
-        AssertRow(rows, 17, padded12.Substring(6, 5).Trim(), 12);
-        AssertRow(rows, 24, rawCode, 18);
-        AssertRow(rows, 25, padded18.Substring(0, 1).Trim(), 18);
-        AssertRow(rows, 26, padded18.Substring(1, 5).Trim(), 18);
-        AssertRow(rows, 27, padded18.Substring(7, 2).Trim(), 18);
-        AssertRow(rows, 28, padded18.Substring(9, 4).Trim(), 18);
-        AssertRow(rows, 29, padded18.Substring(11, 1).Trim(), 18);
         Assert.Equal(9, rows.Count);
     }
 
@@ -371,9 +353,9 @@ public class ConsignesMapperTests
         AssertTypeConsigneSet(consignes, SectionChargeLingotMapper.Map(source)!.CodeOperation, 13, 15, 7, 8, 9);
         AssertTypeConsigneSet(consignes, SectionChargePitsMapper.Map(source)!.CodeOperation, 13, 12, 10, 11, 5, 6);
         AssertTypeConsigneSet(consignes, SectionChargeRefroidissoirsMapper.Map(source)!.CodeOperation, 13, 21, 22, 23);
-        AssertTypeConsigneSet(consignes, SectionChargeDecoupeMapper.Map(source)!.CodeOperation, 13, 16, 17);
+        AssertTypeConsigneSet(consignes, SectionChargeDecoupeMapper.Map(source)!.CodeOperation, 13, 16, 17, 24, 25, 26, 27, 28, 29);
         AssertTypeConsigneSet(consignes, SectionChargePoidsMetriqueMapper.Map(source)!.CodeOperation, 13, 18, 19, 20);
-        Assert.Equal(6 + 5 + 6 + 4 + 3 + 4, consignes.Count);
+        Assert.Equal(6 + 5 + 6 + 4 + 9 + 4, consignes.Count);
     }
 
     // AC-FR19-1: ConsignesMapper is a pure function - no reflection, no database access.
@@ -389,8 +371,8 @@ public class ConsignesMapperTests
         Assert.DoesNotContain("DbContext", source, StringComparison.Ordinal);
     }
 
-    // AC-FR19-4: the mapper documents the one column it still leaves à_clarifier (the Decoupe size-18
-    // block's missing independent source) with the same "assumed, unverified" marker citing
+    // AC-FR19-4: the mapper documents the columns it still leaves à_clarifier (LibelleConsigne on every
+    // row, TypeConsigne/SizeCodeConsigne on the SVT row) with the same "assumed, unverified" marker citing
     // deferred-work.md, instead of leaving the gap silent.
     [Fact]
     [Trait("AC", "FR19-4")]
@@ -404,7 +386,8 @@ public class ConsignesMapperTests
 
     // AC-FR19-4 (reworded from Story 4.4): every row this mapper produces carries ConsigneGPAO=true and
     // leaves LibelleConsigne untouched (null); SizeCodeConsigne is no longer left at its CLR default for
-    // any row this reference Fichier's applicable sections produce (none of them is SVT).
+    // any row this reference Fichier's applicable sections produce (none of them is SVT) - 18 for the
+    // Decoupe size-18 block (TypeConsigne 24-29), 12 for every other row.
     [Fact]
     [Trait("AC", "FR19-4")]
     public void Map_EveryProducedConsigne_HasConsigneGpaoTrueAndSizeCodeConsigneSet_AcFr19_4()
@@ -416,7 +399,7 @@ public class ConsignesMapperTests
         {
             Assert.True(consigne.ConsigneGPAO);
             Assert.Null(consigne.LibelleConsigne);
-            Assert.Equal(12, consigne.SizeCodeConsigne);
+            Assert.Equal(consigne.TypeConsigne >= 24 ? 18 : 12, consigne.SizeCodeConsigne);
         });
     }
 
@@ -450,11 +433,6 @@ public class ConsignesMapperTests
         int[] actual = [.. RowsFor(consignes, codeOperation).Select(r => r.TypeConsigne).OrderBy(t => t)];
         Assert.Equal(expectedTypes.OrderBy(t => t), actual);
     }
-
-    // Right-pads to the wire format's declared Champ width (12), mirroring ConsignesMapper.PadForSlicing -
-    // a no-op once the XML-normalized value already reaches it, only ever compensating for the trailing
-    // space padding the XML layer already trimmed away.
-    private static string Pad12(string raw) => raw.Length >= 12 ? raw : raw.PadRight(12);
 
     private static string MapperSourceText(string fileName) =>
         System.IO.File.ReadAllText(RepoLayout.ProjectFile($"src/Kape22Importer/{fileName}"));

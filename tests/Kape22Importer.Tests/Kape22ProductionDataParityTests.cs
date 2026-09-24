@@ -26,7 +26,7 @@ namespace Kape22Importer.Tests;
 // db_datareader-only login. All writes go to the test database and roll back.
 //
 // Row matching: OF + NumeroFichier (the D22 identity of a Fichier), trailing-space-insensitive; each of
-// the 100 sample Fichiers maps to exactly one production row. Columns Id, DateReception and
+// the sample Fichiers maps to exactly one production row. Columns Id, DateReception and
 // DateEnfournementFour1/2 are excluded (identity, worker timestamp, always-NULL D14 slices).
 //
 // KnownLegacyDivergences catalogues the columns where a CORRECT new insert legitimately differs from
@@ -238,15 +238,25 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
             $"{fichierName}: aucune ligne L_D_ORDRE_FABRICATION en production pour OF '{of}' " +
             $"(paddé '{PadOf(of)}').");
 
+        // The P60 is a forecast: an operator may edit some of these values afterwards through the legacy
+        // CommandeENC screen, which logs every edit to L_D_LOG_COMMANDE (see OperatorAdjustedColumns).
+        List<string> operatorChanges = ReadProductionRows<L_D_LOG_COMMANDE>(rows => rows
+            .Where(row => row.OF == PadOf(of) && row.Commande == "MCC" && row.Message.StartsWith("Changement de Consigne "))
+            .OrderBy(row => row.Date)
+            .ThenBy(row => row.Id)
+            .ToList())
+            .Select(row => row.Message)
+            .ToList();
+
         List<string> regressions = [];
         L_D_ORDRE_FABRICATION testOrdre = RoundTrip(
             OrdreFabricationMapper.Map(mapped, StableClock()), rows => rows.Single(row => row.OF == PadOf(of)));
-        regressions.AddRange(ScaledRegressions(testOrdre, productionOrdre!));
+        regressions.AddRange(ScaledRegressions(testOrdre, productionOrdre!, operatorChanges));
 
-        CompareSectionCharge(regressions, fichierName, of, SectionChargeChutageMapper.Map(mapped));
-        CompareSectionCharge(regressions, fichierName, of, SectionChargeDecoupeMapper.Map(mapped));
-        CompareSectionCharge(regressions, fichierName, of, SectionChargeLingotMapper.Map(mapped));
-        CompareSectionCharge(regressions, fichierName, of, SectionChargePitsMapper.Map(mapped));
+        CompareSectionCharge(regressions, fichierName, of, SectionChargeChutageMapper.Map(mapped), operatorChanges);
+        CompareSectionCharge(regressions, fichierName, of, SectionChargeDecoupeMapper.Map(mapped), operatorChanges);
+        CompareSectionCharge(regressions, fichierName, of, SectionChargeLingotMapper.Map(mapped), operatorChanges);
+        CompareSectionCharge(regressions, fichierName, of, SectionChargePitsMapper.Map(mapped), operatorChanges);
 
         Assert.True(
             regressions.Count == 0,
@@ -303,7 +313,24 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
 
         List<L_D_CONSIGNES> testRows = RoundTripConsignes(consignes);
 
+        // A read-back missing rows would otherwise make the loop below compare nothing and pass vacuously.
+        Assert.Equal(consignes.Count, testRows.Count);
+
         List<string> regressions = [];
+
+        // Reverse direction (code-review patch): every production ConsigneGPAO=1 row of a CodeOperation this
+        // mapper produced must have its own mapped counterpart - under-production (5 rows produced vs 60 in
+        // production, the defect this story fixes) is otherwise invisible to the per-mapped-row loop below.
+        HashSet<string> mappedCodeOperations = [.. testRows.Select(row => row.CodeOperation.Trim())];
+        foreach (L_D_CONSIGNES production in productionRows.Where(p => mappedCodeOperations.Contains(p.CodeOperation.Trim())))
+        {
+            if (!testRows.Any(row => row.CodeOperation.Trim() == production.CodeOperation.Trim() && row.TypeConsigne == production.TypeConsigne))
+            {
+                regressions.Add(
+                    $"  CodeOperation={production.CodeOperation}, TypeConsigne={production.TypeConsigne}: ligne de production non produite par le nouveau traitement.");
+            }
+        }
+
         foreach (L_D_CONSIGNES row in testRows)
         {
             // FirstOrDefault, not SingleOrDefault: a data-quality surprise in production (more than one
@@ -371,7 +398,7 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
     // one production row across re-dispatches, so a silent FirstOrDefault could compare against the
     // wrong one; ambiguity fails loudly instead, the same policy ReadProductionRows already applies to
     // L_D_KAPE22 above.
-    private void CompareSectionCharge<TEntity>(List<string> regressions, string fichierName, string of, TEntity? mapped)
+    private void CompareSectionCharge<TEntity>(List<string> regressions, string fichierName, string of, TEntity? mapped, IReadOnlyList<string> operatorChanges)
         where TEntity : class
     {
         if (mapped is null)
@@ -393,7 +420,7 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
         // The mapper pads OF before this entity is even constructed (DownstreamOf.Pad), so the same
         // padded key finds it back after the round-trip through the test database.
         TEntity testRow = RoundTrip(mapped, rows => WithOf(rows, PadOf(of)).Single());
-        regressions.AddRange(ScaledRegressions(testRow, candidates[0]));
+        regressions.AddRange(ScaledRegressions(testRow, candidates[0], operatorChanges));
     }
 
     // Every L_D_SECTIONCHARGE_* entity this test round-trips shares a string OF column (half of its
@@ -418,9 +445,46 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
         nameof(L_D_SECTIONCHARGE_CHUTAGE.ChutagePied),
     };
 
+    // The P60 is a forecast (confirmed by the business owner, 2026-09-23): after reception, an operator may
+    // adjust some consignes to an unplanned production constraint through the legacy CommandeENC screen
+    // (Lsi.Net/Website/Commandes/CommandeENC.ascx.cs), which logs each edit to L_D_LOG_COMMANDE as
+    // "Changement de Consigne <label>: <old> --> <new>" (Commande "MCC", lines 1702-1717). The mapper must
+    // stay faithful to the P60, so a production value differing from it is accepted only when the latest
+    // logged edit of that label for this OF ended on exactly that production value. Labels come from the
+    // screen fields bound to these columns (CommandeENC.ascx.cs:655-701); every other scale-guarded column
+    // is not editable there and keeps the strict comparison.
+    private static readonly Dictionary<string, string> OperatorAdjustedColumns = new(StringComparer.Ordinal)
+    {
+        [nameof(L_D_SECTIONCHARGE_LINGOT.EpaisseurEnLaminage)] = "Epaisseur",
+        [nameof(L_D_SECTIONCHARGE_LINGOT.SectionLaminage)] = "Section",
+        [nameof(L_D_SECTIONCHARGE_LINGOT.ToleranceMaxEpaisseur)] = "Epaisseur Max",
+        [nameof(L_D_SECTIONCHARGE_LINGOT.ToleranceMaxSection)] = "Section Max",
+        [nameof(L_D_SECTIONCHARGE_LINGOT.ToleranceMinEpaisseur)] = "Epaisseur Min",
+        [nameof(L_D_SECTIONCHARGE_LINGOT.ToleranceMinSection)] = "Section Min",
+    };
+
+    // True when the latest logged CommandeENC edit of this column's label ends on the production value.
+    // The screen writes decimals with the French separator ("250,0 --> 245").
+    private static bool IsLoggedOperatorAdjustment(string column, object? productionValue, IReadOnlyList<string> operatorChanges)
+    {
+        if (!OperatorAdjustedColumns.TryGetValue(column, out string? label) || productionValue is not decimal production)
+        {
+            return false;
+        }
+
+        string prefix = $"Changement de Consigne {label}: ";
+        string? latest = operatorChanges.LastOrDefault(message => message.StartsWith(prefix, StringComparison.Ordinal));
+        int arrow = latest?.LastIndexOf(" --> ", StringComparison.Ordinal) ?? -1;
+
+        return arrow >= 0
+            && decimal.TryParse(latest![(arrow + 5)..].Trim(), NumberStyles.Number, CultureInfo.GetCultureInfo("fr-FR"), out decimal logged)
+            && logged == production;
+    }
+
     // Compares only the DownstreamColumnMagnitudes-registered (scale-guarded) decimal columns of two
-    // same-typed entities - the columns B-3 exists to check, never the full row.
-    private static IEnumerable<string> ScaledRegressions<TEntity>(TEntity testRow, TEntity productionRow)
+    // same-typed entities - the columns B-3 exists to check, never the full row - minus any difference a
+    // logged CommandeENC operator edit explains.
+    private static IEnumerable<string> ScaledRegressions<TEntity>(TEntity testRow, TEntity productionRow, IReadOnlyList<string> operatorChanges)
     {
         foreach (PropertyInfo property in typeof(TEntity).GetProperties())
         {
@@ -432,7 +496,7 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
 
             object? expected = property.GetValue(productionRow);
             object? actual = property.GetValue(testRow);
-            if (!Equals(expected, actual))
+            if (!Equals(expected, actual) && !IsLoggedOperatorAdjustment(property.Name, expected, operatorChanges))
             {
                 yield return $"{typeof(TEntity).Name}.{property.Name}: production={Format(expected)}, nouveau traitement={Format(actual)}";
             }

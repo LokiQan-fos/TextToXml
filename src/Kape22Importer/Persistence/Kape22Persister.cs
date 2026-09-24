@@ -122,15 +122,15 @@ public sealed class Kape22Persister(AscoLsiDbContext context, IConfiguration con
             // missing-Coulee check above - never widening the DbUpdateException/DbException catch filter
             // to cover it.
             // The full 4-part tuple mirrors L_D_CONSIGNES' real natural key. OF is bundle-constant today
-            // (every ConsignesMapper.Build call passes the same source.OF) and ConsigneGPAO is always
+            // (every ConsignesMapper.Row call passes the same source.OF) and ConsigneGPAO is always
             // true since Story 4.4-bis, but TypeConsigne now varies per row (0-29, one full-code row plus
             // one row per decoded sub-field per applicable section - see ConsignesMapper): every
             // decodable section's own TypeConsigne=13 full-code row still shares the same (OF,
             // CodeOperation, TypeConsigne, ConsigneGPAO) key whenever two sections share one
             // CodeOperation, so the collision this check exists for remains reachable through that row,
             // not through the whole tuple degenerating to CodeOperation alone. C-2 (Épic 4 retro #3):
-            // CodeOperation collides case-insensitively at
-            // the real SQL Server (case-insensitive collation) even though plain tuple equality would
+            // CodeOperation collides case-insensitively at the real SQL Server (case-insensitive
+            // collation) even though plain tuple equality would
             // treat "XC1" and "xc1" as distinct - ConsignesNaturalKeyComparer makes only CodeOperation
             // case-insensitive, OF/TypeConsigne/ConsigneGPAO stay ordinal, and the message below still
             // reads collidingGroup[0]'s own original-case CodeOperation, never a normalized form.

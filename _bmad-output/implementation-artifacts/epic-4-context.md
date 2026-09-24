@@ -71,13 +71,15 @@ and tagged its rows with the wrong `ConsigneGPAO` value.
 - The Consignes natural-key collision pre-check `(OF, CodeOperation,
   TypeConsigne, ConsigneGPAO)` must compare `CodeOperation` case-insensitively,
   matching the real primary key's SQL Server collation.
-- `L_D_CONSIGNES` decomposition (4.4-bis): each of the 7 sections decodes its
-  raw consigne code into several positional sub-fields (`Substring` offsets),
+- `L_D_CONSIGNES` decomposition (4.4-bis): each of the 6 decodable sections
+  (every section but SVT) decodes its raw consigne code into several positional sub-fields (`Substring` offsets),
   each a distinct `L_D_CONSIGNES` row with its own `TypeConsigne`, in addition
   to the already-produced "full code" row. Offsets must be read directly from
   the legacy source per section rather than reconstructed from memory (same
   no-guessing discipline as the mapping annex). `Decoupe` (XP1) has a second,
-  optional consigne code with its own sub-fields, present only if non-empty.
+  independent size-18 consigne code, `LibelleConsigneDecoupe` (Position 287),
+  with its own sub-fields, present only if non-empty (code review D-1,
+  2026-09-23).
   `SVT` may legitimately have no discoverable decomposition rule — document as
   `à_clarifier` rather than invent one; this does not block the story.
 - `ConsigneGPAO` semantics (confirmed by the business owner, not previously

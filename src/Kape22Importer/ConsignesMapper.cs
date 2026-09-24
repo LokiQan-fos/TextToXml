@@ -14,7 +14,8 @@ namespace Kape22Importer;
 // out-of-scope process owns (AD-2/AD-7 - no cross-mapper existence check for it). A section produces
 // rows iff its own mapper produced a row (the same per-OF applicability rule, AC-FR19-2) AND its own raw
 // consigne code is non-blank - a blank code decodes to nothing in legacy either (CompleteConsignes2's own
-// "if (!string.IsNullOrEmpty(_global))" guard around both the full code and every sub-field).
+// "if (!string.IsNullOrEmpty(_global))" guard around both the full code and every sub-field). That blank-code
+// rule covers the 6 decoded sections only: SVT keeps its unchanged single row whatever its code holds.
 public static class ConsignesMapper
 {
     public static List<L_D_CONSIGNES> Map(
@@ -43,7 +44,7 @@ public static class ConsignesMapper
 
         if (decoupe is not null)
         {
-            AddDecoupe(consignes, source.OF, decoupe.CodeOperation, source.CodeConsigneDecoupe);
+            AddDecoupe(consignes, source.OF, decoupe.CodeOperation, source.CodeConsigneDecoupe, source.LibelleConsigneDecoupe);
         }
 
         if (lingot is not null)
@@ -95,10 +96,10 @@ public static class ConsignesMapper
         if (svt is not null)
         {
             // SVT: legacy has no decode rule for this section (OrdreDeFabricationManager.cs:1668-1669, a
-            // dead, commented-out read) - unchanged single row (TypeConsigne/SizeCodeConsigne stay at
-            // their CLR default, à_clarifier per the Story 4.2 annex; collision risk tracked in
-            // deferred-work.md, "Deferred from: story-4.4-bis decomposition of L_D_CONSIGNES"), only
-            // ConsigneGPAO corrected to true.
+            // dead, commented-out read) - unchanged single row, only ConsigneGPAO corrected to true.
+            // TypeConsigne, SizeCodeConsigne: assumed, unverified - à_clarifier per the Story 4.2 annex, left
+            // at their CLR default (see deferred-work.md, "Deferred from: story-4.4-bis decomposition of
+            // L_D_CONSIGNES", for the collision risk this leaves open).
             consignes.Add(Row(source.OF, svt.CodeOperation, source.CodeConsigneSVT ?? string.Empty, typeConsigne: 0, sizeCodeConsigne: 0));
         }
 
@@ -133,35 +134,31 @@ public static class ConsignesMapper
     }
 
     // XP1 (OrdreDeFabricationManager.cs:1557-1599): two independent raw codes decode this section - the
-    // size-12 code (13, always) and a size-18 code (24, only if present). The P60 wire format
-    // (Templates/P60.xml) declares a single CodeConsigneDecoupe Champ, Size=12, contiguous with the next
-    // Champ (LongueurMoyenne) - this pipeline has no second Champ to source an independent size-18 code
-    // from (assumed, unverified; see deferred-work.md). Reusing the same field is the closest
-    // non-inventive reading of the legacy rule still true to "own raw code, independently of the size-12
-    // block": the size-18 sub-fields decode from the same raw string, gated on it actually carrying enough
-    // characters for every one of their offsets - a condition real P60 data (always exactly 12 characters
-    // after the wire format's own Size) never satisfies, so this block only exercises through a directly
-    // constructed L_D_KAPE22 today.
-    private static void AddDecoupe(List<L_D_CONSIGNES> consignes, string of, string codeOperation, string? rawCode)
+    // size-12 code (13/16/17, from CodeConsigneDecoupe) and the size-18 code (24/25-29, from
+    // LibelleConsigneDecoupe, Templates/P60.xml Position 287, Size 18). Despite its Champ name, that field
+    // is the second Decoupe consigne: legacy turns the second consigne it adds to this section while
+    // loading a KAPE22 into TypeConsigne 24/size 18 (OrdreFabrication.cs:627-634), and every real P60
+    // fixture carries a structured code there (e.g. ".05750 BC 2.7M" - optimised length, short bar, short
+    // bar length), never a free-text label like the other sections' Libelle Champs. Each block is gated
+    // on its own code being non-blank, independently of the other (legacy line 1577).
+    private static void AddDecoupe(List<L_D_CONSIGNES> consignes, string of, string codeOperation, string? sizeTwelveCode, string? sizeEighteenCode)
     {
-        if (string.IsNullOrEmpty(rawCode))
+        if (!string.IsNullOrEmpty(sizeTwelveCode))
+        {
+            consignes.Add(Row(of, codeOperation, sizeTwelveCode, typeConsigne: 13, sizeCodeConsigne: 12));
+
+            string padded12 = PadForSlicing(sizeTwelveCode, 12);
+            consignes.Add(Row(of, codeOperation, padded12.Substring(0, 5).Trim(), 16, 12));
+            consignes.Add(Row(of, codeOperation, padded12.Substring(6, 5).Trim(), 17, 12));
+        }
+
+        if (string.IsNullOrEmpty(sizeEighteenCode))
         {
             return;
         }
 
-        consignes.Add(Row(of, codeOperation, rawCode, typeConsigne: 13, sizeCodeConsigne: 12));
-
-        string padded12 = PadForSlicing(rawCode, 12);
-        consignes.Add(Row(of, codeOperation, padded12.Substring(0, 5).Trim(), 16, 12));
-        consignes.Add(Row(of, codeOperation, padded12.Substring(6, 5).Trim(), 17, 12));
-
-        if (rawCode.Length < 13)
-        {
-            return;
-        }
-
-        string padded18 = PadForSlicing(rawCode, 18);
-        consignes.Add(Row(of, codeOperation, rawCode, 24, 18));
+        string padded18 = PadForSlicing(sizeEighteenCode, 18);
+        consignes.Add(Row(of, codeOperation, sizeEighteenCode, 24, 18));
         consignes.Add(Row(of, codeOperation, padded18.Substring(0, 1).Trim(), 25, 18));
         consignes.Add(Row(of, codeOperation, padded18.Substring(1, 5).Trim(), 26, 18));
         consignes.Add(Row(of, codeOperation, padded18.Substring(7, 2).Trim(), 27, 18));
@@ -185,7 +182,7 @@ public static class ConsignesMapper
         SizeCodeConsigne = sizeCodeConsigne,
         TypeConsigne = typeConsigne,
 
-        // LibelleConsigne: out of scope (Story 4.2 annex, spec-4-4-bis Boundaries) - stays null (CLR
-        // default), untouched by this story.
+        // LibelleConsigne: assumed, unverified - à_clarifier per the Story 4.2 annex (see deferred-work.md),
+        // out of scope for spec-4-4-bis, stays null (CLR default).
     };
 }

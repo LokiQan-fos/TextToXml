@@ -2457,3 +2457,116 @@ documentation-only, sans test associé.
 
 Owner : Dev (C-4 : Dev / Lead Architecte pour le choix d'emplacement du
 garde-fou ; C-10 : Dev / PM).
+
+## Corrections post-rétrospective Épic 4 (tests de parité production, 2026-09-23)
+
+> Issue découverte hors cycle de rétrospective, par comparaison directe
+> base de test / production (`Sprint Change Proposal`
+> `_bmad-output/planning-artifacts/sprint-change-proposal-2026-09-23.md`,
+> approuvé) : `L_D_CONSIGNES` produit 5 lignes par le pipeline actuel contre 60
+> en production pour un même OF réel. Périmètre FR-19/`AC-FR19-3` inchangé —
+> correction de conformité à un AC déjà déclaré, pas de nouveau FR. Cause
+> racine entièrement décodée depuis `Desktop/kape22/OrdreDeFabricationManager.cs`
+> (décomposition en sous-champs par section, non implémentée) ; sémantique
+> `ConsigneGPAO` tranchée par le donneur d'ordre (2026-09-23) : `1` = valeur
+> injectée par le dispatch P60 (que ce mapper doit produire), `0` = valeur
+> initiale de l'OF, hors périmètre de ce mapper.
+
+### Story 4.4-bis : Décomposition `L_D_CONSIGNES` en sous-champs + sémantique `ConsigneGPAO`
+
+As a `Kape22Importer`,
+I want que `ConsignesMapper` produise, pour chaque section applicable, une
+ligne par sous-champ décodé du code consigne (en plus de la ligne "code
+complet" déjà produite), taguée `ConsigneGPAO=1` (valeur telle qu'injectée par
+le dispatch P60, confirmé par le donneur d'ordre) plutôt que `ConsigneGPAO=0`,
+So that `L_D_CONSIGNES` porte, pour chaque OF, les mêmes lignes `ConsigneGPAO=1`
+que la production legacy, plutôt qu'un sous-ensemble ne portant que le code
+consigne brut non décodé sous le mauvais tag `ConsigneGPAO`.
+
+**Prérequis :** aucun — indépendante des stories 4.2-bis/4.3-bis/4.9/4.10/4.11
+déjà livrées.
+
+**Acceptance Criteria:**
+
+**AC-1 (décomposition en sous-champs, par section) :**
+Given le code source legacy `Desktop/kape22/OrdreDeFabricationManager.cs`,
+  méthode `AddOrModifyConsigne` (lignes ~1362-1435) et les blocs de décodage
+  par section (`ConsignesChutage` ~1520-1545, `ConsignesLingot` ~1488-1510,
+  `ConsignesEnfournementPits` ~1450-1478, `ConsignesRefroidissoir` ~1642-1660,
+  `ConsignesDecoupeLingot` ~1557-1599, `ConsignesPoidsMetrique` ~1612-1632)
+When `ConsignesMapper.Map` est étendu
+Then chaque section produit, en plus de sa ligne `TypeConsigne=13` (code
+  complet, déjà produite aujourd'hui), une ligne par sous-champ décodé à
+  l'offset exact documenté dans le code source ci-dessus — **lire le code
+  source directement pour chaque offset plutôt que s'appuyer sur une
+  retranscription**, notamment pour `ConsignesEnfournementPits` (PC1) dont les
+  types 10 et 11 partagent apparemment le même `Substring(2,3)` sous une
+  condition différente à élucider en lisant les lignes 1465-1472
+And `ConsignesDecoupeLingot` (XP1) produit ses sous-champs à partir de **deux**
+  codes consigne distincts (`GetConsignes("ConsignesDecoupeLingot", 13)` et
+  `GetConsignes("ConsignesDecoupeLingot", 24)`, lignes 1557-1599) — le second
+  code et ses propres sous-champs (types 25-29) ne sont produits que s'il est
+  renseigné (garde `!string.IsNullOrEmpty(_global2)`, ligne 1577)
+And les 7 sections sont couvertes ; si `ConsignesSVT` ne présente aucune règle
+  de décomposition trouvée dans le code legacy fourni (seule une ligne
+  commentée `//_current = ordre.GetConsignes("ConsignesSVT", 13);` a été
+  repérée à ce jour), la story le documente explicitement comme
+  `à_clarifier` plutôt que d'inventer une règle — pas de blocage total de la
+  story (pattern `AC-FR19-4` déjà établi)
+
+**AC-2 (sémantique ConsigneGPAO=0/1 — tranché par le donneur d'ordre 2026-09-23) :**
+Given la confirmation du donneur d'ordre : `ConsigneGPAO=0` porte la valeur
+  initiale prévue par l'OF, `ConsigneGPAO=1` porte la valeur possiblement
+  modifiée par un opérateur pour une contrainte de production temporaire — ce
+  n'est pas un doublon à dédupliquer — **et les données injectées par le
+  dispatch P60 portent `ConsigneGPAO=1`**
+When `ConsignesMapper.Map` est corrigé
+Then chaque ligne produite par ce mapper (code complet et sous-champs, AC-1)
+  porte `ConsigneGPAO=1` — pas `0`/`false` comme aujourd'hui — puisqu'elle
+  reflète la valeur telle qu'elle arrive par le P60, potentiellement déjà
+  ajustée en amont de l'enregistrement du Fichier
+And les lignes `ConsigneGPAO=0` (valeur initiale prévue par l'OF) sont
+  **hors périmètre de ce mapper** — elles sont portées par un autre
+  processus, antérieur au dispatch P60 (probablement la création initiale de
+  l'OF), que `ConsignesMapper` ne doit ni produire ni modifier ; la story
+  n'invente aucune règle pour les créer
+And `Kape22ImportBundleMapper`/`Kape22Persister` ne doivent pas non plus
+  supposer l'existence d'une ligne `ConsigneGPAO=0` correspondante (pas de
+  contrôle d'existence ajouté pour ces lignes) — cohérent avec AD-2/AD-7 (pas
+  de connaissance croisée entre mappers, pas de propriété de navigation)
+
+**AC-3 (annexe de mapping) :**
+Given `annexe-mapping-dispatch-epic4.md` § L_D_CONSIGNES, dont les colonnes
+  `TypeConsigne`/`SizeCodeConsigne` sont aujourd'hui `à_clarifier` et dont la
+  ligne `ConsigneGPAO` emploie le mot « miroir »
+When l'annexe est mise à jour
+Then `TypeConsigne` documente la règle par section (renvoi vers AC-1 et les
+  lignes source), `SizeCodeConsigne` documente sa valeur par section (12 ou
+  18, paramètre `tailleconsigne` de `CompleteConsignes2`) si déterminable, et
+  la ligne `ConsigneGPAO` est reformulée selon la sémantique confirmée en AC-2
+  (valeur initiale vs. modifiée, pas un miroir)
+
+**AC-4 (couverture de parité production, comblant le trou qui a masqué ce gap) :**
+Given `Kape22ProductionDataParityTests.cs`, qui ne compare aujourd'hui ni
+  `L_D_CONSIGNES` ni `L_D_COULEE` — seuls `L_D_KAPE22` (ligne complète) et les
+  colonnes `decimal` de `L_D_ORDRE_FABRICATION`/`L_D_SECTIONCHARGE_*` le sont
+When la suite est étendue
+Then elle compare également `L_D_CONSIGNES` (par `OF` zero-paddé, comme les
+  autres tables aval — voir `DownstreamOf.Pad`) pour les 100 fichiers `P60/`
+  réels, colonne par colonne, contre la production — afin qu'une future
+  régression sur ce mapper ne reste plus silencieuse comme celle-ci l'a été,
+  en ne comparant que les lignes production `ConsigneGPAO=1` (AC-2 exclut
+  `ConsigneGPAO=0` du périmètre de ce mapper)
+
+**Tests xUnit (TDD — écrits en premier, CC-1) :** un test par section
+(sous-champs produits avec les bons `TypeConsigne`/valeurs, sur fixtures
+`P60/` réelles) ; un test sur le second code consigne XP1 (présent et absent) ;
+un test que chaque ligne produite porte `ConsigneGPAO=1` (AC-2) ; extension de
+`MappingAnnexCompletenessTests`/`AcCoverageCompletenessTests` si l'annexe gagne
+une colonne structurée ; les nouveaux cas `Kape22ProductionDataParityTests`
+(AC-4).
+
+**Critères transverses :** CC-1, CC-2, CC-3, CC-4, CC-5. *(CC-6/CC-7 sans
+objet : pas de nouvel accès base, `ConsignesMapper` reste pur.)*
+
+Owner : Dev.
