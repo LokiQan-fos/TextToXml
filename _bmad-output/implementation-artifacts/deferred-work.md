@@ -1202,3 +1202,17 @@ s'y trouver et rester à confirmer.
 ## Corrected in: code review of story-4.12 (2026-09-24)
 
 - Correction to the second bullet of "Deferred from: story-4.12 LibelleConsigne (2026-09-24)" above: a NULL `H2Coulee` giving `"?"` is verified legacy behaviour, not an assumption. The call site passes `H2Coulee.ToString()` (`""` for NULL), and the `decimal.Parse` of it runs inside `GetLibelle`'s own try (`LibelleConsigneController.cs:224-225`, try at :21, catch at :280), which returns `"?"`. Only a missing Pits section stays assumed, unverified: legacy dereferences the absent charge at the call site (`OrdreDeFabricationManager.cs:1408`, not :1407), outside that try.
+
+## Deferred from: code review of story-4.12, round 2 (2026-09-24)
+
+- source_spec: `spec-4-12-libelle-consigne.md`
+  summary: The 13 `L_P_CONSIGNES_*` table names are hand-maintained in four places (`scripts/sync-reference-consignes.ps1`, `ConsigneReferenceData.Load`, `PersistenceSmokeTests`, `SqlServerIntegrationFixture` reset) plus the DDL; a missed copy fails silently (table not synced or not reset).
+  evidence: Same hand-maintained-enumeration smell as PROJECT-CLOSED §4. The smoke test's table count catches part of the drift. Revisit if a reference table is ever added or renamed.
+
+- source_spec: `spec-4-12-libelle-consigne.md`
+  summary: The E2E label check in `scripts/e2e-worker-import.ps1` hard-codes `-S localhost -d AscoLSI_Test`, while the reference sync reads its target from `appsettings.Test.json`; the two can diverge.
+  evidence: Pre-existing pattern: the script's `Invoke-Sql` helper hard-codes the same target for every query. Not a secret (no CC-7 breach). Revisit if the test database ever moves off localhost.
+
+- source_spec: `spec-4-12-libelle-consigne.md`
+  summary: `Kape22FichierProcessor` catches only `DbException` around `ConsigneReferenceData.Load`; a connection-pool timeout (`InvalidOperationException`) is classified `UnexpectedFailure` (error/, no retry), and a `SqlNullValueException` from a schema drift likewise.
+  evidence: Same exception filter as the pre-existing persister catch (`DbUpdateException or DbException`); extends round-1 F1. Revisit together with any change to the persister's retry classification.

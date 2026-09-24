@@ -441,7 +441,9 @@ public sealed class Kape22Persister(AscoLsiDbContext context, IConfiguration con
     // DbUpdateException or DbException leaves the persister. Any priorErrors (the reasons a rejected
     // Fichier was rejected) are kept ahead of it here. The caller Kape22FichierProcessor.Import then
     // re-sorts the ImportResult by LineNumber, which moves this File-level entry (LineNumber 0) to the
-    // front (AC-FR6-4 extended to ImportResult).
+    // front (AC-FR6-4 extended to ImportResult). Since Story 4.12, Kape22FichierProcessor.Import also calls
+    // it, with no priorErrors, when the L_P_CONSIGNES_* reference read fails, and sets NormalizedXml and
+    // Warnings on the result itself.
     internal static ImportResult PersistenceFailure(Exception exception, IReadOnlyList<ConversionError>? priorErrors = null)
     {
         string cause = (exception.InnerException ?? exception).Message;

@@ -66,7 +66,8 @@ public class LibelleConsigneResolverTests
         Assert.Null(resolved.LatestDateMaj);
     }
 
-    // Matrix row "Lookup hit", plus one lookup per remaining section table.
+    // Matrix row "Lookup hit", plus one lookup per remaining section table and one per cooling section
+    // sharing the XA1 branch (FD2, FD3, FC1, XA2).
     [Theory]
     [Trait("AC", "FR19-5")]
     [InlineData("LA1", 7, "0", "Pas de scarfing")]
@@ -77,6 +78,10 @@ public class LibelleConsigneResolverTests
     [InlineData("XP1", 30, "A", "Découpe A")]
     [InlineData("XP9", 21, "B", "Poids B")]
     [InlineData("FD1", 9, "2", "Refroidissoir 2")]
+    [InlineData("FD2", 21, "00", "Refroidissement à l'air")]
+    [InlineData("FD3", 21, "00", "Refroidissement à l'air")]
+    [InlineData("FC1", 21, "00", "Refroidissement à l'air")]
+    [InlineData("XA2", 21, "00", "Refroidissement à l'air")]
     public void Resolve_LookupHit_ReturnsReferenceLibelle_AcFr19_5(string section, int type, string code, string expected)
     {
         LibelleConsigneResolution resolved = LibelleConsigneResolver.Resolve(section, type, code, Snapshot);
@@ -147,7 +152,7 @@ public class LibelleConsigneResolverTests
     // appended; the reported DateMaj is the later of the two rows consulted.
     [Fact]
     [Trait("AC", "FR19-5")]
-    public void Resolve_PitsParticulier_AppendsParticularLibelle_AcFr19_5()
+    public void Resolve_PitsParticular_AppendsParticularLibelle_AcFr19_5()
     {
         LibelleConsigneResolution resolved = LibelleConsigneResolver.Resolve("PC1", 6, "312", Snapshot);
 
@@ -206,22 +211,24 @@ public class LibelleConsigneResolverTests
     [InlineData("RD", 100.0)]
     [InlineData("RD", 200.1)]
     [InlineData("CR", 150.0)]
-    public void Resolve_DegazageOutsideDetailRange_ReturnsZero_AcFr19_5(string profil, double diametre)
+    public void Resolve_DegazageOutsideDetailRange_ReturnsZero_AcFr19_5(string profile, double diameter)
     {
         Assert.Equal(
             "0",
-            LibelleConsigneResolver.Resolve("XA1", 22, "1", Snapshot, profil, (decimal)diametre, 6.0m).Libelle);
+            LibelleConsigneResolver.Resolve("XA1", 22, "1", Snapshot, profile, (decimal)diameter, 6.0m).Libelle);
     }
 
-    // Matrix row "Degazage, pits section absent or H2Coulee null" (assumed, unverified: legacy would throw).
+    // Matrix row "Degazage, pits section absent or H2Coulee null". A null H2Coulee giving "?" is verified legacy
+    // behaviour (its decimal.Parse runs inside the GetLibelle try); only the absent pits section stays
+    // assumed, unverified (Spec Change Log, 2026-09-24).
     [Theory]
     [Trait("AC", "FR19-5")]
     [InlineData(true, false)]
     [InlineData(false, true)]
-    public void Resolve_DegazageMissingInput_ReturnsQuestionMark_AcFr19_5(bool hasDiametre, bool hasH2)
+    public void Resolve_DegazageMissingInput_ReturnsQuestionMark_AcFr19_5(bool hasDiameter, bool hasH2)
     {
         LibelleConsigneResolution resolved = LibelleConsigneResolver.Resolve(
-            "XA1", 22, "1", Snapshot, "RD", hasDiametre ? 150.0m : null, hasH2 ? 6.0m : null);
+            "XA1", 22, "1", Snapshot, "RD", hasDiameter ? 150.0m : null, hasH2 ? 6.0m : null);
 
         Assert.Equal("?", resolved.Libelle);
     }

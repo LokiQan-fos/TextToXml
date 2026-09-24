@@ -78,6 +78,11 @@ function Get-SqlTarget([string] $ConnectionString, [string] $Name) {
         if ($builder.TryGetValue($key, [ref] $value)) { $password = [string] $value; break }
     }
 
+    # A missing password would leave -P without a value, so the tools would prompt or read the next switch.
+    if ($user -and $null -eq $password) {
+        throw "ConnectionStrings:$Name has a User ID but no Password."
+    }
+
     $login = if ($user) { @('-U', $user, '-P', $password) } else { @() }
     return [pscustomobject] @{
         BcpLogin    = if ($user) { $login } else { @('-T') }
@@ -94,6 +99,20 @@ $production = Get-SqlTarget $settings.ConnectionStrings.AscoLSI_Production 'Asco
 # Production is read-only: refuse to run when the write target is the production source itself.
 if ($test.Server -eq $production.Server -and $test.Database -eq $production.Database) {
     throw "ConnectionStrings:AscoLSI points at the production source ($($production.Server)/$($production.Database)); refusing to write to it."
+}
+
+# The string check above misses another spelling of the same host (alias, FQDN, IP, port, "."), so each
+# server is also asked for its own name and current database. Only a SELECT is sent, and production is
+# opened with the read-only intent.
+function Get-ServerIdentity($Target, [string[]] $Intent) {
+    $identity = & sqlcmd -S $Target.Server -d $Target.Database @($Target.SqlcmdLogin) -C -b @Intent -h -1 -W -Q "SET NOCOUNT ON; SELECT @@SERVERNAME + '/' + DB_NAME();"
+    if ($LASTEXITCODE -ne 0) { throw "sqlcmd could not read the identity of $($Target.Server)/$($Target.Database)." }
+    return ($identity | Select-Object -First 1).Trim()
+}
+
+$testIdentity = Get-ServerIdentity $test @()
+if ($testIdentity -eq (Get-ServerIdentity $production @('-K', 'ReadOnly'))) {
+    throw "ConnectionStrings:AscoLSI resolves to the production source ($testIdentity); refusing to write to it."
 }
 
 function Invoke-TestSql([string[]] $Arguments) {

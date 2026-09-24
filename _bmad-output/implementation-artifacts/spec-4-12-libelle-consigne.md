@@ -3,7 +3,7 @@ title: '4.12 — Populate L_D_CONSIGNES.LibelleConsigne (port of legacy GetLibel
 type: 'bugfix'
 created: '2026-09-24'
 status: 'done'
-review_loop_iteration: 0
+review_loop_iteration: 2
 baseline_commit: '4abad8c8318203e53fa62efc357dc39774998a3b'
 context: []
 ---
@@ -93,6 +93,9 @@ context: []
 
 ## Spec Change Log
 
+- 2026-09-24 (code review round 2, P5): the I/O matrix row "Degazage, pits section absent or `H2Coulee` null" is only half assumed. A null `H2Coulee` giving `?` is verified legacy behaviour: the call site passes `""`, and its `decimal.Parse` runs inside the `GetLibelle` try (`LibelleConsigneController.cs:224-225`, try at :21, catch at :280). Only the absent pits section stays assumed, unverified (dereferenced at `OrdreDeFabricationManager.cs:1408`, outside that try). Behaviour unchanged; the frozen row is left as written.
+- 2026-09-24 (code review round 2, D2 option 1, human decision): CC-3 clarification. An existing comment made factually false by a change elsewhere (its own code unchanged) is updated, not preserved. Applied to `InboxScanner.cs:314` and `WorkerLoopRobustnessIntegrationTests.cs` (the reference-data read, not the persister, now catches an unreachable database first).
+
 ## Design Notes
 
 `SqlQuery` into keyless records was chosen over 13 `DbSet` entities. The tables are only read, only into the snapshot, and never written by the dispatch, so full EF entities would add model and parity-test surface for no benefit. The `DateMaj` guard compares the production import date against the current reference rows. A parameter edited after dispatch explains a legitimate delta (same principle as "P60 is a forecast").
@@ -130,3 +133,22 @@ Code review 2026-09-24, range `21075e5^..HEAD`, report `reviews/story-4-12/aggre
 - [x] [Review][Defer] F6 DateMaj guard cannot see deleted or re-coded reference rows [tests/Kape22Importer.Tests/Kape22ProductionDataParityTests.cs:327] — deferred, known limit
 - [x] [Review][Defer] F7 11 of 13 Load projections exercised on SQL Server only by opt-in tests [src/Kape22Importer/ConsigneReferenceData.cs:73] — deferred, AR-12 opt-in tier
 - [x] [Review][Defer] F8 E2E script now always needs production reachable [scripts/e2e-worker-import.ps1:88] — deferred, no offline use case today
+
+Code review round 2, 2026-09-24, range `21075e5^..HEAD`, report `reviews/story-4-12/aggregated-report.md` (REFUSÉ).
+
+- [x] [Review][Decision] R2-D1 CC-1: no AC → test attestation in commits 21075e5/2842a06 — both bodies are trailer-only (not pushed, ahead 2); rewrite messages or carry the attestation in the next commit plus a dated exemption. — resolved 2026-09-24: option 1, reword both commit messages (became R2-P11, run only after explicit go).
+- [x] [Review][Decision] R2-D2 CC-3 preservation vs a comment made false elsewhere — InboxScanner.cs:314 reworded without code change; WorkerLoopRobustnessIntegrationTests.cs:130-134,156-158 now false; clarify the rule and update both, or revert. — resolved 2026-09-24: option 1, dated CC-3 clarification + update the WorkerLoop comments (became R2-P10).
+- [x] [Review][Patch] R2-P1 Production guard bypassed by server aliases; compare SELECT @@SERVERNAME, DB_NAME() [scripts/sync-reference-consignes.ps1:94]
+- [x] [Review][Patch] R2-P2 E2E label gate cannot catch all-"?" labels [scripts/e2e-worker-import.ps1:163]
+- [x] [Review][Patch] R2-P3 Get-SqlTarget: User ID without Password drops -P value [scripts/sync-reference-consignes.ps1:81]
+- [x] [Review][Patch] R2-P4 French identifiers left in resolver tests (profil, diametre, hasDiametre, PitsParticulier) [tests/Kape22Importer.Tests/LibelleConsigneResolverTests.cs:209]
+- [x] [Review][Patch] R2-P5 Spec Change Log entry: H2Coulee null is verified legacy behaviour; fix test comment [tests/Kape22Importer.Tests/LibelleConsigneResolverTests.cs:216]
+- [x] [Review][Patch] R2-P6 FD2/FD3/FC1/XA2 shared-branch sections never exercised [tests/Kape22Importer.Tests/LibelleConsigneResolverTests.cs:79]
+- [x] [Review][Patch] R2-P7 PersistenceFailure doc comment ignores its new processor caller [src/Kape22Importer/Persistence/Kape22Persister.cs:439]
+- [x] [Review][Patch] R2-P8 PROJECT-CLOSED.md still says Story 4.12 is open [_bmad-output/implementation-artifacts/PROJECT-CLOSED.md:11]
+- [x] [Review][Patch] R2-P9 review_loop_iteration not updated [_bmad-output/implementation-artifacts/spec-4-12-libelle-consigne.md:6]
+- [x] [Review][Patch] R2-P10 CC-3 clarification in the Spec Change Log + update stale persister comments [tests/Kape22Importer.Tests/WorkerLoopRobustnessIntegrationTests.cs:130]
+- [x] [Review][Patch] R2-P11 Reword commits 21075e5/2842a06 with the AC-FR19-5 → test attestation (explicit go required) [git history] — done 2026-09-24: now ec65715 and d51055c (backup branch backup/story-4-12-pre-reword)
+- [x] [Review][Defer] R2-F1 13 reference table names hand-maintained in 4 places [scripts/sync-reference-consignes.ps1:27] — deferred, same smell as PROJECT-CLOSED §4
+- [x] [Review][Defer] R2-F2 E2E label check hard-codes localhost/AscoLSI_Test [scripts/e2e-worker-import.ps1:161] — deferred, pre-existing Invoke-Sql pattern
+- [x] [Review][Defer] R2-F3 Non-DbException outage/schema errors on the reference read become UnexpectedFailure [src/Kape22Importer/Kape22FichierProcessor.cs:82] — deferred, same filter as the persister

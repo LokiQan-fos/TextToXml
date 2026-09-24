@@ -156,11 +156,14 @@ try {
     Invoke-Sql "SELECT [OF], CodeOperation, TypeConsigne, CodeConsigne, LibelleConsigne FROM L_D_CONSIGNES WHERE $consignesFilter ORDER BY [OF], CodeOperation, TypeConsigne"
     # -b and the exit code check keep a failed query from reading as a zero count; the row total makes a
     # run that persisted nothing fail too.
-    $counts = & sqlcmd -S localhost -d AscoLSI_Test -C -b -h -1 -W -s ',' -Q "SET NOCOUNT ON; SELECT COUNT(*), SUM(CASE WHEN LibelleConsigne IS NULL THEN 1 ELSE 0 END) FROM L_D_CONSIGNES WHERE $consignesFilter"
+    $counts = & sqlcmd -S localhost -d AscoLSI_Test -C -b -h -1 -W -s ',' -Q "SET NOCOUNT ON; SELECT COUNT(*), SUM(CASE WHEN LibelleConsigne IS NULL THEN 1 ELSE 0 END), SUM(CASE WHEN LibelleConsigne = '?' THEN 1 ELSE 0 END) FROM L_D_CONSIGNES WHERE $consignesFilter"
     if ($LASTEXITCODE -ne 0) { throw 'The L_D_CONSIGNES label check query failed.' }
-    $total, $nullLibelles = ($counts | Select-Object -First 1).Split(',')
+    $total, $nullLibelles, $unresolvedLibelles = ($counts | Select-Object -First 1).Split(',')
     if ([int]$total -eq 0) { throw 'No L_D_CONSIGNES row was persisted for the Fichiers of this run.' }
     if ([int]$nullLibelles -ne 0) { throw "$nullLibelles L_D_CONSIGNES row(s) persisted with a NULL LibelleConsigne." }
+    # The resolver never returns NULL, so the check above alone cannot fail. Every row at "?" means the
+    # worker resolved nothing, for example from an empty reference snapshot.
+    if ([int]$unresolvedLibelles -eq [int]$total) { throw "All $total L_D_CONSIGNES row(s) persisted with LibelleConsigne '?'." }
 }
 finally {
     # --- 6. Always tear down the Launcher and its broker, and always restore the tracked config. ---

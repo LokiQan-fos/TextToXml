@@ -128,9 +128,10 @@ public class WorkerLoopRobustnessIntegrationTests(SqlServerIntegrationFixture fi
     }
 
     // AC-FR15-3: the real Kape22FichierProcessor with a context factory pointed at a dead host/port -
-    // Converter and Kape22Mapper succeed, Kape22Persister catches the SqlException and returns a
-    // PersistenceError - and InboxScanner leaves the Fichier in processing/, never in error/. Proves the
-    // whole persister -> processor -> scanner wiring routes an unreachable database to a retry. Real TCP
+    // the Converter succeeds, the processor's L_P_CONSIGNES_* reference read (Story 4.12, the first
+    // database access) catches the SqlException and returns a PersistenceError - and InboxScanner leaves
+    // the Fichier in processing/, never in error/. Proves the whole processor -> scanner wiring routes an
+    // unreachable database to a retry. Real TCP
     // I/O (a loopback connect that fails fast), so Integration, but no SQL Server instance is needed.
     [Fact]
     [Trait("AC", "FR15-3")]
@@ -154,7 +155,7 @@ public class WorkerLoopRobustnessIntegrationTests(SqlServerIntegrationFixture fi
     }
 
     // A context bound to loopback port 1, where nothing ever listens: the first EF query fails fast with
-    // a SqlException (a DbException), which Kape22Persister translates to a PersistenceError. Port 1 is
+    // a SqlException (a DbException), which Kape22FichierProcessor translates to a PersistenceError. Port 1 is
     // privileged and outside the ephemeral range, so it cannot be transiently bound on a CI host. No
     // SQL Server needed.
     private static AscoLsiDbContext DeadDatabaseContext() =>
