@@ -122,8 +122,9 @@ public sealed class Kape22Persister(AscoLsiDbContext context, IConfiguration con
             // missing-Coulee check above - never widening the DbUpdateException/DbException catch filter
             // to cover it.
             // The full 4-part tuple mirrors L_D_CONSIGNES' real natural key. OF is bundle-constant today
-            // (every ConsignesMapper.Row call passes the same source.OF) and ConsigneGPAO is always
-            // true since Story 4.4-bis, but TypeConsigne now varies per row (0-29, one full-code row plus
+            // (every ConsignesMapper.Row call passes the same source.OF) and ConsigneGPAO is true or false
+            // per decoded row since Story 4.13 (the working copy), so the two halves never collide with each
+            // other, but TypeConsigne now varies per row (0-29, one full-code row plus
             // one row per decoded sub-field per applicable section - see ConsignesMapper): every
             // decodable section's own TypeConsigne=13 full-code row still shares the same (OF,
             // CodeOperation, TypeConsigne, ConsigneGPAO) key whenever two sections share one

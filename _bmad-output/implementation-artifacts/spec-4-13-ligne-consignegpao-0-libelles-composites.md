@@ -142,7 +142,7 @@ The Ask First on test runs was resolved on 2026-09-24. The human authorized the 
 - ConsigneGPAO=0 parity: codes vs production 1, labels vs production 0 unless MCC-edited.
   [`Kape22ProductionDataParityTests.cs:423`](../../tests/Kape22Importer.Tests/Kape22ProductionDataParityTests.cs#L423)
 
-- MCC-edited section detection, including a 1 row with no 0 counterpart.
+- MCC-edited section detection: a code that differs between production 0 and 1 (a missing counterpart fails as a regression).
   [`Kape22ProductionDataParityTests.cs:436`](../../tests/Kape22Importer.Tests/Kape22ProductionDataParityTests.cs#L436)
 
 - DateMaj guard: row-scoped, section-scoped only for composites.
@@ -164,3 +164,13 @@ The Ask First on test runs was resolved on 2026-09-24. The human authorized the 
 
 - epics.md section header: ConsigneGPAO meaning corrected (AC-3).
   [`epics.md:2471`](../planning-artifacts/epics.md#L2471)
+
+### Review Findings
+
+- [x] [Review][Decision] D1 MCC-edited detection wider than the frozen AC — `.Concat(...)` also skips a section whose production `1` row has no `0` counterpart; no dated Change Log note. — resolved 2026-09-24: option 2, apply the frozen AC literally (production has 1 unpaired row in 899 997: MCC never deletes the working copy) → P6.
+- [x] [Review][Patch] P1 CC-3: stale "ConsigneGPAO is always true" comment [src/Kape22Importer/Persistence/Kape22Persister.cs:124]
+- [x] [Review][Patch] P2 Test name still claims every row is ConsigneGPAO=true [tests/Kape22Importer.Tests/ConsignesMapperTests.cs:490]
+- [x] [Review][Patch] P3 Reverse `1`-row check has no ConsigneGPAO filter [tests/Kape22Importer.Tests/Kape22ProductionDataParityTests.cs:348]
+- [x] [Review][Patch] P4 E2E gate does not check "no ConsigneGPAO=0 row for SVT" [scripts/e2e-worker-import.ps1:160]
+- [x] [Review][Patch] P5 Rewritten comment not re-wrapped (177 chars) [tests/Kape22Importer.Tests/Kape22ProductionDataParityTests.cs:282]
+- [x] [Review][Patch] P6 Remove the missing-counterpart clause from MCC detection [tests/Kape22Importer.Tests/Kape22ProductionDataParityTests.cs:438]

@@ -279,10 +279,10 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
     // this Fichier's production DateReception is reported as skipped, not failed: the legacy application
     // resolved it against values that no longer exist (same principle as "P60 is a forecast"). Story 4.13
     // (AC-FR19-6): every ConsigneGPAO=0 row produced must exist in production ConsigneGPAO=0, and every
-    // production ConsigneGPAO=0 row of a CodeOperation it produced must be produced. Its codes are compared to the production ConsigneGPAO=1 row, since both rows carry the same
-    // codes at import time. Its label is compared to the production ConsigneGPAO=0 row only when no code
-    // of that section differs between production 0 and 1; a section edited after the import (MCC) is
-    // reported as skipped, not failed.
+    // production ConsigneGPAO=0 row of a CodeOperation it produced must be produced. Its codes are compared
+    // to the production ConsigneGPAO=1 row, since both rows carry the same codes at import time. Its label
+    // is compared to the production ConsigneGPAO=0 row only when no code of that section differs between
+    // production 0 and 1; a section edited after the import (MCC) is reported as skipped, not failed.
     [SkippableTheory]
     [MemberData(nameof(P60Fichiers))]
     [Trait("AC", "FR19-5")]
@@ -345,7 +345,7 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
         HashSet<string> mappedCodeOperations = [.. testRows.Where(row => row.ConsigneGPAO).Select(row => row.CodeOperation.Trim())];
         foreach (L_D_CONSIGNES production in productionRows.Where(p => mappedCodeOperations.Contains(p.CodeOperation.Trim())))
         {
-            if (!testRows.Any(row => row.CodeOperation.Trim() == production.CodeOperation.Trim() && row.TypeConsigne == production.TypeConsigne))
+            if (!testRows.Any(row => row.ConsigneGPAO && row.CodeOperation.Trim() == production.CodeOperation.Trim() && row.TypeConsigne == production.TypeConsigne))
             {
                 regressions.Add(
                     $"  CodeOperation={production.CodeOperation}, TypeConsigne={production.TypeConsigne}: ligne de production non produite par le nouveau traitement.");
@@ -416,10 +416,11 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
     }
 
     // Story 4.13 (AC-FR19-6): the ConsigneGPAO=0 half of the consignes parity. A section is edited when one
-    // of its production codes differs between ConsigneGPAO=0 and 1, or has no counterpart on the other
-    // side: its labels then reflect an operator's MCC edit, not the import, so a label difference there is
-    // skipped. Outside such sections the DateMaj guard of the ConsigneGPAO=1 comparison applies: to the
-    // row's own reference rows, or to those of every row of the section for a composite label.
+    // of its production codes differs between ConsigneGPAO=0 and 1: its labels then reflect an operator's
+    // MCC edit, not the import, so a label difference there is skipped. MCC never deletes the working copy,
+    // so a production row with no counterpart is a data anomaly and fails as a regression below. Outside
+    // such sections the DateMaj guard of the ConsigneGPAO=1 comparison applies: to the row's own reference
+    // rows, or to those of every row of the section for a composite label.
     private static void CompareWorkingRows(
         List<string> regressions,
         List<string> skippedLibelles,
@@ -434,8 +435,7 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
             p => p.CodeOperation.Trim() == row.CodeOperation.Trim() && p.TypeConsigne == row.TypeConsigne);
 
         HashSet<string> editedSections = [.. productionWorking
-            .Where(working => !Equals(Normalize(Match(productionRows, working)?.CodeConsigne), Normalize(working.CodeConsigne)))
-            .Concat(productionRows.Where(received => Match(productionWorking, received) is null))
+            .Where(working => Match(productionRows, working) is { } received && !Equals(Normalize(received.CodeConsigne), Normalize(working.CodeConsigne)))
             .Select(row => row.CodeOperation.Trim())];
         List<L_D_CONSIGNES> testWorking = [.. testRows.Where(row => !row.ConsigneGPAO)];
         HashSet<string> mappedCodeOperations = [.. testWorking.Select(row => row.CodeOperation.Trim())];

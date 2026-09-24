@@ -156,9 +156,9 @@ try {
     Invoke-Sql "SELECT [OF], CodeOperation, TypeConsigne, ConsigneGPAO, CodeConsigne, LibelleConsigne FROM L_D_CONSIGNES WHERE $consignesFilter ORDER BY [OF], CodeOperation, TypeConsigne, ConsigneGPAO"
     # -b and the exit code check keep a failed query from reading as a zero count; the row total makes a
     # run that persisted nothing fail too.
-    $counts = & sqlcmd -S localhost -d AscoLSI_Test -C -b -h -1 -W -s ',' -Q "SET NOCOUNT ON; SELECT COUNT(*), SUM(CASE WHEN LibelleConsigne IS NULL THEN 1 ELSE 0 END), SUM(CASE WHEN LibelleConsigne = '?' THEN 1 ELSE 0 END), SUM(CASE WHEN ConsigneGPAO = 1 AND SizeCodeConsigne <> 0 THEN 1 ELSE 0 END), (SELECT COUNT(*) FROM L_D_CONSIGNES c WHERE $consignesFilter AND c.SizeCodeConsigne <> 0 AND NOT EXISTS (SELECT 1 FROM L_D_CONSIGNES m WHERE m.[OF] = c.[OF] AND m.CodeOperation = c.CodeOperation AND m.TypeConsigne = c.TypeConsigne AND m.ConsigneGPAO <> c.ConsigneGPAO)), SUM(CASE WHEN ConsigneGPAO = 0 AND (TypeConsigne = 13 OR (TypeConsigne = 24 AND SizeCodeConsigne = 18)) AND LibelleConsigne = '?' THEN 1 ELSE 0 END) FROM L_D_CONSIGNES WHERE $consignesFilter"
+    $counts = & sqlcmd -S localhost -d AscoLSI_Test -C -b -h -1 -W -s ',' -Q "SET NOCOUNT ON; SELECT COUNT(*), SUM(CASE WHEN LibelleConsigne IS NULL THEN 1 ELSE 0 END), SUM(CASE WHEN LibelleConsigne = '?' THEN 1 ELSE 0 END), SUM(CASE WHEN ConsigneGPAO = 1 AND SizeCodeConsigne <> 0 THEN 1 ELSE 0 END), (SELECT COUNT(*) FROM L_D_CONSIGNES c WHERE $consignesFilter AND c.SizeCodeConsigne <> 0 AND NOT EXISTS (SELECT 1 FROM L_D_CONSIGNES m WHERE m.[OF] = c.[OF] AND m.CodeOperation = c.CodeOperation AND m.TypeConsigne = c.TypeConsigne AND m.ConsigneGPAO <> c.ConsigneGPAO)), SUM(CASE WHEN ConsigneGPAO = 0 AND (TypeConsigne = 13 OR (TypeConsigne = 24 AND SizeCodeConsigne = 18)) AND LibelleConsigne = '?' THEN 1 ELSE 0 END), SUM(CASE WHEN ConsigneGPAO = 0 AND SizeCodeConsigne = 0 THEN 1 ELSE 0 END) FROM L_D_CONSIGNES WHERE $consignesFilter"
     if ($LASTEXITCODE -ne 0) { throw 'The L_D_CONSIGNES label check query failed.' }
-    $total, $nullLibelles, $unresolvedLibelles, $received, $unpaired, $unresolvedComposites = ($counts | Select-Object -First 1).Split(',')
+    $total, $nullLibelles, $unresolvedLibelles, $received, $unpaired, $unresolvedComposites, $svtWorking = ($counts | Select-Object -First 1).Split(',')
     if ([int]$total -eq 0) { throw 'No L_D_CONSIGNES row was persisted for the Fichiers of this run.' }
     if ([int]$nullLibelles -ne 0) { throw "$nullLibelles L_D_CONSIGNES row(s) persisted with a NULL LibelleConsigne." }
     # The resolver never returns NULL, so the check above alone cannot fail. Every row at "?" means the
@@ -166,10 +166,12 @@ try {
     if ([int]$unresolvedLibelles -eq [int]$total) { throw "All $total L_D_CONSIGNES row(s) persisted with LibelleConsigne '?'." }
     # Story 4.13 (AC-FR19-6): every decoded row pairs with its other ConsigneGPAO value on the same key (the
     # SVT row, SizeCodeConsigne 0, has no working copy), and every working composite row (type 13, and type
-    # 24 of the size-18 block) carries its composite label, never "?".
+    # 24 of the size-18 block) carries its composite label, never "?". The pairing check skips size 0, so
+    # the SVT row is checked on its own: it never gets a ConsigneGPAO=0 row.
     if ([int]$received -eq 0) { throw 'No decoded ConsigneGPAO=1 L_D_CONSIGNES row was persisted for the Fichiers of this run.' }
     if ([int]$unpaired -ne 0) { throw "$unpaired decoded L_D_CONSIGNES row(s) without their ConsigneGPAO=0/1 counterpart." }
     if ([int]$unresolvedComposites -ne 0) { throw "$unresolvedComposites ConsigneGPAO=0 composite row(s) persisted with LibelleConsigne '?'." }
+    if ([int]$svtWorking -ne 0) { throw "$svtWorking SVT L_D_CONSIGNES row(s) persisted with ConsigneGPAO=0." }
 }
 finally {
     # --- 6. Always tear down the Launcher and its broker, and always restore the tracked config. ---

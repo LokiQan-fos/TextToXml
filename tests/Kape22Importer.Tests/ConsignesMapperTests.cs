@@ -487,7 +487,7 @@ public class ConsignesMapperTests
     // ConsigneGPAO=true (Story 4.13: SVT alone has no working copy).
     [Fact]
     [Trait("AC", "FR19-4")]
-    public void Map_EveryProducedConsigne_HasConsigneGpaoTrueAndSizeCodeConsigneSet_AcFr19_4()
+    public void Map_EveryProducedConsigne_HasMirroredGpaoHalvesAndSizeCodeConsigneSet_AcFr19_4()
     {
         List<L_D_CONSIGNES> consignes = MapAll(ReferenceKape22());
 
