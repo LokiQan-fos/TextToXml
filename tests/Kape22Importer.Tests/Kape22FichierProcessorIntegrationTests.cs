@@ -212,8 +212,9 @@ public class Kape22FichierProcessorIntegrationTests(SqlServerIntegrationFixture 
 
         using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
         List<L_D_CONSIGNES> rows = [.. verify.ConsignesRows.AsNoTracking()];
-        string? Libelle(string codeOperation, int type) =>
-            Assert.Single(rows, row => row.CodeOperation.Trim() == codeOperation && row.TypeConsigne == type).LibelleConsigne;
+        string? Libelle(string codeOperation, int type, bool consigneGpao = true) => Assert.Single(
+            rows,
+            row => row.CodeOperation.Trim() == codeOperation && row.TypeConsigne == type && row.ConsigneGPAO == consigneGpao).LibelleConsigne;
 
         Assert.Equal("Pas de scarfing", Libelle("LA1", 7));
         Assert.Equal("Refroidissement à l'air", Libelle("XA1", 21));
@@ -224,5 +225,12 @@ public class Kape22FichierProcessorIntegrationTests(SqlServerIntegrationFixture 
         // resolves to "0", while a dropped input would give "?".
         Assert.Equal("0", Libelle("XA1", 22));
         Assert.All(rows, row => Assert.NotNull(row.LibelleConsigne));
+
+        // Story 4.13 (AC-FR19-6): the ConsigneGPAO=false working copies are persisted too, one per
+        // ConsigneGPAO=true row, and the composite label reaches the database on the working copy only
+        // (the unseeded type 23 lookup contributes "?").
+        Assert.Equal(rows.Count(row => row.ConsigneGPAO), rows.Count(row => !row.ConsigneGPAO));
+        Assert.Equal("Refroidissement à l'air\t\t0\t\t?\t\t", Libelle("XA1", 13, consigneGpao: false));
+        Assert.Equal("?", Libelle("XA1", 13));
     }
 }

@@ -163,6 +163,12 @@ public class ConsignesMapperTests
         AssertRow(rows, 19, "67", 12);
         AssertRow(rows, 20, "9A", 12);
         Assert.Equal(4, rows.Count);
+
+        // Story 4.13 (AC-FR19-6): the reference Fichier has no XP9 section, so the mapper's PoidsMetrique
+        // composite is checked here, on the working-copy type 13 row only.
+        List<L_D_CONSIGNES> working = WorkingRowsFor(MapAll(source), poidsMetrique.CodeOperation);
+        Assert.Equal(LibelleConsigneComposer.PoidsMetrique(rows), Assert.Single(working, r => r.TypeConsigne == 13).LibelleConsigne);
+        Assert.Equal("?", Assert.Single(rows, r => r.TypeConsigne == 13).LibelleConsigne);
     }
 
     // The class-header comment's claim, locked in by a test (code-review patch): a section produces rows
@@ -230,6 +236,26 @@ public class ConsignesMapperTests
         Assert.Equal("?", consigne.LibelleConsigne);
     }
 
+    // Story 4.13: the legacy CompleteConsignes2 never touches SVT and production holds no L_D_CONSIGNES row
+    // for any SVT CodeOperation, so SVT gets no ConsigneGPAO=0 working-copy row.
+    [Fact]
+    [Trait("AC", "FR19-6")]
+    public void Map_SvtSectionApplicable_ProducesNoWorkingCopyRow_AcFr19_6()
+    {
+        MapResult<L_D_KAPE22> result = MapMutatedFichier(document =>
+        {
+            SetChamp(document, "message", "CodeOpeSVT", "SV1");
+            SetChamp(document, "message", "RangOpeSVT", "170");
+        });
+        Assert.True(result.Success);
+        L_D_KAPE22 source = result.Value!;
+        L_D_SECTIONCHARGE_SVT svt = SectionChargeSvtMapper.Map(source)!;
+
+        List<L_D_CONSIGNES> consignes = MapAll(source);
+
+        Assert.DoesNotContain(consignes, c => c.CodeOperation == svt.CodeOperation && !c.ConsigneGPAO);
+    }
+
     // XP1 (OrdreDeFabricationManager.cs:1557-1599), both blocks, on the reference Fichier's real data: the
     // size-12 block decodes CodeConsigneDecoupe, the size-18 block decodes LibelleConsigneDecoupe
     // (Position 287, Size 18) - the second Decoupe consigne legacy turns into TypeConsigne 24/size 18 when
@@ -276,6 +302,11 @@ public class ConsignesMapperTests
         AssertRow(rows, 17, "11400", 12);
         Assert.Equal(3, rows.Count);
         Assert.DoesNotContain(rows, r => r.TypeConsigne is 24 or 25 or 26 or 27 or 28 or 29);
+
+        // Story 4.13 (AC-FR19-6): only the size-12 composite exists, on the working-copy type 13 row.
+        List<L_D_CONSIGNES> working = WorkingRowsFor(MapAll(source), decoupe.CodeOperation);
+        Assert.Equal(LibelleConsigneComposer.Decoupe(rows).SizeTwelve, Assert.Single(working, r => r.TypeConsigne == 13).LibelleConsigne);
+        Assert.DoesNotContain(working, r => r.TypeConsigne == 24);
     }
 
     // XP1, size-18 code only: the size-18 block fires independently of the size-12 block (Boundaries &
@@ -296,6 +327,11 @@ public class ConsignesMapperTests
         AssertRow(rows, 29, "A", 18);
         Assert.Equal(6, rows.Count);
         Assert.DoesNotContain(rows, r => r.TypeConsigne is 13 or 16 or 17);
+
+        // Story 4.13 (AC-FR19-6): only the size-18 composite exists, on the working-copy type 24 row.
+        List<L_D_CONSIGNES> working = WorkingRowsFor(MapAll(source), decoupe.CodeOperation);
+        Assert.Equal(LibelleConsigneComposer.Decoupe(rows).SizeEighteen, Assert.Single(working, r => r.TypeConsigne == 24).LibelleConsigne);
+        Assert.DoesNotContain(working, r => r.TypeConsigne == 13);
     }
 
     // XP1, full-width size-18 code: every size-18 offset reads its own character range, 28 and 29
@@ -333,7 +369,8 @@ public class ConsignesMapperTests
     }
 
     // The frozen Acceptance Criteria's first bullet, verbatim: with all 6 decodable sections applicable,
-    // Map produces exactly the row set the Code Map table describes, every row ConsigneGPAO=true.
+    // Map produces exactly the row set the Code Map table describes. Story 4.13: that set is the
+    // ConsigneGPAO=1 half, and a ConsigneGPAO=0 working copy doubles it.
     [Fact]
     [Trait("AC", "FR19-3")]
     public void Map_AllSixDecodableSectionsApplicable_ProducesExactCodeMapRowSet_AcFr19_3()
@@ -349,14 +386,72 @@ public class ConsignesMapperTests
 
         List<L_D_CONSIGNES> consignes = MapAll(source);
 
-        Assert.All(consignes, c => Assert.True(c.ConsigneGPAO));
+        Assert.Equal(consignes.Count(c => c.ConsigneGPAO), consignes.Count(c => !c.ConsigneGPAO));
         AssertTypeConsigneSet(consignes, SectionChargeChutageMapper.Map(source)!.CodeOperation, 13, 0, 1, 2, 3, 4);
         AssertTypeConsigneSet(consignes, SectionChargeLingotMapper.Map(source)!.CodeOperation, 13, 15, 7, 8, 9);
         AssertTypeConsigneSet(consignes, SectionChargePitsMapper.Map(source)!.CodeOperation, 13, 12, 10, 11, 5, 6);
         AssertTypeConsigneSet(consignes, SectionChargeRefroidissoirsMapper.Map(source)!.CodeOperation, 13, 21, 22, 23);
         AssertTypeConsigneSet(consignes, SectionChargeDecoupeMapper.Map(source)!.CodeOperation, 13, 16, 17, 24, 25, 26, 27, 28, 29);
         AssertTypeConsigneSet(consignes, SectionChargePoidsMetriqueMapper.Map(source)!.CodeOperation, 13, 18, 19, 20);
-        Assert.Equal(6 + 5 + 6 + 4 + 9 + 4, consignes.Count);
+        Assert.Equal(2 * (6 + 5 + 6 + 4 + 9 + 4), consignes.Count);
+    }
+
+    // Story 4.13 (AC-FR19-6): every ConsigneGPAO=1 row has exactly one ConsigneGPAO=0 working copy with the
+    // same key, codes and size (AddOrModifyConsigne, OrdreDeFabricationManager.cs:1362-1435, writes one
+    // codeconsigne to both rows). Its label is the same, except on the composite rows (type 13, and type 24
+    // for XP1), and there are no other working rows.
+    [Fact]
+    [Trait("AC", "FR19-6")]
+    public void Map_ReferenceFichier_EveryGpaoRowHasOneMirroredWorkingCopy_AcFr19_6()
+    {
+        L_D_KAPE22 source = ReferenceKape22();
+        string decoupeCodeOperation = SectionChargeDecoupeMapper.Map(source)!.CodeOperation;
+
+        List<L_D_CONSIGNES> consignes = MapAll(source);
+        List<L_D_CONSIGNES> gpao = [.. consignes.Where(c => c.ConsigneGPAO)];
+
+        Assert.NotEmpty(gpao);
+        Assert.Equal(gpao.Count, consignes.Count(c => !c.ConsigneGPAO));
+        foreach (L_D_CONSIGNES row in gpao)
+        {
+            L_D_CONSIGNES working = Assert.Single(
+                consignes,
+                c => !c.ConsigneGPAO && c.CodeOperation == row.CodeOperation && c.TypeConsigne == row.TypeConsigne);
+            Assert.Equal(row.OF, working.OF);
+            Assert.Equal(row.CodeConsigne, working.CodeConsigne);
+            Assert.Equal(row.SizeCodeConsigne, working.SizeCodeConsigne);
+            bool composite = row.TypeConsigne == 13 || (row.TypeConsigne == 24 && row.CodeOperation == decoupeCodeOperation);
+            if (!composite)
+            {
+                Assert.Equal(row.LibelleConsigne, working.LibelleConsigne);
+            }
+        }
+    }
+
+    // Story 4.13 (AC-FR19-6): the working-copy composite rows carry the BuildLibelleConsigne port of their
+    // section's labels, while the ConsigneGPAO=1 composite rows keep "?", as in the legacy (GetConsignes
+    // defaults to gpao=false, OrdreFabrication.cs:60).
+    [Fact]
+    [Trait("AC", "FR19-6")]
+    public void Map_ReferenceFichier_OnlyWorkingCompositeRowsCarryComposedLabel_AcFr19_6()
+    {
+        L_D_KAPE22 source = ReferenceKape22();
+        List<L_D_CONSIGNES> consignes = MapAll(source);
+        string chutage = SectionChargeChutageMapper.Map(source)!.CodeOperation;
+        string decoupe = SectionChargeDecoupeMapper.Map(source)!.CodeOperation;
+        string lingot = SectionChargeLingotMapper.Map(source)!.CodeOperation;
+        string pits = SectionChargePitsMapper.Map(source)!.CodeOperation;
+        string refroidissoirs = SectionChargeRefroidissoirsMapper.Map(source)!.CodeOperation;
+
+        Assert.Equal(LibelleConsigneComposer.Chutage(RowsFor(consignes, chutage)), WorkingLabel(consignes, chutage, 13));
+        Assert.Equal(LibelleConsigneComposer.Decoupe(RowsFor(consignes, decoupe)).SizeTwelve, WorkingLabel(consignes, decoupe, 13));
+        Assert.Equal(LibelleConsigneComposer.Decoupe(RowsFor(consignes, decoupe)).SizeEighteen, WorkingLabel(consignes, decoupe, 24));
+        Assert.Equal(LibelleConsigneComposer.Lingot(RowsFor(consignes, lingot)), WorkingLabel(consignes, lingot, 13));
+        Assert.Equal(LibelleConsigneComposer.Pits(RowsFor(consignes, pits)), WorkingLabel(consignes, pits, 13));
+        Assert.Equal(LibelleConsigneComposer.Refroidissoirs(RowsFor(consignes, refroidissoirs)), WorkingLabel(consignes, refroidissoirs, 13));
+        Assert.All(
+            consignes.Where(c => c.ConsigneGPAO && (c.TypeConsigne == 13 || (c.TypeConsigne == 24 && c.CodeOperation == decoupe))),
+            c => Assert.Equal("?", c.LibelleConsigne));
     }
 
     // AC-FR19-1: ConsignesMapper is a pure function - no reflection, no database access.
@@ -385,10 +480,11 @@ public class ConsignesMapperTests
         Assert.Contains("deferred-work.md", source, StringComparison.Ordinal);
     }
 
-    // AC-FR19-4 (reworded from Story 4.4): every row this mapper produces carries ConsigneGPAO=true and
-    // carries a LibelleConsigne (Story 4.12); SizeCodeConsigne is no longer left at its CLR default for
-    // any row this reference Fichier's applicable sections produce (none of them is SVT) - 18 for the
-    // Decoupe size-18 block (TypeConsigne 24-29), 12 for every other row.
+    // AC-FR19-4 (reworded from Story 4.4): every row this mapper produces carries a LibelleConsigne
+    // (Story 4.12); SizeCodeConsigne is no longer left at its CLR default for any row this reference
+    // Fichier's applicable sections produce (none of them is SVT) - 18 for the Decoupe size-18 block
+    // (TypeConsigne 24-29), 12 for every other row. With no SVT section, exactly half of them are
+    // ConsigneGPAO=true (Story 4.13: SVT alone has no working copy).
     [Fact]
     [Trait("AC", "FR19-4")]
     public void Map_EveryProducedConsigne_HasConsigneGpaoTrueAndSizeCodeConsigneSet_AcFr19_4()
@@ -396,9 +492,9 @@ public class ConsignesMapperTests
         List<L_D_CONSIGNES> consignes = MapAll(ReferenceKape22());
 
         Assert.NotEmpty(consignes);
+        Assert.Equal(consignes.Count(c => c.ConsigneGPAO), consignes.Count(c => !c.ConsigneGPAO));
         Assert.All(consignes, consigne =>
         {
-            Assert.True(consigne.ConsigneGPAO);
             Assert.NotNull(consigne.LibelleConsigne);
             Assert.Equal(consigne.TypeConsigne >= 24 ? 18 : 12, consigne.SizeCodeConsigne);
         });
@@ -416,10 +512,14 @@ public class ConsignesMapperTests
         SectionChargeRefroidissoirsMapper.Map(source),
         SectionChargeSvtMapper.Map(source));
 
-    // The rows a section's own decode produced, isolated by its own CodeOperation - every row of one
-    // section shares the same CodeOperation, only TypeConsigne tells them apart.
+    // The ConsigneGPAO=1 rows a section's own decode produced, isolated by its own CodeOperation - every
+    // row of one section shares the same CodeOperation, only TypeConsigne tells them apart.
     private static List<L_D_CONSIGNES> RowsFor(List<L_D_CONSIGNES> consignes, string codeOperation) =>
-        consignes.Where(c => c.CodeOperation == codeOperation).ToList();
+        consignes.Where(c => c.CodeOperation == codeOperation && c.ConsigneGPAO).ToList();
+
+    // The ConsigneGPAO=0 working-copy rows of the same section (Story 4.13).
+    private static List<L_D_CONSIGNES> WorkingRowsFor(List<L_D_CONSIGNES> consignes, string codeOperation) =>
+        consignes.Where(c => c.CodeOperation == codeOperation && !c.ConsigneGPAO).ToList();
 
     private static void AssertRow(List<L_D_CONSIGNES> rows, int typeConsigne, string expectedCodeConsigne, int expectedSizeCodeConsigne)
     {
@@ -434,6 +534,9 @@ public class ConsignesMapperTests
         int[] actual = [.. RowsFor(consignes, codeOperation).Select(r => r.TypeConsigne).OrderBy(t => t)];
         Assert.Equal(expectedTypes.OrderBy(t => t), actual);
     }
+
+    private static string? WorkingLabel(List<L_D_CONSIGNES> consignes, string codeOperation, int typeConsigne) =>
+        Assert.Single(WorkingRowsFor(consignes, codeOperation), r => r.TypeConsigne == typeConsigne).LibelleConsigne;
 
     private static string MapperSourceText(string fileName) =>
         System.IO.File.ReadAllText(RepoLayout.ProjectFile($"src/Kape22Importer/{fileName}"));

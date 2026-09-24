@@ -1216,3 +1216,9 @@ s'y trouver et rester à confirmer.
 - source_spec: `spec-4-12-libelle-consigne.md`
   summary: `Kape22FichierProcessor` catches only `DbException` around `ConsigneReferenceData.Load`; a connection-pool timeout (`InvalidOperationException`) is classified `UnexpectedFailure` (error/, no retry), and a `SqlNullValueException` from a schema drift likewise.
   evidence: Same exception filter as the pre-existing persister catch (`DbUpdateException or DbException`); extends round-1 F1. Revisit together with any change to the persister's retry classification.
+
+## Deferred from: story-4.13 ConsigneGPAO=0 working copy (2026-09-24)
+
+- source_spec: `spec-4-13-ligne-consignegpao-0-libelles-composites.md`
+  summary: The worker's single SVT `ConsigneGPAO=1` row (TypeConsigne 0, SizeCodeConsigne 0, Story 4.4-bis) has no production counterpart: production writes no `L_D_CONSIGNES` row at all for the SVT CodeOperations (`DS2`, `NLT`, `VD1`, `VD2`, `VD9`).
+  evidence: Read-only SELECT on AFV004-LSI on 2026-09-24 (counts by CodeOperation and ConsigneGPAO); the legacy `CompleteConsignes2` never touches SVT. Story 4.13 only refrains from adding a `ConsigneGPAO=0` row for SVT; whether to drop the existing `1` row is a separate decision.

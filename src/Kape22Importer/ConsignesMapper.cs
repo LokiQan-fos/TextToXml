@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Kape22Importer.Persistence;
 
 namespace Kape22Importer;
@@ -8,10 +9,11 @@ namespace Kape22Importer;
 // section is not what production carries - legacy (OrdreDeFabricationManager.CompleteConsignes2 /
 // AddOrModifyConsigne, OrdreDeFabricationManager.cs:1362-1682, read-only reference, AD-3, never
 // called/referenced at runtime) also decodes each section's raw consigne code into several positional
-// sub-fields, each its own row, at the exact offsets sourced from that legacy code. Every row this
-// mapper produces carries ConsigneGPAO=true - the confirmed P60-dispatch value (business owner,
-// sprint-change-proposal-2026-09-23), not the OF-initial ConsigneGPAO=false value some earlier,
-// out-of-scope process owns (AD-2/AD-7 - no cross-mapper existence check for it). A section produces
+// sub-fields, each its own row, at the exact offsets sourced from that legacy code. Story 4.13
+// (AC-FR19-6, sprint-change-proposal-2026-09-24, which corrects the 2026-09-23 meaning): each decoded row
+// exists twice, as AddOrModifyConsigne writes it (OrdreDeFabricationManager.cs:1362-1435). ConsigneGPAO=true
+// is the value received from the GPAO, never edited. ConsigneGPAO=false is the working copy the import
+// itself creates with the same codes, which operators edit afterwards (MCC). A section produces
 // rows iff its own mapper produced a row (the same per-OF applicability rule, AC-FR19-2) AND its own raw
 // consigne code is non-blank - a blank code decodes to nothing in legacy either (CompleteConsignes2's own
 // "if (!string.IsNullOrEmpty(_global))" guard around both the full code and every sub-field). That blank-code
@@ -95,36 +97,107 @@ public static class ConsignesMapper
                 (23, raw => raw.Substring(5, 3).Trim()));
         }
 
-        if (svt is not null)
-        {
-            // SVT: legacy has no decode rule for this section (OrdreDeFabricationManager.cs:1668-1669, a
-            // dead, commented-out read) - unchanged single row, only ConsigneGPAO corrected to true.
-            // TypeConsigne, SizeCodeConsigne: assumed, unverified - à_clarifier per the Story 4.2 annex, left
-            // at their CLR default (see deferred-work.md, "Deferred from: story-4.4-bis decomposition of
-            // L_D_CONSIGNES", for the collision risk this leaves open).
-            consignes.Add(Row(source.OF, svt.CodeOperation, source.CodeConsigneSVT ?? string.Empty, typeConsigne: 0, sizeCodeConsigne: 0));
-        }
-
         // Story 4.12 (AC-FR19-5): every row gets its label from the pure port of the legacy
         // LibelleConsigneController.GetLibelle, over the reference snapshot the caller loaded. With no
         // snapshot it is empty, so a lookup-based label becomes "?" and a computed one is still produced.
         // Type 22 also reads the Ordre de Fabrication's ProfilProduit and DiametreProduit and the Pits
         // H2Coulee, the legacy call-site arguments (OrdreDeFabricationManager.cs:1405-1416).
         ConsigneReferenceData reference = referenceData ?? ConsigneReferenceData.Empty;
+        string? Libelle(L_D_CONSIGNES consigne) => LibelleConsigneResolver.Resolve(
+            consigne.CodeOperation,
+            consigne.TypeConsigne,
+            consigne.CodeConsigne,
+            reference,
+            ordreFabrication?.ProfilProduit,
+            ordreFabrication?.DiametreProduit,
+            pits?.H2Coulee).Libelle;
+
         foreach (L_D_CONSIGNES consigne in consignes)
         {
-            consigne.LibelleConsigne = LibelleConsigneResolver.Resolve(
-                consigne.CodeOperation,
-                consigne.TypeConsigne,
-                consigne.CodeConsigne,
-                reference,
-                ordreFabrication?.ProfilProduit,
-                ordreFabrication?.DiametreProduit,
-                pits?.H2Coulee).Libelle;
+            consigne.LibelleConsigne = Libelle(consigne);
         }
 
+        // Story 4.13 (AC-FR19-6): one working copy per decoded row, then the composite labels of the legacy
+        // BuildLibelleConsigne, called once per section after all its rows exist. Only the working copy
+        // receives them, because GetConsignes defaults to gpao=false (OrdreFabrication.cs:60), so the
+        // ConsigneGPAO=true rows 13 and 24 keep "?".
+        List<L_D_CONSIGNES> working = [.. consignes.Select(WorkingCopy)];
+        if (chutage is not null)
+        {
+            SetLabel(SectionRows(working, chutage.CodeOperation), 13, LibelleConsigneComposer.Chutage);
+        }
+
+        if (decoupe is not null)
+        {
+            List<L_D_CONSIGNES> rows = SectionRows(working, decoupe.CodeOperation);
+            (string sizeTwelve, string sizeEighteen) = LibelleConsigneComposer.Decoupe(rows);
+            SetLabel(rows, 13, _ => sizeTwelve);
+            SetLabel(rows, 24, _ => sizeEighteen);
+        }
+
+        if (lingot is not null)
+        {
+            SetLabel(SectionRows(working, lingot.CodeOperation), 13, LibelleConsigneComposer.Lingot);
+        }
+
+        if (pits is not null)
+        {
+            SetLabel(SectionRows(working, pits.CodeOperation), 13, LibelleConsigneComposer.Pits);
+        }
+
+        if (poidsMetrique is not null)
+        {
+            SetLabel(SectionRows(working, poidsMetrique.CodeOperation), 13, LibelleConsigneComposer.PoidsMetrique);
+        }
+
+        if (refroidissoirs is not null)
+        {
+            SetLabel(SectionRows(working, refroidissoirs.CodeOperation), 13, LibelleConsigneComposer.Refroidissoirs);
+        }
+
+        if (svt is not null)
+        {
+            // SVT: legacy has no decode rule for this section (OrdreDeFabricationManager.cs:1668-1669, a
+            // dead, commented-out read) - unchanged single ConsigneGPAO=true row, added after the working
+            // copies were taken because it gets none: CompleteConsignes2 never touches SVT (Story 4.13).
+            // TypeConsigne, SizeCodeConsigne: assumed, unverified - à_clarifier per the Story 4.2 annex, left
+            // at their CLR default (see deferred-work.md, "Deferred from: story-4.4-bis decomposition of
+            // L_D_CONSIGNES", for the collision risk this leaves open).
+            L_D_CONSIGNES svtRow = Row(source.OF, svt.CodeOperation, source.CodeConsigneSVT ?? string.Empty, typeConsigne: 0, sizeCodeConsigne: 0);
+            svtRow.LibelleConsigne = Libelle(svtRow);
+            consignes.Add(svtRow);
+        }
+
+        consignes.AddRange(working);
         return consignes;
     }
+
+    // The working-copy rows of one section, which all share its CodeOperation.
+    private static List<L_D_CONSIGNES> SectionRows(List<L_D_CONSIGNES> working, string codeOperation) =>
+        [.. working.Where(row => row.CodeOperation == codeOperation)];
+
+    // Writes the composite on the section's row of that type, computed before the write. A missing row, or
+    // a null composite (the legacy exception that skips the assignment), leaves the rows unchanged.
+    private static void SetLabel(List<L_D_CONSIGNES> rows, int typeConsigne, Func<IReadOnlyList<L_D_CONSIGNES>, string?> composer)
+    {
+        string? libelle = composer(rows);
+        L_D_CONSIGNES? row = rows.Find(r => r.TypeConsigne == typeConsigne);
+        if (row is not null && libelle is not null)
+        {
+            row.LibelleConsigne = libelle;
+        }
+    }
+
+    private static L_D_CONSIGNES WorkingCopy(L_D_CONSIGNES row) => new()
+    {
+        CodeConsigne = row.CodeConsigne,
+        CodeOperation = row.CodeOperation,
+        ConsigneGPAO = false,
+        LibelleConsigne = row.LibelleConsigne,
+        OF = row.OF,
+        SizeCodeConsigne = row.SizeCodeConsigne,
+        TypeConsigne = row.TypeConsigne,
+    };
 
     // Shared shape for the 5 sections whose full code is always TypeConsigne=13/size 12: skip entirely
     // (no rows at all, matching legacy's own guard) when the section's own raw consigne code is blank,

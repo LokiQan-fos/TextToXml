@@ -227,17 +227,15 @@ public class Kape22FichierProcessorTests
 
         // Story 4.4-bis: one full-code row plus one row per decoded sub-field, per applicable section
         // above (Chutage 6, Decoupe 9 - size-12 block 3 plus size-18 block 6, Lingot 5, Pits 6,
-        // Refroidissoirs 4 - PoidsMetrique/SVT contribute none), all ConsigneGPAO=true, SizeCodeConsigne
-        // 18 only for the Decoupe size-18 block.
+        // Refroidissoirs 4 - PoidsMetrique/SVT contribute none), SizeCodeConsigne 18 only for the Decoupe
+        // size-18 block. Story 4.13: each of those rows exists as ConsigneGPAO=true and as its
+        // ConsigneGPAO=false working copy.
         List<L_D_CONSIGNES> consignes = verify.ConsignesRows.ToList();
-        Assert.Equal(6 + 9 + 5 + 6 + 4, consignes.Count);
-        Assert.All(consignes, consigne =>
-        {
-            Assert.True(consigne.ConsigneGPAO);
-            Assert.Equal(consigne.TypeConsigne >= 24 ? 18 : 12, consigne.SizeCodeConsigne);
-        });
+        Assert.Equal(6 + 9 + 5 + 6 + 4, consignes.Count(consigne => consigne.ConsigneGPAO));
+        Assert.Equal(6 + 9 + 5 + 6 + 4, consignes.Count(consigne => !consigne.ConsigneGPAO));
+        Assert.All(consignes, consigne => Assert.Equal(consigne.TypeConsigne >= 24 ? 18 : 12, consigne.SizeCodeConsigne));
         int[] decoupeTypes = [.. consignes
-            .Where(consigne => consigne.CodeOperation == verify.SectionChargeDecoupeRows.Single().CodeOperation)
+            .Where(consigne => consigne.ConsigneGPAO && consigne.CodeOperation == verify.SectionChargeDecoupeRows.Single().CodeOperation)
             .Select(consigne => consigne.TypeConsigne)
             .OrderBy(type => type)];
         Assert.Equal([13, 16, 17, 24, 25, 26, 27, 28, 29], decoupeTypes);

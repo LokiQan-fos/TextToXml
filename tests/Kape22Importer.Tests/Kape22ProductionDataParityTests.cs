@@ -268,18 +268,25 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
     // Story 4.4-bis (AC-4): L_D_CONSIGNES carries several rows per OF - its own natural key is
     // (OF, CodeOperation, TypeConsigne, ConsigneGPAO), not OF alone (Story 4.1) - which is exactly the
     // gap that let ConsignesMapper silently under-produce before this story (5 rows vs 60 in production
-    // for one real OF, never caught because this table had no parity test at all). Only the
-    // ConsigneGPAO=1 rows are in this mapper's own scope (AC-2, sprint-change-proposal-2026-09-23) -
-    // ConsigneGPAO=0 belongs to an earlier, out-of-scope process this mapper never produces or checks
-    // for. For every row ConsignesMapper actually produces, its exact natural-key match must exist in
+    // for one real OF, never caught because this table had no parity test at all). ConsigneGPAO=1 is the
+    // value received from the GPAO, never edited; ConsigneGPAO=0 is the working copy the import itself
+    // creates with the same codes, which operators edit afterwards through MCC (Story 4.13,
+    // sprint-change-proposal-2026-09-24, correcting the 2026-09-23 meaning). For every ConsigneGPAO=1 row
+    // ConsignesMapper actually produces, its exact natural-key match must exist in
     // production with the same CodeConsigne/SizeCodeConsigne; a row with no production match at all is a
     // real regression. Story 4.12 (AC-FR19-5): LibelleConsigne is compared too, resolved against the
     // production L_P_CONSIGNES_* snapshot. A row whose consulted reference rows were edited (DateMaj) after
     // this Fichier's production DateReception is reported as skipped, not failed: the legacy application
-    // resolved it against values that no longer exist (same principle as "P60 is a forecast").
+    // resolved it against values that no longer exist (same principle as "P60 is a forecast"). Story 4.13
+    // (AC-FR19-6): every ConsigneGPAO=0 row produced must exist in production ConsigneGPAO=0, and every
+    // production ConsigneGPAO=0 row of a CodeOperation it produced must be produced. Its codes are compared to the production ConsigneGPAO=1 row, since both rows carry the same
+    // codes at import time. Its label is compared to the production ConsigneGPAO=0 row only when no code
+    // of that section differs between production 0 and 1; a section edited after the import (MCC) is
+    // reported as skipped, not failed.
     [SkippableTheory]
     [MemberData(nameof(P60Fichiers))]
     [Trait("AC", "FR19-5")]
+    [Trait("AC", "FR19-6")]
     public void MappedFichier_ConsignesRows_MatchLegacyProductionRows(string fichierName)
     {
         Skip.IfNot(fixture.Available, fixture.SkipReason ?? "SQL Server test instance unavailable.");
@@ -313,8 +320,9 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
 
         Skip.If(consignes.Count == 0, $"{fichierName}: aucune section décodable applicable pour cet OF, rien à comparer.");
 
-        List<L_D_CONSIGNES> productionRows = ReadProductionRows<L_D_CONSIGNES>(
-            rows => WithOf(rows, PadOf(of)).Where(row => row.ConsigneGPAO).ToList());
+        List<L_D_CONSIGNES> productionAll = ReadProductionRows<L_D_CONSIGNES>(rows => WithOf(rows, PadOf(of)).ToList());
+        List<L_D_CONSIGNES> productionRows = [.. productionAll.Where(row => row.ConsigneGPAO)];
+        List<L_D_CONSIGNES> productionWorking = [.. productionAll.Where(row => !row.ConsigneGPAO)];
         Skip.If(
             productionRows.Count == 0,
             $"{fichierName}: aucune ligne L_D_CONSIGNES (ConsigneGPAO=1) en production pour OF '{of}' (paddé '{PadOf(of)}').");
@@ -334,7 +342,7 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
         // Reverse direction (code-review patch): every production ConsigneGPAO=1 row of a CodeOperation this
         // mapper produced must have its own mapped counterpart - under-production (5 rows produced vs 60 in
         // production, the defect this story fixes) is otherwise invisible to the per-mapped-row loop below.
-        HashSet<string> mappedCodeOperations = [.. testRows.Select(row => row.CodeOperation.Trim())];
+        HashSet<string> mappedCodeOperations = [.. testRows.Where(row => row.ConsigneGPAO).Select(row => row.CodeOperation.Trim())];
         foreach (L_D_CONSIGNES production in productionRows.Where(p => mappedCodeOperations.Contains(p.CodeOperation.Trim())))
         {
             if (!testRows.Any(row => row.CodeOperation.Trim() == production.CodeOperation.Trim() && row.TypeConsigne == production.TypeConsigne))
@@ -344,7 +352,7 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
             }
         }
 
-        foreach (L_D_CONSIGNES row in testRows)
+        foreach (L_D_CONSIGNES row in testRows.Where(row => row.ConsigneGPAO))
         {
             // FirstOrDefault, not SingleOrDefault: a data-quality surprise in production (more than one
             // row for this (CodeOperation, TypeConsigne) pair) must still produce the descriptive
@@ -393,6 +401,8 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
             }
         }
 
+        CompareWorkingRows(regressions, skippedLibelles, testRows, productionRows, productionWorking, dateReception, ordreFabrication, pits);
+
         // Reported, not failed: written to the xUnit test output of this Fichier.
         foreach (string skipped in skippedLibelles)
         {
@@ -401,8 +411,92 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
 
         Assert.True(
             regressions.Count == 0,
-            $"{fichierName} (OF {of}) diverge de la production sur L_D_CONSIGNES (ConsigneGPAO=1) :\n" +
+            $"{fichierName} (OF {of}) diverge de la production sur L_D_CONSIGNES :\n" +
             string.Join("\n", regressions));
+    }
+
+    // Story 4.13 (AC-FR19-6): the ConsigneGPAO=0 half of the consignes parity. A section is edited when one
+    // of its production codes differs between ConsigneGPAO=0 and 1, or has no counterpart on the other
+    // side: its labels then reflect an operator's MCC edit, not the import, so a label difference there is
+    // skipped. Outside such sections the DateMaj guard of the ConsigneGPAO=1 comparison applies: to the
+    // row's own reference rows, or to those of every row of the section for a composite label.
+    private static void CompareWorkingRows(
+        List<string> regressions,
+        List<string> skippedLibelles,
+        List<L_D_CONSIGNES> testRows,
+        List<L_D_CONSIGNES> productionRows,
+        List<L_D_CONSIGNES> productionWorking,
+        DateTime? dateReception,
+        L_D_ORDRE_FABRICATION ordreFabrication,
+        L_D_SECTIONCHARGE_PITS? pits)
+    {
+        L_D_CONSIGNES? Match(List<L_D_CONSIGNES> rows, L_D_CONSIGNES row) => rows.FirstOrDefault(
+            p => p.CodeOperation.Trim() == row.CodeOperation.Trim() && p.TypeConsigne == row.TypeConsigne);
+
+        HashSet<string> editedSections = [.. productionWorking
+            .Where(working => !Equals(Normalize(Match(productionRows, working)?.CodeConsigne), Normalize(working.CodeConsigne)))
+            .Concat(productionRows.Where(received => Match(productionWorking, received) is null))
+            .Select(row => row.CodeOperation.Trim())];
+        List<L_D_CONSIGNES> testWorking = [.. testRows.Where(row => !row.ConsigneGPAO)];
+        HashSet<string> mappedCodeOperations = [.. testWorking.Select(row => row.CodeOperation.Trim())];
+
+        foreach (L_D_CONSIGNES production in productionWorking.Where(p => mappedCodeOperations.Contains(p.CodeOperation.Trim())))
+        {
+            if (Match(testWorking, production) is null)
+            {
+                regressions.Add(
+                    $"  CodeOperation={production.CodeOperation}, TypeConsigne={production.TypeConsigne} (ConsigneGPAO=0): ligne de production non produite par le nouveau traitement.");
+            }
+        }
+
+        foreach (L_D_CONSIGNES row in testWorking)
+        {
+            string key = $"  CodeOperation={row.CodeOperation}, TypeConsigne={row.TypeConsigne} (ConsigneGPAO=0)";
+            L_D_CONSIGNES? working = Match(productionWorking, row);
+            L_D_CONSIGNES? received = Match(productionRows, row);
+            if (working is null || received is null)
+            {
+                string missing = working is null ? "ConsigneGPAO=0" : "ConsigneGPAO=1";
+                regressions.Add($"{key}: aucune ligne de production correspondante ({missing}).");
+                continue;
+            }
+
+            if (!Equals(Normalize(received.CodeConsigne), Normalize(row.CodeConsigne)))
+            {
+                regressions.Add($"{key}.CodeConsigne: production (ConsigneGPAO=1)={Format(received.CodeConsigne)}, nouveau traitement={Format(row.CodeConsigne)}");
+            }
+
+            if (received.SizeCodeConsigne != row.SizeCodeConsigne)
+            {
+                regressions.Add($"{key}.SizeCodeConsigne: production (ConsigneGPAO=1)={received.SizeCodeConsigne}, nouveau traitement={row.SizeCodeConsigne}");
+            }
+
+            if (Equals(working.LibelleConsigne, row.LibelleConsigne))
+            {
+                continue;
+            }
+
+            string difference = $"{key}.LibelleConsigne: production={Format(working.LibelleConsigne)}, nouveau traitement={Format(row.LibelleConsigne)}";
+            bool composite = row.TypeConsigne == 13 || (row.TypeConsigne == 24 && row.SizeCodeConsigne == 18);
+            DateTime? consulted = testWorking
+                .Where(other => composite ? other.CodeOperation == row.CodeOperation : other == row)
+                .Select(other => LibelleConsigneResolver.Resolve(
+                    other.CodeOperation, other.TypeConsigne, other.CodeConsigne, ProductionReferenceData.Value,
+                    ordreFabrication.ProfilProduit, ordreFabrication.DiametreProduit, pits?.H2Coulee).LatestDateMaj)
+                .Max();
+            if (editedSections.Contains(row.CodeOperation.Trim()))
+            {
+                skippedLibelles.Add($"{difference} (section retouchée après l'import, MCC)");
+            }
+            else if (consulted > dateReception)
+            {
+                skippedLibelles.Add($"{difference} (référence modifiée le {Format(consulted)}, après la réception)");
+            }
+            else
+            {
+                regressions.Add(difference);
+            }
+        }
     }
 
     // The production L_P_CONSIGNES_* snapshot, read once for the whole class (SELECT only, the same
@@ -418,7 +512,7 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
     });
 
     // Inserts every row ConsignesMapper produced for this OF under one rolled-back TransactionScope, then
-    // reads them all back by OF + ConsigneGPAO - the multi-row-per-OF counterpart of RoundTrip (which
+    // reads them all back by OF, both ConsigneGPAO values (Story 4.13) - the multi-row-per-OF counterpart of RoundTrip (which
     // reloads by a single-row key) and RoundTripThroughTestDatabase (which reloads by Id).
     private List<L_D_CONSIGNES> RoundTripConsignes(List<L_D_CONSIGNES> entities)
     {
@@ -434,10 +528,9 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
 
         // No scope.Complete(): the insert rolls back here, same as RoundTrip/RoundTripThroughTestDatabase.
         // Scoped to the CodeOperations just inserted for this call, not just OF: a shared test database
-        // carrying other ConsigneGPAO=1 rows for the same OF from an unrelated source would otherwise be
-        // silently included.
+        // carrying other rows for the same OF from an unrelated source would otherwise be silently included.
         return context.ConsignesRows.AsNoTracking()
-            .Where(row => row.OF == of && row.ConsigneGPAO && codeOperations.Contains(row.CodeOperation))
+            .Where(row => row.OF == of && codeOperations.Contains(row.CodeOperation))
             .ToList();
     }
 

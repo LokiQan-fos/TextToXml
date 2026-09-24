@@ -2468,9 +2468,11 @@ garde-fou ; C-10 : Dev / PM).
 > correction de conformité à un AC déjà déclaré, pas de nouveau FR. Cause
 > racine entièrement décodée depuis `Desktop/kape22/OrdreDeFabricationManager.cs`
 > (décomposition en sous-champs par section, non implémentée) ; sémantique
-> `ConsigneGPAO` tranchée par le donneur d'ordre (2026-09-23) : `1` = valeur
-> injectée par le dispatch P60 (que ce mapper doit produire), `0` = valeur
-> initiale de l'OF, hors périmètre de ce mapper.
+> `ConsigneGPAO` : **corrigée le 2026-09-24** (sprint-change-proposal-2026-09-24.md,
+> Story 4.13). `1` = valeur reçue du GPAO, jamais retouchée ; `0` = copie de
+> travail créée par l'import avec les mêmes codes, retouchée ensuite par les
+> opérateurs (MCC). La lecture du 2026-09-23 (`0` = valeur initiale de l'OF,
+> hors périmètre) était inversée.
 
 ### Story 4.4-bis : Décomposition `L_D_CONSIGNES` en sous-champs + sémantique `ConsigneGPAO`
 
