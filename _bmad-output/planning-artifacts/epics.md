@@ -307,7 +307,7 @@ microservices à UI et ne s'appliquent à aucune story v1.
 | FR-16 | Épic 1 — 1.8 | AC-FR16-1 … AC-FR16-4 |
 | FR-17 | Épic 4 — 4.2 | AC-FR17-1 … AC-FR17-5 |
 | FR-18 | Épic 4 — 4.3 | AC-FR18-1 … AC-FR18-4 |
-| FR-19 | Épic 4 — 4.4 (`AC-FR19-1..4`), 4.12 (`AC-FR19-5`, `LibelleConsigne`) | AC-FR19-1 … AC-FR19-5 |
+| FR-19 | Épic 4 — 4.4 (`AC-FR19-1..4`), 4.12 (`AC-FR19-5`, `LibelleConsigne`), 4.13 (`AC-FR19-6`, ligne `ConsigneGPAO=0`) | AC-FR19-1 … AC-FR19-6 |
 | FR-20 | Épic 4 — 4.5 (contrôles purs), 4.6 (`AC-FR20-5`, existence coulée) | AC-FR20-1 … AC-FR20-5 |
 | FR-21 | Épic 4 — 4.6 (persister), 4.7 (E2E) | AC-FR21-1 … AC-FR21-5 |
 | CTR-1/2/3 | Épic 1 — 1.8 | contrat `decimal`/`datetime`/`convert` + round‑trip typé |
@@ -2609,6 +2609,97 @@ And `scripts/e2e-worker-import.ps1` recharge d'abord les 13 tables de test
 **Tests xUnit :** `LibelleConsigneResolverTests` (matrice I/O et une branche
 legacy par test), `Kape22FichierProcessorIntegrationTests` (références seedées),
 `Kape22ProductionDataParityTests` (parité `LibelleConsigne`).
+
+**Critères transverses :** CC-1, CC-2, CC-3, CC-4, CC-5.
+
+Owner : Dev.
+
+> Écart constaté en session de test n° 3 (2026-09-24, OF `2039771`, `2040231`,
+> `2040232`) : la production porte chaque consigne en deux lignes
+> (`ConsigneGPAO=1` et `0`), le worker n'écrit que la ligne `1`. La sémantique
+> `ConsigneGPAO` retenue le 2026-09-23 est corrigée (`1` = valeur reçue du
+> GPAO, `0` = copie de travail retouchée par MCC) —
+> `sprint-change-proposal-2026-09-24.md`, approuvé. Un AC ajouté (`AC-FR19-6`).
+
+### Story 4.13 : Ligne de travail `ConsigneGPAO=0` + libellés composites (port de `BuildLibelleConsigne`)
+
+As a `Kape22Importer`,
+I want que chaque consigne produite existe aussi en ligne `ConsigneGPAO=0`
+(copie de travail), avec les libellés composites que le legacy construit par
+`BuildLibelleConsigne`,
+So that `L_D_CONSIGNES` porte, à l'import, les mêmes 2 × N lignes que la
+production au lieu de la seule moitié `ConsigneGPAO=1`.
+
+**Prérequis :** Stories 4.4-bis et 4.12 (livrées).
+
+**Acceptance Criteria:**
+
+**AC-FR19-6 (ligne de travail) :**
+Given un Fichier `P60/` dont `ConsignesMapper` produit N lignes `ConsigneGPAO=1`
+When il est mappé
+Then il produit aussi N lignes `ConsigneGPAO=0`, une par ligne `1`, de même
+  `OF`, `CodeOperation`, `TypeConsigne`, `CodeConsigne`, `SizeCodeConsigne`
+  (source : `AddOrModifyConsigne`, `OrdreDeFabricationManager.cs:1362-1435`,
+  un seul `codeconsigne` pour les deux lignes)
+And le `LibelleConsigne` de chaque ligne `0` non composite est celui de sa
+  ligne `1` (`LibelleConsigneResolver`, Story 4.12)
+And SVT suit ce que fait le legacy (lecture de `CompleteConsignes2` et de la
+  production) ; faute de règle trouvée, SVT est documentée `à_clarifier`
+  sans règle inventée
+
+**AC-2 (libellés composites, port exact de `BuildLibelleConsigne`) :**
+Given `OrdreFabrication.BuildLibelleConsigne` (`Desktop/kape22/OrdreFabrication.cs:700+`)
+When les lignes `0` de type 13 (6 sections décodées) et de type 24 (XP1) sont produites
+Then leur `LibelleConsigne` est reproduit **à l'identique** du legacy, sans
+  normalisation : l'ordre des sous-types par section (lire le tableau `__tabCodes*`
+  de chaque `case`), le séparateur `"\t\t"` après chaque élément, séparateur
+  final compris, le suffixe `"°C"` sur les types 10/11 de PC1, le `"\n"` suivi
+  du libellé du type 6 de PC1, et les sous-libellés `?` recopiés tels quels
+  — lire le code source directement pour chaque section plutôt qu'une
+  retranscription
+And les lignes `ConsigneGPAO=1` de type 13/24 gardent `?` (inchangé, comme le legacy)
+And un port pur (fonction statique, AD-2), sans accès base
+
+**AC-3 (sémantique `ConsigneGPAO` corrigée) :**
+Given la sémantique retenue le 2026-09-23 (`0` = valeur initiale hors
+  périmètre, `1` = valeur modifiée), contredite par la production (§1 de
+  sprint-change-proposal-2026-09-24.md)
+When la story est livrée
+Then l'annexe § L_D_CONSIGNES (ligne `ConsigneGPAO`), les commentaires
+  `ConsignesMapper.cs` et `Kape22ProductionDataParityTests.cs`, et le
+  chapeau de section « tests de parité production, 2026-09-23 » d'epics.md
+  portent : `1` = valeur reçue du GPAO, jamais retouchée ; `0` = copie de
+  travail créée par l'import avec les mêmes codes, retouchée ensuite par les
+  opérateurs (MCC)
+
+**AC-4 (espaces de fin de `CodeConsigne`, écart accepté) :**
+Given le legacy conserve les espaces de fin (ex. `"00 1        "`)
+When une ligne est produite
+Then `CodeConsigne` reste sans espaces de fin (comportement actuel, décision
+  utilisateur 2026-09-24) et l'annexe documente cet écart accepté
+
+**AC-5 (parité production) :**
+Given `Kape22ProductionDataParityTests` (compare aujourd'hui les lignes `1` seulement)
+When la suite est étendue
+Then chaque ligne `0` produite a sa correspondante en production (clé naturelle)
+And ses `CodeConsigne`/`SizeCodeConsigne` sont comparés à la ligne `1` de
+  production (à l'import, `0` et `1` portent les mêmes codes)
+And son `LibelleConsigne` n'est comparé à la ligne `0` de production que pour
+  les sections (`OF`, `CodeOperation`) dont aucun code `0` ne diffère du code
+  `1` en production ; une section retouchée après l'import (MCC) est signalée
+  comme ignorée, pas en échec
+
+**AC-6 (E2E) :**
+Given `scripts/e2e-worker-import.ps1`
+When il est rejoué sur `P60_847_682_001`
+Then il vérifie aussi que les lignes `ConsigneGPAO=0` existent en même nombre
+  que les lignes `1`, et que leurs libellés de type 13 ne sont pas `?`
+
+**Tests xUnit (TDD, CC-1) :** un test « ligne 0 miroir des codes » ; un test par
+section pour le libellé composite (fixtures `P60/` réelles, valeurs attendues
+tirées de la production sur une section non retouchée) ; un test XP1 type 24
+présent/absent ; un test « lignes 1 composites restent `?` » ; extension
+`Kape22ProductionDataParityTests` (AC-5).
 
 **Critères transverses :** CC-1, CC-2, CC-3, CC-4, CC-5.
 

@@ -83,6 +83,7 @@ development_status:
   4-11-hardening-epic-4-c: done
   4-4-bis-decomposition-l-d-consignes-sous-champs-consignegpao: done
   4-12-libelle-consigne: done
+  4-13-ligne-consignegpao-0-libelles-composites: backlog
 action_items:
   - id: "story-4-6-decimal-scale-defect-story-4-3-bis"
     epic: 4

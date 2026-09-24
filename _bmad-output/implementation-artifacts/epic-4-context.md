@@ -5,21 +5,18 @@
 ## Goal
 
 Complete the P60 pipeline after the `L_D_KAPE22` insert (Epic 2) by dispatching
-explicitly — without reflection — into `L_D_ORDRE_FABRICATION`, `L_D_COULEE`,
+explicitly, without reflection, into `L_D_ORDRE_FABRICATION`, `L_D_COULEE`,
 `L_D_CONSIGNES` and the 7 `L_D_SECTIONCHARGE_*` tables (Chutage, Lingot,
-Decoupe, Pits, PoidsMetrique, Refroidissoirs, Svt), replacing the legacy
-reflection-based `MappingTemplate` procedure (read-only reference, never
-modified or called at runtime). A valid Fichier must write exactly one
-transaction covering all 10 tables; any business or SQL failure blocks the
-whole batch, logs the precise cause through the existing circuit, and moves
-the Fichier to `error/`, never leaving an orphaned `L_D_KAPE22` row. The epic
-has been reopened four times after retrospectives/production-parity testing
-surfaced gaps, each closed by a follow-up story
-(4.2-bis/4.3-bis/4.9/4.10/4.11/4.4-bis). The latest, 4.4-bis, corrects
-`ConsignesMapper`: production-parity testing on a real OF found the mapper
-producing only 1/12th of the real `L_D_CONSIGNES` row count, because it never
-decoded the per-section sub-fields legacy derives from the raw consigne code,
-and tagged its rows with the wrong `ConsigneGPAO` value.
+Decoupe, Pits, PoidsMetrique, Refroidissoirs, Svt). This replaces the legacy
+`MappingTemplate`/reflection procedure, which stays a read-only reference and
+is never modified or called at runtime. A valid Fichier writes exactly one
+transaction covering all 10 tables. Any business or SQL failure blocks the whole
+batch, logs the precise cause through the existing circuit and moves the Fichier
+to `error/`, so no orphaned `L_D_KAPE22` row is ever left behind. Retrospectives
+and production-parity test sessions have reopened the epic several times. The
+latest correction, Story 4.13, makes `L_D_CONSIGNES` match production's 2 × N
+rows: each consigne is written twice, as a `ConsigneGPAO=1` row and as a
+`ConsigneGPAO=0` working-copy row that carries the composite labels.
 
 ## Stories
 
@@ -32,120 +29,114 @@ and tagged its rows with the wrong `ConsigneGPAO` value.
 - Story 4.7: E2E suite extended to the 10 downstream tables
 - Story 4.2-bis: Mapping annex extended with a `scale` field
 - Story 4.3-bis: Decimal scaling fix (5 mappers)
-- Story 4.9: Hardening (A-2..A-5: DbSet assertions, OF/Coulee trim-at-source, shared hot/cold marker, Consignes collision pre-check)
-- Story 4.10: Hardening (B-1..B-5: scale/annex conformance guard, `DecimalScale.Apply` bypass guard, production parity extended, script exit-code guard, magnitude overflow guard)
+- Story 4.9: Hardening (A-2..A-5)
+- Story 4.10: Hardening (B-1..B-5)
 - Story 4.11: Hardening (C-1..C-10) + business notes Q-3/Q-5
-- Story 4.4-bis: Decompose `L_D_CONSIGNES` into per-section decoded sub-fields + correct `ConsigneGPAO` semantics
+- Story 4.4-bis: Decompose `L_D_CONSIGNES` into per-section decoded sub-fields
+- Story 4.12: Populate `L_D_CONSIGNES.LibelleConsigne` (port of `GetLibelle`)
+- Story 4.13: `ConsigneGPAO=0` working-copy row + composite labels (port of `BuildLibelleConsigne`)
 
 ## Requirements & Constraints
 
-- Extract and document, column-by-column, how every downstream column derives
-  from `L_D_KAPE22` or a business rule, with a test that mechanically fails on
-  any undocumented column (no rule may be coded from memory).
-- Map `L_D_KAPE22` → OF/Coulee and → Consignes/7×SectionCharge explicitly, one
-  mapper per target table, respecting the per-OF applicability rule for
-  SectionCharge tables.
-- Blocking business checks must run before persistence: cold Coulee must
-  exist, hot Coulee format must be valid, ingot/furnace distribution must be
-  consistent (missing Pits, malformed hot-Coulee, etc.).
-- Extended transactional persistence: one commit for `L_D_KAPE22` + the 9 (now
-  10, per the bundle) downstream tables; any failure cause is logged via the
-  existing dual-logging circuit (`L_D_LOG_COMMANDE` + `MQTTnetServices.Logs`)
-  and the file is routed to `error/`. Must preserve NFR-7 (replay = redeposit,
-  no DB action) and the anti-duplicate guard keyed on `(NumeroFichier, OF)`.
-- The SQL Server integration test harness (local instance, versioned
-  `scripts/schema/`, dual isolation regime) is extended to cover the 10 new
-  entities; unit tests for mapping logic stay DB-free.
-- Transverse coding standards apply to every development story: TDD
-  (test-first, one xUnit test per `AC-FRx-y`), English-only comments (own line,
-  above the code, sentence case), alphabetical property ordering on classes/
-  entities/records (not on local tuples/deconstructions), PRD glossary
-  vocabulary in identifiers, no secrets/connection strings hard-coded.
-- Every `decimal` column sourced from a KAPE22 `int`/`int?` must have an
-  explicit, annex-documented scale, applied only through `DecimalScale.Apply`;
-  a completeness test must fail if a mapper's literal scale diverges from the
-  annex, or if such a column is assigned without going through `DecimalScale.Apply`.
-- A pre-persistence magnitude guard must catch a scaled value that still
-  overflows its target column's precision and turn it into a diagnosed
-  `ConversionError` rather than a raw SQL overflow.
-- The Consignes natural-key collision pre-check `(OF, CodeOperation,
-  TypeConsigne, ConsigneGPAO)` must compare `CodeOperation` case-insensitively,
-  matching the real primary key's SQL Server collation.
-- `L_D_CONSIGNES` decomposition (4.4-bis): each of the 6 decodable sections
-  (every section but SVT) decodes its raw consigne code into several positional sub-fields (`Substring` offsets),
-  each a distinct `L_D_CONSIGNES` row with its own `TypeConsigne`, in addition
-  to the already-produced "full code" row. Offsets must be read directly from
-  the legacy source per section rather than reconstructed from memory (same
-  no-guessing discipline as the mapping annex). `Decoupe` (XP1) has a second,
-  independent size-18 consigne code, `LibelleConsigneDecoupe` (Position 287),
-  with its own sub-fields, present only if non-empty (code review D-1,
-  2026-09-23).
-  `SVT` may legitimately have no discoverable decomposition rule — document as
-  `à_clarifier` rather than invent one; this does not block the story.
-- `ConsigneGPAO` semantics (confirmed by the business owner, not previously
-  known): `0` = the value initially planned by the OF; `1` = the value as
-  possibly adjusted by an operator for a temporary production constraint —
-  these are two distinct, both-needed values, not a mirror/duplicate. Every
-  row this pipeline produces (P60 dispatch) is a `1`-value; producing or
-  assuming the existence of a matching `0`-value row is out of scope for this
-  mapper and for downstream code (no cross-mapper existence check).
-- Production-parity testing (`Kape22ProductionDataParityTests`) did not
-  previously cover `L_D_CONSIGNES` or `L_D_COULEE` column-by-column against
-  real data — only `L_D_KAPE22` and the `decimal` columns of
-  `L_D_ORDRE_FABRICATION`/`L_D_SECTIONCHARGE_*` were checked, which is why the
-  `L_D_CONSIGNES` under-population went undetected. Closing this coverage gap
-  for `L_D_CONSIGNES` (`ConsigneGPAO=1` rows only) is part of this epic.
+- Every downstream column is documented in the mapping annex, which says how it
+  derives from `L_D_KAPE22` or from a business rule. A completeness test fails
+  on any undocumented column. No rule may be coded from memory: offsets and
+  branches are read directly from the legacy source (`Desktop/kape22/`,
+  `Lsi.Net/Ascometal.LSI.DAL/`). A rule that cannot be found is marked
+  `à_clarifier` / `assumed, unverified`, never guessed (SVT is the recurring
+  case).
+- There is one pure mapper per target table. SectionCharge tables follow the
+  per-OF applicability rule: a table that does not apply gets no default row.
+- Blocking business checks run before persistence: the cold Coulee must exist,
+  the hot Coulee format must be valid, and the ingot/furnace distribution must be
+  consistent.
+- Every `decimal` column sourced from a KAPE22 `int` has an annex-documented
+  scale, applied only through `DecimalScale.Apply`. A pre-persistence magnitude
+  guard turns an overflow into a diagnosed `ConversionError`.
+- The Consignes natural key is `(OF, CodeOperation, TypeConsigne,
+  ConsigneGPAO)`. The collision pre-check compares `CodeOperation`
+  case-insensitively.
+- **`L_D_CONSIGNES` content:**
+  - Each decodable section (all except SVT) produces a full-code row
+    (`TypeConsigne=13`) plus one row per positional sub-field.
+  - XP1 has a second, optional size-18 code (type 24) with its own sub-fields
+    (types 25-29). These rows exist only when that code is non-empty.
+  - `LibelleConsigne` comes from the pure `LibelleConsigneResolver`, a port of
+    `GetLibelle`. `Kape22FichierProcessor` loads a SELECT-only snapshot of the
+    13 `L_P_CONSIGNES_*` tables once per Fichier. With an empty snapshot,
+    table-sourced labels are `?`.
+- **`ConsigneGPAO` semantics** (corrected 2026-09-24, replacing the inverted
+  2026-09-23 version):
+  - `1` is the value received from the GPAO and is never edited.
+  - `0` is a working copy that the import itself creates with identical codes;
+    operators edit it later through the MCC command. No other process writes
+    the `0` rows.
+- Each `1` row therefore has a `0` twin with the same `OF`, `CodeOperation`,
+  `TypeConsigne`, `CodeConsigne`, `SizeCodeConsigne` and label, with one
+  exception: the composite rows (type 13 of each decoded section, type 24 of
+  XP1). On those rows the `0` row carries the composite label built by an exact,
+  pure port of `BuildLibelleConsigne`, while the `1` row keeps `?`. The port
+  keeps the sub-type order per section, the `"\t\t"` separators (trailing one
+  included), `"°C"` on PC1 types 10/11, `"\n"` + the PC1 type 6 label, and
+  copies `?` sub-labels as-is.
+- `CodeConsigne` trailing spaces are trimmed (unlike legacy). This is an
+  accepted deviation and must be documented in the annex.
+- Production parity (`Kape22ProductionDataParityTests`, real `P60/` files)
+  covers `L_D_CONSIGNES`:
+  - For `1` rows, it compares every column, including `LibelleConsigne`.
+  - For `0` rows, it checks that a production row with the same natural key
+    exists. Codes are compared against production's `1` row. The label is
+    compared only for sections whose production `0` codes are all equal to
+    their `1` codes. A section edited through MCC is reported as skipped,
+    not failed.
+- `scripts/e2e-worker-import.ps1` first reloads the reference tables from
+  production. It fails on a `NULL` label, checks that the number of `0` rows
+  equals the number of `1` rows, and checks that no type 13 label on a `0` row
+  is `?`.
+- The production DB is read-only (SELECT only).
+- Transverse standards apply:
+  - TDD, with one xUnit test per AC.
+  - English comments.
+  - Case-insensitive alphabetical property ordering.
+  - PRD glossary vocabulary.
+  - No hard-coded secrets.
 
 ## Technical Decisions
 
-- **Single extended transaction**: `L_D_KAPE22`, `L_D_LOG_COMMANDE` and the 9
-  downstream tables live in the same `DbContext` and commit via one
-  `SaveChanges()` — no partial write.
-- **Explicit mapping, no reflection**: one mapper class per target table
-  (`OrdreFabricationMapper`, `CouleeMapper`, `ConsignesMapper`,
-  `SectionCharge{Chutage,Lingot,Decoupe,Pits,PoidsMetrique,Refroidissoirs,Svt}Mapper`),
-  properties read/written by explicit name — no `System.Reflection`,
-  `Activator.CreateInstance`, or runtime-interpreted mapping table.
-- **Legacy wall**: `Ascometal.LSI.DAL`/`BLL` (legacy repo) is read-only
-  reference for business intent only — never modified, referenced as an
-  assembly, or called at runtime. New EF entities are redefined in
-  `Kape22Importer.Persistence`, independent of legacy `EntityObject` classes.
-- **EF database-first, no migrations**: the 10 new entities follow the
-  `L_D_KAPE22.cs` convention, one file per entity under `Persistence/`, schema
-  derived exclusively from `AFV004-LSI` (`sys.columns`), never from the
-  mapping annex (which documents derivation rules, not table shape).
-- **`Kape22ImportBundle` replaces `MapResult<L_D_KAPE22>`** at the Persister
-  boundary: same metadata (`Success`, `Errors`, `Warnings`, `NumeroFichier`,
-  `OF`) plus the 9 nullable downstream entities. `Kape22Persister.Persist` is
-  replaced, not overloaded.
-- **FK by explicit scalar column**: each bundle entity carries its business
-  key as a scalar column (e.g. `OF`); no EF navigation properties
-  (`ICollection<T>`) link bundle entities. `ConsignesMapper`/`Kape22Persister`
-  must not add a cross-mapper existence check for the (out-of-scope)
-  `ConsigneGPAO=0` counterpart rows — consistent with this no-navigation rule.
-- **Failure cause reuses the existing circuit**: any dispatch failure (SQL or
-  business) becomes a distinct `ConversionError{Block:File, Code}` feeding
-  `L_D_LOG_COMMANDE` (`"<NumeroFichier> — REJETÉ : <cause>"`) and
-  `MQTTnetServices.Logs` — no new channel.
-- **Hot-Coulee reuse semantics** (documented, not changed): a Coulee is
-  created by the first OF that references it, then shared as-is by later OFs
-  of the same Coulee; a later OF must not modify it. An OF cannot be
-  resubmitted today — an OF in error is reissued under a new OF number rather
-  than replayed identically.
+- **Single transaction:** `L_D_KAPE22`, `L_D_LOG_COMMANDE` and the downstream
+  tables share one `DbContext` and are written by one `SaveChanges()`.
+  `Kape22ImportBundle` replaces `MapResult<L_D_KAPE22>` at the Persister
+  boundary.
+- **Explicit mapping, pure functions:** mappers read and write properties by
+  name, with no `System.Reflection`, `Activator` or runtime mapping table.
+  Mappers have no DB access and no cross-mapper knowledge. The label resolver
+  and the composite-label port are also pure.
+- **Legacy wall:** `Ascometal.LSI.DAL`/`BLL` are reference material for
+  business intent only. They are never modified, referenced as assemblies or
+  called at runtime.
+- **EF database-first, no migrations:** there is one file per entity under
+  `Persistence/`. The schema comes from `AFV004-LSI` `sys.columns`, never from
+  the annex.
+- **Foreign keys by scalar column:** bundle entities are linked only by scalar
+  columns such as `OF`, never by navigation properties. Adding the `0` rows
+  needs no schema or Persister change because `ConsigneGPAO` already
+  distinguishes the pair in the key.
+- **Failure cause reuses the existing circuit:** a failure becomes a
+  `ConversionError{Block:File, Code}` that feeds both `L_D_LOG_COMMANDE`
+  (`"<NumeroFichier> — REJETÉ : <cause>"`) and `MQTTnetServices.Logs`. No new
+  channel is added.
+- **Hot-Coulee reuse:** the first OF that references a Coulee creates it. Later
+  OFs share it and must not modify it. An OF in error is reissued under a new
+  number and never replayed.
 
 ## Cross-Story Dependencies
 
-- Internal sequencing: 4.1 → {4.3, 4.4} → 4.5 → 4.6 → 4.7; Story 4.2 is a
-  transverse prerequisite for 4.3/4.4 (mapping annex must exist before mappers
-  are coded against it).
-- Hardening chain: 4.2-bis → 4.3-bis → 4.9 → 4.10 → 4.11, each retrospective
-  building on the fixes and tests of the previous one; 4.11 is independent
-  internally (C-1..C-10 have no ordering) but depends on all prior Epic 4
-  stories being delivered.
-- Story 4.4-bis has no prerequisite and is independent of
-  4.2-bis/4.3-bis/4.9/4.10/4.11 (already delivered); it solely corrects
-  `ConsignesMapper` (Story 4.4) and extends the mapping annex + production
-  parity suite it depends on (Stories 4.2/4.2-bis).
-- Depends on Epic 2 (`L_D_KAPE22` insert, FR-11) as the upstream write this
-  epic extends, and on Epic 3's dual-logging/error-routing circuit (FR-14,
-  FR-12) which this epic's failure handling reuses rather than replacing.
+- Core sequence: 4.1 → 4.2 → {4.3, 4.4} → 4.5 → 4.6 → 4.7.
+- Hardening chain: 4.2-bis → 4.3-bis → 4.9 → 4.10 → 4.11.
+- Consignes chain: 4.4-bis (sub-fields) → 4.12 (`LibelleConsigneResolver`) →
+  4.13. Story 4.13 reuses the resolver for `0` rows that are not composite, and
+  the annex, `ConsignesMapper.cs` comments, parity test comments and the epics
+  section header must all be updated to the corrected `ConsigneGPAO` semantics.
+- Upstream dependencies: Epic 2 (the `L_D_KAPE22` insert and the
+  `(NumeroFichier, OF)` anti-duplicate guard) and Epic 3 (dual logging and
+  `error/` routing). Replaying a Fichier means redepositing it, with no DB action.

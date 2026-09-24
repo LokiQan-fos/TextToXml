@@ -952,6 +952,10 @@ règle d'applicabilité par Ordre de Fabrication.
   sa Section de charge propriétaire — jamais de propriété de navigation EF.
 - `AC-FR19-4` : une règle `à_clarifier` est codée avec un marqueur
   `assumed, unverified`, pas une condition devinée.
+- `AC-FR19-6` : chaque consigne produite existe en deux lignes `L_D_CONSIGNES`
+  de mêmes codes : `ConsigneGPAO=1` (valeur reçue du GPAO) et
+  `ConsigneGPAO=0` (copie de travail, seule porteuse des libellés composites
+  de `BuildLibelleConsigne`) — sprint-change-proposal-2026-09-24.md.
 
 #### FR-20 : Contrôles métier bloquants
 
