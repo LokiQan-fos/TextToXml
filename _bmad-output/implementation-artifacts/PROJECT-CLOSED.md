@@ -10,7 +10,8 @@ last_commit: '1fcfbf2404176014e27cff77fb40d2c72779e5a4'
 # TextToXml / Kape22Importer — Project Closure
 
 > **Re-closed 2026-09-25**, after a reopening on 2026-09-24 (test/correction session 2). `last_commit`
-> is the last commit before this re-close; the re-close itself ships in the Story 4.14 commit.
+> is the last commit before this re-close; the re-close itself ships in the Story 4.14 commits
+> (`f425eb5`, `1c58af6` and the review-closure commit).
 
 **Decision:** the project is functionally complete. All planned Epics (1–4), including every
 post-retrospective hardening story, are `done`. No Epic 5 is planned — confirmed by the donneur
@@ -63,7 +64,7 @@ story exists for a specific, traceable reason:
   as-is) — both confirmed current behavior correct, documented in code comments only, no behavior change.
 
 After the 2026-09-22 closure, a production test session (2026-09-22/24) reopened the epic for
-`L_D_CONSIGNES` parity with the legacy output:
+production parity with the legacy output (`L_D_CONSIGNES`, then the retro #4 follow-up):
 
 - **Manual-session fixes `1ab5ea7`, `547bf2a`.** Explicit EF decimal precision (EF's decimal(18,2) default
   rounded scale-3 columns), downstream OF zero-padding, blank-user fallback, and the withdrawal of
@@ -80,9 +81,9 @@ After the 2026-09-22 closure, a production test session (2026-09-22/24) reopened
 
 ## 3. Action-item reconciliation at closure
 
-All `sprint-status.yaml` action items are `done` as of this closure (re-checked 2026-09-25). Three older items were superseded by
-later work and are now marked `done` with a pointer to what actually closed them, rather than left
-formally `open`:
+All `sprint-status.yaml` action items are `done` as of this closure (re-checked 2026-09-25). Three
+older items were superseded by later work and are now marked `done` with a pointer to what actually
+closed them, rather than left formally `open`:
 
 - **`epic-2-retro-item-9`** (CI Integration gate) — superseded by `epic-3-retro-item-1` (service-container
   Linux SQL Server wired into `ci.yml`, 2026-09-14). Its "SQLite Unit-tier fallback" sub-clause was made
@@ -180,6 +181,7 @@ At the 2026-09-22 closure (commit `8f6e79e`), for reference:
 ## 6. Closure
 
 TextToXml / Kape22Importer is closed as of 2026-09-25 (re-close after the 2026-09-24 reopening), with
-the Story 4.14 commit on top of `1fcfbf2`. The first closure was 2026-09-22, commit `8f6e79e`. No story is in progress; no Epic 5 is planned. Any further
+the Story 4.14 commits (`f425eb5`, `1c58af6` and the review-closure commit) on top of `1fcfbf2`. The
+first closure was 2026-09-22, commit `8f6e79e`. No story is in progress; no Epic 5 is planned. Any further
 work on this codebase starts as a new, explicitly re-opened initiative, not a continuation of Epic 4's
 sprint.

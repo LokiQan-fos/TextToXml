@@ -4,7 +4,7 @@ type: 'chore'
 created: '2026-09-25'
 status: 'done'
 baseline_commit: '1fcfbf2404176014e27cff77fb40d2c72779e5a4'
-review_loop_iteration: 0
+review_loop_iteration: 2
 context: []
 ---
 
@@ -104,7 +104,7 @@ internal sealed record SqlColumn(Type ClrType, (int Precision, int Scale)? Decim
 - `dotnet test tests/Kape22Importer.Tests --filter "FullyQualifiedName~Kape22Importer.Tests.DownstreamColumn&Category=Unit"`: expected 6 green (the precisions, magnitudes and lengths parity classes), with no SQL fixture. Corrected at step-03: the bare `~DownstreamColumn` filter also matches `Kape22ProductionDataParityTests` (`...ScaledDownstreamColumns...`, Integration, SQL fixture). It ran once and recreated the `AscoLSI_Test` tables.
 
 **Step-03 notes (red proof, CC-1):** after the test was written, the build failed on the missing `SqlColumn.DecimalPrecision` (CS0117/CS1503). Once that compiled, a scratch mutation `LongueurCD` → `(5, 2)` made AC-1 fail with an `Assert.Equal` diff on `["LongueurCD"] (5, 3)` vs `(5, 2)`, and AC-2 fail with "LongueurCD: magnitude 100, expected 1000 from (5,2)". The mutation was reverted, and the strict build and the 6 scoped tests are green.
-- The full `Category=Unit` run, for the §5 counts, happens only after the human confirms (see Ask First).
+- The full `Category=Unit` run (1026 passed), for the PROJECT-CLOSED.md §5 counts, was authorized by the user on 2026-09-25 (Ask First gate).
 
 ## Suggested Review Order
 
