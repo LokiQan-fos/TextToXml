@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 16:00
-last_updated: 09-24-2026
+last_updated: 09-25-2026 09:41
 project: TextToXml
 project_key: NOKEY
 tracking_system: file-system
@@ -252,8 +252,8 @@ action_items:
     status: done
     ref: "_bmad-output/implementation-artifacts/epic-2-retro-2026-09-07.md -> reconduit
       et clos par epic-3-retro-item-2 (DONE 2026-09-14): garde implementee comme etape
-      CI dans ci.yml plutot qu un hook local (cf Q-2 de la retro Epic 3 - un hook non
-      installe ne protege rien); les 3 coquilles de Templates/P60.xml corrigees."
+      CI dans ci.yml plutot qu un hook local (cf Q-2 de la retro Epic 3 - un hook
+      non installe ne protege rien); les 3 coquilles de Templates/P60.xml corrigees."
   - id: "epic-2-retro-item-12-basculer-epic-2-de-in-progress-a-done-da"
     epic: 2
     action: "Basculer epic-2 de in-progress a done dans sprint-status.yaml (les 8
@@ -321,11 +321,11 @@ action_items:
       finale r533 sur l Epic 3 (r528-r532 sans message)"
     owner: "Dev"
     status: done
-    ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-09-11.md -> sans objet
-      sur Epic 4: epic-4-retro-2026-09-17.md ligne 64 constate qu aucun commit SVN n a
-      eu lieu sur cet epic, donc la convention n a jamais ete exercee (ni respectee ni
-      violee). Clos a la cloture du projet: aucun Epic 5 planifie, plus aucun commit
-      SVN a venir sur ce perimetre."
+    ref: "_bmad-output/implementation-artifacts/epic-3-retro-2026-09-11.md -> sans
+      objet sur Epic 4: epic-4-retro-2026-09-17.md ligne 64 constate qu aucun commit
+      SVN n a eu lieu sur cet epic, donc la convention n a jamais ete exercee (ni
+      respectee ni violee). Clos a la cloture du projet: aucun Epic 5 planifie, plus
+      aucun commit SVN a venir sur ce perimetre."
   - id: "epic-3-retro-item-5-purger-entete-pied"
     epic: 3
     action: "Purger Entete/Pied de CoherenceChecker.cs (reserve CC-2 mineure reconduite
@@ -433,8 +433,8 @@ action_items:
     owner: "Dev"
     status: done
     ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-21.md -> story
-      4-11-hardening-epic-4-c (C-2): GroupBy A-5 rendu insensible a la casse sur
-      CodeOperation via un IEqualityComparer dedie, DONE 2026-09-22."
+      4-11-hardening-epic-4-c (C-2): GroupBy A-5 rendu insensible a la casse sur CodeOperation
+      via un IEqualityComparer dedie, DONE 2026-09-22."
   - id: "epic-4-retro3-item-c3-mapper-file-list-consistency"
     epic: 4
     action: "Derive the mapper-file lists behind B-1/B-2/B-5 generically instead of
@@ -474,11 +474,10 @@ action_items:
       4-11-hardening-epic-4-c (C-5): 3 des 4 causes couvertes (AC-FR20-3, AC-FR20-4,
       A-5) ; la 4e (B-5, depassement de magnitude) n est pas reproductible via une
       fixture reelle a largeur fixe (les 21 champs KAPE22 sources sont par construction
-      trop etroits pour depasser la borne de leur colonne cible) - reduction de
-      perimetre approuvee par l utilisateur en cours d implementation, documentee
-      dans deferred-work.md § 'Deferred from: implementation of story-4.11'. B-5
-      reste prouve au niveau Unit (DecimalMagnitudeGuardTests, depuis Story 4.10).
-      DONE 2026-09-22."
+      trop etroits pour depasser la borne de leur colonne cible) - reduction de perimetre
+      approuvee par l utilisateur en cours d implementation, documentee dans deferred-work.md
+      § 'Deferred from: implementation of story-4.11'. B-5 reste prouve au niveau
+      Unit (DecimalMagnitudeGuardTests, depuis Story 4.10). DONE 2026-09-22."
   - id: "epic-4-retro3-item-c6-accumulate-a5-b5-checks"
     epic: 4
     action: "Accumulate, rather than early-return, the A-5 (Consignes-collision) and
@@ -536,3 +535,35 @@ action_items:
     ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-21.md -> story
       4-11-hardening-epic-4-c (C-10): ARCHITECTURE-SPINE.md:123 corrige '9' -> '10'
       entites avales, DONE 2026-09-22."
+  - id: "epic-4-retro4-item-d1-ac-fr20-3-spec-reconciliation"
+    epic: 4
+    action: "Reconcile AC-FR20-3 removal (547bf2a, process-owner decision 2026-09-22)
+      into the contract: mark it withdrawn at PRD.md:972-973, epics.md:1884-1888,
+      epics.md:2420, epic-4-context.md:51 (see Q-1: withdrawn vs deleted)."
+    owner: "PM"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-25.md"
+  - id: "epic-4-retro4-item-d2-precisions-schema-parity-test"
+    epic: 4
+    action: "Add a Unit-tier parity test locking DownstreamColumnPrecisions against
+      scripts/schema/01-ascolsi-tables.sql, same discipline as DownstreamColumnMagnitudesParityTests;
+      optionally assert DownstreamColumnMagnitudes = 10^(p-s) of it."
+    owner: "Dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-25.md"
+  - id: "epic-4-retro4-item-d3-project-closed-refresh"
+    epic: 4
+    action: "Bring PROJECT-CLOSED.md in line with sprint-status.yaml (status open
+      vs epic-4 done; missing 4.4-bis/4.13, fourth retro, current test counts): re-close
+      or state why it stays open."
+    owner: "SM"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-25.md"
+  - id: "epic-4-retro4-item-d4-review-manual-session-fixes"
+    epic: 4
+    action: "Route behavior-changing fix(...) commits from manual test sessions through
+      /run-review (or a story) before commit, and treat a removed/changed declared
+      AC as a spec change in the same commit (1ab5ea7 and 547bf2a had no review record)."
+    owner: "SM / user"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-25.md"
