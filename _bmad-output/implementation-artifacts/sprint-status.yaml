@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 16:00
-last_updated: 09-25-2026 09:41
+last_updated: 09-25-2026 10:06
 project: TextToXml
 project_key: NOKEY
 tracking_system: file-system
@@ -67,7 +67,7 @@ development_status:
   3-6-validation-de-bout-en-bout-harnais-de-couverture-sm-1-2-3: done
   epic-3-retrospective: done
 
-  epic-4: done
+  epic-4: in-progress
   4-1-entités-ef-database-first-extension-du-harnais-sql-pour-les: done
   4-2-extraction-documentation-du-mapping-legacy-annexe-colonne-pa: done
   4-3-mapper-of-coulée-mapping-structurel-pur: done
@@ -84,6 +84,7 @@ development_status:
   4-4-bis-decomposition-l-d-consignes-sous-champs-consignegpao: done
   4-12-libelle-consigne: done
   4-13-ligne-consignegpao-0-libelles-composites: done
+  4-14-verrou-parite-downstream-column-precisions: backlog
 action_items:
   - id: "story-4-6-decimal-scale-defect-story-4-3-bis"
     epic: 4
@@ -541,8 +542,8 @@ action_items:
       into the contract: mark it withdrawn at PRD.md:972-973, epics.md:1884-1888,
       epics.md:2420, epic-4-context.md:51 (see Q-1: withdrawn vs deleted)."
     owner: "PM"
-    status: open
-    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-25.md"
+    status: done
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-25.md -> sprint-change-proposal-2026-09-25.md §4.1-4.3: AC-FR20-3 marked withdrawn in PRD.md, epics.md (inventory, Story 4.5, Story 4.11 C-5) and epic-4-context.md, DONE 2026-09-25."
   - id: "epic-4-retro4-item-d2-precisions-schema-parity-test"
     epic: 4
     action: "Add a Unit-tier parity test locking DownstreamColumnPrecisions against
@@ -550,7 +551,7 @@ action_items:
       optionally assert DownstreamColumnMagnitudes = 10^(p-s) of it."
     owner: "Dev"
     status: open
-    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-25.md"
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-25.md -> Story 4-14-verrou-parite-downstream-column-precisions (sprint-change-proposal-2026-09-25.md §4.4)."
   - id: "epic-4-retro4-item-d3-project-closed-refresh"
     epic: 4
     action: "Bring PROJECT-CLOSED.md in line with sprint-status.yaml (status open
@@ -558,12 +559,12 @@ action_items:
       or state why it stays open."
     owner: "SM"
     status: open
-    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-25.md"
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-25.md -> banner fixed by sprint-change-proposal-2026-09-25.md §4.5; full re-close is Story 4.14's closing task."
   - id: "epic-4-retro4-item-d4-review-manual-session-fixes"
     epic: 4
     action: "Route behavior-changing fix(...) commits from manual test sessions through
       /run-review (or a story) before commit, and treat a removed/changed declared
       AC as a spec change in the same commit (1ab5ea7 and 547bf2a had no review record)."
     owner: "SM / user"
-    status: open
-    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-25.md"
+    status: done
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-25.md -> project memory manual-session-fix-review (sprint-change-proposal-2026-09-25.md §4.6), DONE 2026-09-25."

@@ -1,16 +1,19 @@
 ---
 status: 'open'
 reopened_date: '2026-09-24'
-reopened_reason: 'test/correction session 2 — Story 4.12 (LibelleConsigne)'
+reopened_reason: 'test/correction session 2 — Stories 4.4-bis, 4.12, 4.13; then Story 4.14 (correct-course 2026-09-25)'
 closed_date: '2026-09-22'
 last_commit: '8f6e79edd7fa8829b7946cbd998999b1c843cde2'
 ---
 
 # TextToXml / Kape22Importer — Project Closure
 
-> **Reopened 2026-09-24 (test/correction session 2).** Story 4.12 (`L_D_CONSIGNES.LibelleConsigne`,
-> `spec-4-12-libelle-consigne.md`) is done; epic-4 stays `in-progress` until the project is re-closed. Sections 1–6 below describe the project as closed on
-> 2026-09-22 (commit `8f6e79e`); their test counts and "no story in progress" statement are not updated.
+> **Reopened 2026-09-24 (test/correction session 2).** Delivered since the 2026-09-22 closure: Story
+> 4.4-bis (L_D_CONSIGNES sub-fields), 4.12 (LibelleConsigne), 4.13 (ConsigneGPAO=0 working copy), two
+> fix commits from a manual session (`1ab5ea7` EF decimal precision, `547bf2a` AC-FR20-3 withdrawn,
+> downstream OF padding, blank-user fallback), and a fourth retro pass (`epic-4-retro-2026-09-25.md`).
+> The 2026-09-25 correct-course adds Story 4.14; epic-4 is `in-progress` until it is done.
+> Sections 1–6 below still describe the 2026-09-22 closure (commit `8f6e79e`).
 
 **Decision:** the project is functionally complete. All planned Epics (1–4), including every
 post-retrospective hardening story, are `done`. No Epic 5 is planned — confirmed by the donneur

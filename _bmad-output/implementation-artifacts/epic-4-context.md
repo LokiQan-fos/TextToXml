@@ -48,8 +48,10 @@ rows: each consigne is written twice, as a `ConsigneGPAO=1` row and as a
 - There is one pure mapper per target table. SectionCharge tables follow the
   per-OF applicability rule: a table that does not apply gets no default row.
 - Blocking business checks run before persistence: the cold Coulee must exist,
-  the hot Coulee format must be valid, and the ingot/furnace distribution must be
-  consistent.
+  the ingot/furnace distribution must be consistent, and the enfournement
+  instruction (Pits) must be present. There is no Coulee number format check:
+  AC-FR20-3 was withdrawn on 2026-09-22 (`547bf2a`, process-owner decision)
+  because hot/cold and Coulee origin are independent.
 - Every `decimal` column sourced from a KAPE22 `int` has an annex-documented
   scale, applied only through `DecimalScale.Apply`. A pre-persistence magnitude
   guard turns an overflow into a diagnosed `ConversionError`.

@@ -960,17 +960,21 @@ règle d'applicabilité par Ordre de Fabrication.
 #### FR-20 : Contrôles métier bloquants
 
 **Description :** avant toute écriture, les règles métier héritées du legacy
-sont vérifiées explicitement : existence de la Coulée froide, format de la
-Coulée chaude, cohérence de la répartition des lingots entre fours vs le
-nombre de demi-produits de l'Ordre de Fabrication.
+sont vérifiées explicitement : existence de la Coulée froide, cohérence de
+la répartition des lingots entre fours vs le nombre de demi-produits de
+l'Ordre de Fabrication.
 
 **Consequences (testables) :**
 - `AC-FR20-1` : le résultat du mapping porte toutes les entités structurelles
   du dispatch (Ordre de Fabrication, Coulée, Section de charge applicables,
   Consignes) avant tout contrôle.
 - `AC-FR20-2` : répartition lingots/fours incohérente → rejet, cause explicite.
-- `AC-FR20-3` : Coulée chaude mal formée (ne commence pas par `'0'`) → rejet,
-  cause explicite.
+- ~~`AC-FR20-3` : Coulée chaude mal formée (ne commence pas par `'0'`) → rejet,
+  cause explicite.~~ **Retiré le 2026-09-22** (`547bf2a`, décision du
+  responsable process) : chaud/froid et origine de la Coulée (premier chiffre :
+  `'0'` aciérie locale, autre = fournisseur externe) sont des dimensions
+  indépendantes ; le contrôle rejetait un Fichier P60 réel et légitime.
+  Aucun contrôle de format sur la Coulée — sprint-change-proposal-2026-09-25.md.
 - `AC-FR20-4` : absence de consigne d'enfournement → rejet, cause explicite.
 - `AC-FR20-5` : Coulée froide introuvable en base → rejet, cause explicite,
   aucune écriture.

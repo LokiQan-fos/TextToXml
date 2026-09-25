@@ -59,7 +59,7 @@ distingués ici : **`AC-FR5-12a`** (round‑trip vers un `record` générique, S
 | FR-17 | Extraction & documentation du mapping legacy `L_D_KAPE22` → tables aval (annexe colonne-par-colonne, dérivée du `MappingTemplate` XML) | `Kape22Importer` |
 | FR-18 | Mapping explicite (sans réflexion) `L_D_KAPE22` → `L_D_ORDRE_FABRICATION` & `L_D_COULEE` | `Kape22Importer` |
 | FR-19 | Mapping explicite (sans réflexion) `L_D_KAPE22` → `L_D_CONSIGNES` & les 7 `L_D_SECTIONCHARGE_*` (Chutage, Lingot, Découpe, Pits, PoidsMétrique, Refroidissoirs, SVT), règle d'applicabilité par OF | `Kape22Importer` |
-| FR-20 | Contrôles métier bloquants avant persistance (existence coulée froide, format coulée chaude, cohérence répartition lingots/fours) | `Kape22Importer` |
+| FR-20 | Contrôles métier bloquants avant persistance (existence coulée froide, cohérence répartition lingots/fours ; AC-FR20-3 retiré 2026-09-22) | `Kape22Importer` |
 | FR-21 | Persistance transactionnelle étendue (`Kape22ImportBundle` + `Kape22Persister` remplacé) : un seul commit `L_D_KAPE22` + 9 tables aval, cause d'échec journalisée via le circuit existant (FR-14) | `Kape22Importer` |
 
 ### Contract Requirements (hors `AC-FRx-y`, issues de §0 / §4.1 / Annexe A.4)
@@ -1860,7 +1860,7 @@ As a `Kape22Importer`,
 I want un `Kape22ImportBundleMapper` qui compose `Kape22Mapper.Map` avec les
 mappers des stories 4.3/4.4 pour produire un `Kape22ImportBundle` complet, et
 qui applique les contrôles métier **ne nécessitant aucune lecture base**
-(cohérence répartition lingots/fours, format de la coulée chaude),
+(cohérence répartition lingots/fours, présence de la consigne d'enfournement),
 So that le bundle transmis au Persister porte déjà toutes les entités
 structurelles et les rejets purement calculables, sans dupliquer cette logique
 côté Persister.
@@ -1881,11 +1881,14 @@ côté Persister.
   l'OF et les deux valeurs en écart — aucune entité n'est ajoutée au contexte
   plus tard (AC-FR20-2)
 
-**Given** une coulée « chaude » (`ConsignesEnfournementPits.CodeConsigne ≠ "1"`)
+~~**Given** une coulée « chaude » (`ConsignesEnfournementPits.CodeConsigne ≠ "1"`)
   dont le numéro `Coulee` ne commence pas par `'0'`
 **When** le bundle est construit
 **Then** `Success = false`, une `ConversionError` dédiée cite l'OF et le numéro
-  de coulée (AC-FR20-3)
+  de coulée (AC-FR20-3)~~
+**AC-FR20-3 retiré le 2026-09-22** (`547bf2a`, décision du responsable process) :
+chaud/froid et origine de la Coulée sont indépendants — une coulée chaude dont
+le numéro ne commence pas par `'0'` (Coulée externe) est acceptée.
 
 **Given** un OF sans `L_D_SECTIONCHARGE_PITS` applicable (donc sans consigne
   d'enfournement)
@@ -1894,9 +1897,9 @@ côté Persister.
   consigne d'enfournement — reproduit le rejet legacy correspondant
   (AC-FR20-4)
 
-**Tests xUnit (TDD — écrits en premier, CC-1) :** `AC-FR20-1` … `AC-FR20-4`,
-fixtures `P60/` valides + variantes fautives dédiées (répartition incohérente,
-coulée chaude mal formée, PITS absent).
+**Tests xUnit (TDD — écrits en premier, CC-1) :** `AC-FR20-1`, `AC-FR20-2`,
+`AC-FR20-4` (AC-FR20-3 retiré), fixtures `P60/` valides + variantes fautives
+dédiées (répartition incohérente, PITS absent).
 
 **Critères transverses :** CC-1, CC-2, CC-3, CC-4, CC-5. *(CC-6/CC-7 sans objet :
 pas d'accès base dans cet orchestrateur.)*
@@ -2417,7 +2420,8 @@ seul cycle de revue de code (même rationale que Stories 4.9 et 4.10).
   pour 3 causes de rejet (Coulée manquante AC-FR20-5, une autre cause métier
   pré-existante, le chemin composite d'échec SQL)
 **When** la suite est étendue
-**Then** elle couvre également AC-FR20-3 (hot-Coulee malformée), AC-FR20-4
+**Then** elle couvre également ~~AC-FR20-3 (hot-Coulee malformée)~~ (retiré
+  2026-09-22 avec la règle, `547bf2a`), AC-FR20-4
   (Pits manquant), A-5 (collision Consignes) et B-5 (dépassement de
   magnitude) — aujourd'hui prouvées uniquement au niveau Unit/Persister (C-5)
 
@@ -2704,5 +2708,56 @@ présent/absent ; un test « lignes 1 composites restent `?` » ; extension
 `Kape22ProductionDataParityTests` (AC-5).
 
 **Critères transverses :** CC-1, CC-2, CC-3, CC-4, CC-5.
+
+Owner : Dev.
+
+> Rétro Épic 4 n° 4 (2026-09-25) : `DownstreamColumnPrecisions` (`1ab5ea7`) n'a
+> pas de verrou de parité schéma, contrairement à ses deux voisines ; AC-FR20-3
+> retiré du contrat (Story 4.5) — `sprint-change-proposal-2026-09-25.md`, approuvé.
+
+### Story 4.14 : Verrou de parité schéma pour `DownstreamColumnPrecisions`
+
+As a mainteneur de `Kape22Importer`,
+I want que `DownstreamColumnPrecisions` soit verrouillée contre
+`scripts/schema/01-ascolsi-tables.sql` par un test Unit, comme ses deux voisines,
+So that une erreur de transcription (precision, scale) échoue au tier Unit au
+lieu de réapparaître seulement au tier Integration de parité production
+(défaut d'arrondi decimal(18,2) de `1ab5ea7`).
+
+**Origine :** rétro Épic 4 du 2026-09-25, F-2 / D-2 ;
+sprint-change-proposal-2026-09-25.md.
+
+**Acceptance Criteria:**
+
+**AC-1 (parité precision/scale) :**
+Given `DownstreamColumnPrecisions.Precisions` et les tables aval du schéma
+  (`L_D_ORDRE_FABRICATION`, `L_D_COULEE`, les 7 `L_D_SECTIONCHARGE_*`)
+When le test lit toutes les colonnes `DECIMAL(p,s)` de ces tables
+Then chaque colonne a une entrée de même (precision, scale), et chaque entrée
+  a au moins une colonne correspondante (égalité d'ensemble, dans les deux sens)
+And un nom de colonne répété entre deux tables avec des (p,s) différents fait
+  échouer le test avec un message nommant les deux tables
+
+**AC-2 (cohérence avec les magnitudes) :**
+Given `DownstreamColumnMagnitudes.MaxAbsoluteValues`
+When le test la compare à `DownstreamColumnPrecisions`
+Then chaque entrée vaut 10^(p−s) de sa (p,s) dans `DownstreamColumnPrecisions`
+
+**Notes dev :** `SqlColumn` (`tests/Kape22Importer.Tests/SqlTableSchema.cs`)
+n'expose aujourd'hui que `DecimalMagnitude` ; l'étendre avec (precision, scale)
+sans dupliquer le parsing. Test Unit uniquement, aucun changement de code de
+production attendu ; si le test révèle un écart, corriger la map. Aligner au
+passage le commentaire de `DownstreamColumnPrecisions.cs` (« four Tolerance* »
+contre « six » côté magnitudes) sur ce que le schéma montre.
+
+**Tests xUnit (TDD, CC-1) :** `DownstreamColumnPrecisionsParityTests`
+(AC-1, AC-2), `Category=Unit`, `[Trait("AC", "4.14-…")]`.
+
+**Tâche de clôture (D-3) :** à la clôture de la story, re-fermer
+`PROJECT-CLOSED.md` : `status: closed`, `last_commit`, ligne Épic 4 (4.4-bis,
+4.12, 4.13, 4.14 ; quatre passes de rétro), §5 avec les comptes de tests
+courants, §3 avec la réconciliation D-1..D-4.
+
+**Critères transverses :** CC-1, CC-2, CC-4.
 
 Owner : Dev.
