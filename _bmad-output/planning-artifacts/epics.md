@@ -61,6 +61,8 @@ distingués ici : **`AC-FR5-12a`** (round‑trip vers un `record` générique, S
 | FR-19 | Mapping explicite (sans réflexion) `L_D_KAPE22` → `L_D_CONSIGNES` & les 7 `L_D_SECTIONCHARGE_*` (Chutage, Lingot, Découpe, Pits, PoidsMétrique, Refroidissoirs, SVT), règle d'applicabilité par OF | `Kape22Importer` |
 | FR-20 | Contrôles métier bloquants avant persistance (existence coulée froide, cohérence répartition lingots/fours ; AC-FR20-3 retiré 2026-09-22) | `Kape22Importer` |
 | FR-21 | Persistance transactionnelle étendue (`Kape22ImportBundle` + `Kape22Persister` remplacé) : un seul commit `L_D_KAPE22` + 9 tables aval, cause d'échec journalisée via le circuit existant (FR-14) | `Kape22Importer` |
+| FR-22 | Conversion d'un dossier de Fichiers P89 en XML normalisé horodaté (Étape 1 seule), worker `GpaoConvertP89` | `P89Converter` + `MicroServices.sln` |
+| FR-23 | Journal de Fichier : interface `IFichierJournal` + implémentation LSI `L_D_LOG_COMMANDE` hors transaction (D31) | `FichierJournal` + `AscoLsiJournal` |
 
 ### Contract Requirements (hors `AC-FRx-y`, issues de §0 / §4.1 / Annexe A.4)
 
@@ -310,6 +312,8 @@ microservices à UI et ne s'appliquent à aucune story v1.
 | FR-19 | Épic 4 — 4.4 (`AC-FR19-1..4`), 4.12 (`AC-FR19-5`, `LibelleConsigne`), 4.13 (`AC-FR19-6`, ligne `ConsigneGPAO=0`) | AC-FR19-1 … AC-FR19-6 |
 | FR-20 | Épic 4 — 4.5 (contrôles purs), 4.6 (`AC-FR20-5`, existence coulée) | AC-FR20-1 … AC-FR20-5 |
 | FR-21 | Épic 4 — 4.6 (persister), 4.7 (E2E) | AC-FR21-1 … AC-FR21-5 |
+| FR-22 | Épic 5 — 5.1 (`AC-FR22-1..7`), 5.2 (`AC-FR22-8`) | AC-FR22-1 … AC-FR22-8 |
+| FR-23 | Épic 5 — 5.0 | AC-FR23-1 … AC-FR23-4 |
 | CTR-1/2/3 | Épic 1 — 1.8 | contrat `decimal`/`datetime`/`convert` + round‑trip typé |
 | SM-1/2/3 | Épic 3 — 3.6 | Couverture 100 % + E2E 10 fichiers + `*.errors.json` lisible |
 
@@ -417,9 +421,12 @@ la cause précise via le circuit existant (`L_D_LOG_COMMANDE` +
 ### Épic 5 : P89 — conversion Fichier → XML normalisé + XSD (Étape 1)
 Convertir les Fichiers P89 (`LP89_682_617_<nnn>`) en XML normalisé validé par
 `P89.xsd`, avec la bibliothèque `TextToXml` inchangée. À l'issue de l'épic :
-`P89Converter` vide `P89/raw` vers `P89/xml` (sortie horodatée) et `P89/Done`,
-`AC-FR22-1..7` sont verts. Mapping / persistance / worker P89 : plus tard.
-**FRs couverts :** FR-22.
+le worker `GpaoConvertP89` (bibliothèque `P89Converter`) vide le dossier source
+vers le dossier XML (sortie horodatée) et les dossiers `Done` / `error`, avec
+une entrée de journal `IFichierJournal` par Fichier (LSI : `L_D_LOG_COMMANDE`) ;
+`AC-FR22-1..8` et `AC-FR23-1..4` sont verts. Mapping / persistance métier P89 :
+plus tard.
+**FRs couverts :** FR-22, FR-23.
 
 ---
 
@@ -2772,40 +2779,72 @@ Owner : Dev.
 ## Épic 5 : P89 — conversion Fichier → XML normalisé + XSD (Étape 1)
 
 Livrer l'Étape 1 du format P89 (D30) : descripteur `Templates/P89.xml` corrigé,
-`Templates/P89.xsd` généré, exécutable `P89Converter`. `TextToXml` n'est pas
-modifiée (AC-FR16-4). Fichiers UTF-8 transcodés avant conversion (D29).
+`Templates/P89.xsd` généré, bibliothèque `P89Converter` exécutée par le worker
+`GpaoConvertP89` sous le `Launcher`, journal de Fichier via `IFichierJournal`
+(implémentation LSI `L_D_LOG_COMMANDE`, D31). `TextToXml` n'est pas modifiée
+(AC-FR16-4). Fichiers UTF-8 transcodés avant conversion (D29).
 
-**FRs couverts :** FR-22.
+**FRs couverts :** FR-22, FR-23.
+
+**Séquencement :** 5.0 → 5.1 → 5.2. Découpage décidé par l'utilisateur le
+2026-09-25, au checkpoint spec de la Story 5.1 (journal = interface,
+implémentation LSI hors transaction ; worker au lieu d'un exécutable console).
+La migration de P60 vers `IFichierJournal` est hors Épic 5 (correct-course à
+venir, voir `deferred-work.md`).
+
+**Point de départ commun (session manuelle 2026-09-25, non commité) :**
+`Templates/P89.xml` corrigé (+5, `LG24`), `Templates/P89.xsd`,
+`scripts/gen.ps1 -Format`, `scripts/p89-to-xml.cs` (prototype, 248/248
+Fichiers valides) — remplacé par `src/P89Converter` (Story 5.1).
+
+### Story 5.0 : Journal de Fichier — `IFichierJournal` + implémentation LSI
+
+As a développeur d'un format Fichier → XML,
+I want une interface de journal indépendante de l'application cible et son
+implémentation LSI (`L_D_LOG_COMMANDE`),
+So that chaque format journalise le résultat de ses imports sans dupliquer les
+règles LSI, et qu'une autre application puisse brancher sa propre sortie.
+
+**Acceptance Criteria:** `AC-FR23-1` à `AC-FR23-4` (PRD §4.7, FR-23).
+
+**Notes dev :**
+- `src/FichierJournal` : `IFichierJournal.Record(FichierJournalEntry)`, aucune
+  référence ni package.
+- `src/AscoLsiJournal` : `AscoLsiFichierJournal`, entité `L_D_LOG_COMMANDE`,
+  longueurs de colonnes, `ParisTime`, DbContext limité à cette table ; règles
+  D8/D15 reprises de `Kape22Persister` (copie assumée jusqu'à la migration P60).
+- `Kape22Importer` n'est pas modifié.
+
+**Tests xUnit (TDD, CC-1) :** `tests/AscoLsiJournal.Tests`, `Category=Unit`
+(EF InMemory) + un test `Category=Integration` (AR-12) ; `[Trait("AC", "FR23-…")]`.
+
+**Critères transverses :** CC-1, CC-2, CC-4, CC-7.
+
+Owner : Dev.
 
 ### Story 5.1 : `P89Converter` — dossier P89 brut → XML normalisé horodaté
 
 As an exploitant,
-I want convertir tous les Fichiers `LP89_*` de `P89/raw` en XML normalisé
-validé par `P89.xsd` dans `P89/xml`, le Fichier converti étant rangé dans
-`P89/Done`,
+I want convertir tous les Fichiers `LP89_*` du dossier source en XML normalisé
+validé par `P89.xsd` dans le dossier XML, le Fichier converti étant rangé dans
+`Done` (ou `error` en cas d'échec) et chaque résultat journalisé,
 So that les P89 sont lisibles et validés dès maintenant, en attendant le reste
 du traitement P89, sans qu'une rotation d'index 999 → 001 n'écrase une
 conversion antérieure.
 
 **Origine :** nouveau besoin du 2026-09-25 ;
-sprint-change-proposal-2026-09-25-p89.md.
-
-**Point de départ (session manuelle 2026-09-25, non commité) :**
-`Templates/P89.xml` corrigé (+5, `LG24`), `Templates/P89.xsd`,
-`scripts/gen.ps1 -Format`, `scripts/p89-to-xml.cs` (prototype, 248/248
-Fichiers valides) — à remplacer par `src/P89Converter`.
+sprint-change-proposal-2026-09-25-p89.md. Prérequis : Story 5.0.
 
 **Acceptance Criteria:** `AC-FR22-1` à `AC-FR22-7` (PRD §4.7).
 
 **Notes dev :**
-- `src/P89Converter` : console `net10.0`, `ProjectReference` sur `TextToXml`
-  seulement, descripteur et XSD lus depuis `Templates/` (ou embarqués — au
-  choix, justifier). Arguments : `[raw] [xml] [done]`, défauts `P89/raw`,
-  `P89/xml`, `P89/Done`. Horloge = `TimeProvider` (heure locale) pour le
-  suffixe `yyyyMMddHHmmss`.
-- Déplacement vers `Done` **après** l'écriture du XML (un crash entre les deux
-  laisse le Fichier dans `raw`, reconverti au lancement suivant).
-- Supprimer `scripts/p89-to-xml.cs` ; ajouter les deux projets à
+- `src/P89Converter` : bibliothèque `net10.0`, `ProjectReference` sur
+  `TextToXml` et `FichierJournal` seulement, descripteur et XSD embarqués
+  (modèle AR-5). Horloge = `TimeProvider` (heure locale) pour le suffixe
+  `yyyyMMddHHmmss`.
+- Ordre par Fichier : XML → entrée de journal → déplacement. Journal en échec
+  ⇒ XML supprimé, Fichier laissé en source (retraité au tick suivant).
+- Supprimer `scripts/p89-to-xml.cs` ; ajouter le projet et ses tests à
   `TextToXml.sln` ; ajouter une section P89 au `README.md`.
 - Fixtures : 3 Fichiers réels minimum dans `tests/P89Converter.Tests/fixtures/`
   (dont un avec accents, ex. `LP89_682_617_013`) + variantes fautives
@@ -2814,8 +2853,34 @@ Fichiers valides) — à remplacer par `src/P89Converter`.
   `gen.ps1` depuis les tests.
 
 **Tests xUnit (TDD, CC-1) :** `tests/P89Converter.Tests`, `Category=Unit`
-(dossiers temporaires, aucune base), `[Trait("AC", "AC-FR22-…")]`.
+(dossiers temporaires, journal factice) ; `[Trait("AC", "FR22-…")]`.
 
 **Critères transverses :** CC-1, CC-2, CC-4.
+
+Owner : Dev.
+
+### Story 5.2 : Worker `GpaoConvertP89` sous le `Launcher`
+
+As an exploitant,
+I want que la conversion P89 tourne comme les autres flux, supervisée par le
+`Launcher`, avec ses dossiers et son journal configurés dans
+`GpaoConvertP89.json`,
+So that les P89 sont traités en continu sans intervention manuelle.
+
+**Acceptance Criteria:** `AC-FR22-8` (PRD §4.7).
+
+**Notes dev :**
+- `MicroServices.sln` : `GPAO/ConvertP89` (`Client : Publisher`, modèle
+  `GpaoImportP60`), références `P89Converter` + `AscoLsiJournal` ; une ligne
+  `WorkerRegistry`, une entrée `workers.json`, une `ProjectReference` dans
+  `Launcher.csproj`. Commit SVN par l'utilisateur.
+- Configuration : `ConnectionStrings:AscoLSI`, section `P89` (`SourcePath`,
+  `XmlPath`, `DonePath`, `ErrorPath`, `PollingInterval`),
+  `AscoLsiJournal:InitiatingServer`.
+
+**Tests xUnit :** `GPAO/ConvertP89.Tests` + `Launcher.Tests` ;
+`[Trait("AC", "FR22-8")]`.
+
+**Critères transverses :** CC-1, CC-2, CC-4, CC-7.
 
 Owner : Dev.

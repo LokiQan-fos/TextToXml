@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" />
+    <!-- The AR-12 fixture linked below opens SqlConnection / SqlCommand directly to apply scripts/schema/. -->
+    <PackageReference Include="Microsoft.Data.SqlClient" />
+    <!-- Backs the Category=Unit tests of the L_D_LOG_COMMANDE row without a SQL Server. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
+    <!-- The AR-12 fixture reads appsettings.Test.json and the KAPE22_TEST_ environment variables. -->
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <!-- Runtime skip for the AR-12 integration test when no SQL Server test instance is reachable. -->
+    <PackageReference Include="Xunit.SkippableFact" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\AscoLsiJournal\AscoLsiJournal.csproj" />
+    <!-- The AR-12 fixture (linked below) types its context as Kape22Importer's AscoLsiDbContext; test-only. -->
+    <ProjectReference Include="..\..\src\Kape22Importer\Kape22Importer.csproj" />
+  </ItemGroup>
+
+  <!-- Local SQL Server test connection strings (AR-12), shared with Kape22Importer.Tests. The real file is gitignored. -->
+  <ItemGroup>
+    <None Include="..\Kape22Importer.Tests\appsettings.Test.json" Link="appsettings.Test.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\Kape22Importer.Tests\appsettings.Test.json')" />
+  </ItemGroup>
+
+  <!-- Share the trait vocabulary, the repo-path helper and the AR-12 harness instead of duplicating them. -->
+  <ItemGroup>
+    <Compile Include="..\TextToXml.Tests\AcTraitCoverage.cs" Link="AcTraitCoverage.cs" />
+    <Compile Include="..\TextToXml.Tests\RepoLayout.cs" Link="RepoLayout.cs" />
+    <Compile Include="..\Kape22Importer.Tests\SqlServerIntegrationCollection.cs" Link="SqlServerIntegrationCollection.cs" />
+    <Compile Include="..\Kape22Importer.Tests\SqlServerIntegrationFixture.cs" Link="SqlServerIntegrationFixture.cs" />
+    <Compile Include="..\TextToXml.Tests\TestCategory.cs" Link="TestCategory.cs" />
+  </ItemGroup>
+
+</Project>

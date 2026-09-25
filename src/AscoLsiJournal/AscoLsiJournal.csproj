@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <!-- EF Core writes the LSI journal table (L_D_LOG_COMMANDE), database-first with no migration (AD-5). -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FichierJournal\FichierJournal.csproj" />
+  </ItemGroup>
+
+</Project>

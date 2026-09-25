@@ -1232,3 +1232,9 @@ s'y trouver et rester à confirmer.
 - source_spec: `reviews/story-4-14/aggregated-report.md` (F-1)
   summary: The `throw` branch of `SqlTableSchema.DecimalPrecisionFor` (`SqlTableSchema.cs:89-100`) has no test, and a valid one-argument `DECIMAL(p)` (scale 0) would also throw, with an inaccurate "without an explicit (p,s)" message, breaking every `SqlTableSchema.Read` consumer.
   evidence: Raised by the blind-hunter and edge-case-hunter lenses of the second 4.14 review. No impact today: the generated `scripts/schema/*.sql` only contain two-argument `DECIMAL(p,s)` (34 occurrences, (2,1) to (7,3)). Revisit if a schema script ever emits the one-argument form.
+
+## Deferred from: Story 5.1 spec checkpoint, D31 journal interface (2026-09-25)
+
+- source_spec: `PRD.md` D31, FR-23; `epics.md` Épic 5 (séquencement)
+  summary: Migrate P60 (`Kape22Importer`) onto `IFichierJournal` / `AscoLsiJournal`: write the `L_D_LOG_COMMANDE` row outside the AD-1 transaction for every outcome (success, business rejection, SQL failure), add a detailed SQL rejection reason (column, type, length) to the journal, move the D22 anti-duplicate guard from the "— OK" log row to `L_D_KAPE22` (NumeroFichier + OF), then delete the P60 copies of the entity, column lengths, `ParisTime` and row rules.
+  evidence: User decision 2026-09-25 (the journal is the import result, independent of the business transaction). Today an SQL failure on `L_D_KAPE22` writes no `L_D_LOG_COMMANDE` row (`Kape22Persister.PersistenceFailure`, Logs only) and the "— OK" row shares the AD-1 `SaveChanges`. Touches AD-1, D22, AC-FR11-x / AC-FR21-x of a closed epic: plan it with `/bmad-correct-course`, not inside Épic 5.

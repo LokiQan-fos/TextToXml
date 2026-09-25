@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The Fichier journal contract (D31): no reference and no package, so any format can depend on it. -->
+
+</Project>

@@ -122,6 +122,7 @@ part ailleurs.*
 | D28 | **Types étendus `TextToXml` (généricité, hors P60).** `datatype="decimal"` : analyse pilotée par `decimalSeparator` seul (caractère unique, défaut `.`) ; `convert` ignoré pour `decimal` en v1 ; forme canonique `xs:decimal`, zéros de fin retirés. `datatype="datetime"` : `convert="{0:<masque>}"` **obligatoire** (`DescriptorValidator` rejette un `datetime` sans masque → `LayoutInvalid`), sert **uniquement** à l'analyse (`ParseExact`, `InvariantCulture`) ; le XML normalisé porte **toujours** de l'**ISO‑8601** (`yyyy-MM-dd` / `yyyy-MM-ddTHH:mm:ss`). Le format d'affichage français est une préoccupation d'Étape 2, jamais `TextToXml`. Contrats `CTR-1` / `CTR-2` / `CTR-3` (Story 1.8). | utilisateur (contrat Story 1.8, 2026‑09‑03) |
 | D29 | **Encodage P89 : UTF-8.** Les Fichiers P89 sont en UTF-8 (mesuré sur 248 Fichiers réels). `TextToXml` reste figée en Windows-1252 (§5, AC-FR16-4) : le format P89 transcode **strictement** UTF-8 → Windows-1252 **avant** `Converter.Convert` (octet UTF-8 invalide ou caractère hors Windows-1252 ⇒ Fichier en échec, jamais de caractère de remplacement). | utilisateur + données réelles (2026‑09‑25) |
 | D30 | **P89 : Étape 1 seule.** Le format P89 est livré jusqu'au XML normalisé validé par `P89.xsd` (Épic 5). Mapping, persistance et worker P89 : **plus tard**, épic non planifié. Le layout réel décale de +5 toutes les Positions à partir de `AnomaliePitsFour1` par rapport au template fourni (`Reserve9` Size 6) ; Ligne Détail = 3442 caractères. | utilisateur (2026‑09‑25) |
+| D31 | **Journal de Fichier = interface, LSI = une implémentation.** Un format n'écrit pas lui-même son journal applicatif : il appelle `IFichierJournal` (`src/FichierJournal`, sans dépendance). `src/AscoLsiJournal` est l'implémentation LSI (`L_D_LOG_COMMANDE`, règles D8/D15). D'autres applications auront d'autres implémentations. Le journal est le **résultat** de l'import : il s'écrit **hors de toute transaction métier**, y compris en cas d'échec de l'insertion des données. P89 l'utilise dès l'Épic 5 ; la migration de P60 (ligne `— OK` aujourd'hui dans la transaction AD-1, garde D22 sur la ligne de log, cause SQL détaillée absente du journal) est une story à planifier par correct-course. | utilisateur (2026‑09‑25) |
 
 ## 1. Vision
 
@@ -1010,14 +1011,20 @@ aussi les causes d'échec FR-20/FR-21, sans nouveau canal).
 
 #### FR-22 : Conversion d'un dossier de Fichiers P89 en XML normalisé
 
-**Description :** l'exécutable console `P89Converter` (`src/P89Converter`, ne
-référence que `TextToXml`) traite chaque Fichier `LP89_*` du dossier source
-(défaut `P89/raw`) : transcodage strict UTF-8 → Windows-1252 (D29),
-`Converter.Convert` avec `Templates/P89.xml`, validation contre
-`Templates/P89.xsd`, écriture de `<nom>_<yyyyMMddHHmmss>.xml` dans le dossier
-de sortie (défaut `P89/xml`), puis déplacement du Fichier source dans le dossier
-des Fichiers traités (défaut `P89/Done`) sous le même suffixe horodaté. Le reste
-du traitement P89 est hors périmètre (D30).
+**Description :** le worker `GpaoConvertP89` (`MicroServices.sln`,
+`Client : Publisher` enregistré dans le `Launcher` comme `GpaoImportP60`)
+exécute à chaque tick la bibliothèque `P89Converter` (`src/P89Converter`,
+références `TextToXml` + `FichierJournal` seulement). Chaque Fichier `LP89_*` du
+dossier source (`P89:SourcePath` de `GpaoConvertP89.json`) subit : transcodage
+strict UTF-8 → Windows-1252 (D29), `Converter.Convert` avec `Templates/P89.xml`
+(embarqué), validation contre `Templates/P89.xsd` (embarqué), écriture de
+`<nom>_<yyyyMMddHHmmss>.xml` dans `P89:XmlPath`, une entrée de journal
+`IFichierJournal` (D31 ; en LSI, une ligne `L_D_LOG_COMMANDE` avec
+`Commande="P89"`, FR-23), puis déplacement du Fichier sous le même suffixe
+horodaté dans `P89:DonePath` (succès) ou `P89:ErrorPath` (échec). Le reste du
+traitement P89 est hors périmètre (D30). Corrections 2026-09-25 : worker au lieu
+d'un exécutable console, dossier d'erreur au lieu du maintien en source, journal
+via `IFichierJournal` (D31) ; livraison découpée en Stories 5.0 / 5.1 / 5.2.
 
 **Consequences (testables) :**
 - `AC-FR22-1` : les Fichiers P89 de référence (fixtures) se convertissent sans
@@ -1032,12 +1039,42 @@ du traitement P89 est hors périmètre (D30).
   injectée) ; deux conversions d'un même `<nom>` à des instants différents ne
   s'écrasent pas (rotation 999 → 001).
 - `AC-FR22-5` : succès ⇒ le Fichier source quitte le dossier source et se
-  retrouve dans le dossier des traités sous `<nom>_<yyyyMMddHHmmss>`.
+  retrouve dans le dossier des traités sous `<nom>_<yyyyMMddHHmmss>` ; une entrée
+  de journal de succès est enregistrée (`NumeroFichier` et `OF` bruts).
 - `AC-FR22-6` : échec (Error de conversion, XSD, encodage) ⇒ aucun XML écrit,
-  le Fichier reste dans le dossier source, chaque raison est affichée sur la
-  sortie d'erreur ; les autres Fichiers du dossier sont tout de même traités
-  (pas de fail-fast, §5) ; code retour 1 dès qu'un Fichier échoue, 0 sinon.
-- `AC-FR22-7` : `TextToXml` n'est pas modifiée (AC-FR16-4 inchangé).
+  le Fichier est déplacé dans le dossier d'erreur sous `<nom>_<yyyyMMddHHmmss>`,
+  une entrée de journal porte ses raisons (et l'`OF` s'il est lisible), chaque
+  raison est journalisée (`MQTTnetServices.Logs`) ; les autres Fichiers du
+  dossier sont tout de même traités (pas de fail-fast, §5). Journal en échec
+  ⇒ le XML écrit est supprimé, le Fichier reste dans le dossier source et est
+  retraité au tick suivant.
+- `AC-FR22-7` : `TextToXml` n'est pas modifiée (AC-FR16-4 inchangé) ;
+  `P89Converter` ne référence que `TextToXml` et `FichierJournal`.
+- `AC-FR22-8` : `GpaoConvertP89` est enregistré dans `WorkerRegistry` et
+  `workers.json` ; un dossier `P89:*Path` non configuré empêche le démarrage du
+  worker avec un message nommant la clé.
+
+#### FR-23 : Journal de Fichier — interface et implémentation LSI
+
+**Description :** `src/FichierJournal` expose `IFichierJournal.Record(FichierJournalEntry)`
+(`Commande`, `FichierName`, `Instant` UTC, `NumeroFichier?`, `OF?`, `Reasons` ;
+aucune raison = succès), sans aucune dépendance. `src/AscoLsiJournal`
+(`AscoLsiFichierJournal`) l'implémente pour LSI en écrivant `L_D_LOG_COMMANDE`
+dans sa propre écriture, hors de toute transaction métier (D31). `Record` lève
+une exception si l'écriture échoue ; l'appelant décide du sort du Fichier.
+
+**Consequences (testables) :**
+- `AC-FR23-1` : `FichierJournal` ne référence aucun projet ni package ;
+  `AscoLsiJournal` ne référence que `FichierJournal` (+ EF Core SqlServer).
+- `AC-FR23-2` : une entrée de succès écrit une ligne D8 : `Commande` de
+  l'entrée, `Message = "<NumeroFichier> — OK"`, `OF` de l'entrée, `Date` =
+  `Instant` à l'heure de Paris, `NumLingot = 0`, `Trace = 1`, `User` = serveur
+  initiateur configuré (nom de machine si vide ; trop long ⇒ échec à la
+  construction).
+- `AC-FR23-3` : une entrée d'échec écrit `"<NumeroFichier> — REJETÉ : <raisons>"` ;
+  une entrée sans `OF` n'écrit aucune ligne (D15).
+- `AC-FR23-4` : chaque `Record` est une écriture autonome (aucune transaction
+  ambiante requise) ; une base injoignable lève une exception, rien n'est écrit.
 
 ## 5. Non‑Goals (explicites)
 
