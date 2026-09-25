@@ -1,19 +1,16 @@
 ---
-status: 'open'
+status: 'closed'
 reopened_date: '2026-09-24'
 reopened_reason: 'test/correction session 2 — Stories 4.4-bis, 4.12, 4.13; then Story 4.14 (correct-course 2026-09-25)'
-closed_date: '2026-09-22'
-last_commit: '8f6e79edd7fa8829b7946cbd998999b1c843cde2'
+closed_date: '2026-09-25'
+previous_closed_date: '2026-09-22'
+last_commit: '1fcfbf2404176014e27cff77fb40d2c72779e5a4'
 ---
 
 # TextToXml / Kape22Importer — Project Closure
 
-> **Reopened 2026-09-24 (test/correction session 2).** Delivered since the 2026-09-22 closure: Story
-> 4.4-bis (L_D_CONSIGNES sub-fields), 4.12 (LibelleConsigne), 4.13 (ConsigneGPAO=0 working copy), two
-> fix commits from a manual session (`1ab5ea7` EF decimal precision, `547bf2a` AC-FR20-3 withdrawn,
-> downstream OF padding, blank-user fallback), and a fourth retro pass (`epic-4-retro-2026-09-25.md`).
-> The 2026-09-25 correct-course adds Story 4.14; epic-4 is `in-progress` until it is done.
-> Sections 1–6 below still describe the 2026-09-22 closure (commit `8f6e79e`).
+> **Re-closed 2026-09-25**, after a reopening on 2026-09-24 (test/correction session 2). `last_commit`
+> is the last commit before this re-close; the re-close itself ships in the Story 4.14 commit.
 
 **Decision:** the project is functionally complete. All planned Epics (1–4), including every
 post-retrospective hardening story, are `done`. No Epic 5 is planned — confirmed by the donneur
@@ -28,7 +25,7 @@ d'ordre. No story is in progress.
 | **Epic 1** | Solution scaffolding, descriptor loading/validation, CP1252 decoding, block assignment, line-length control, typed XML extraction, `ConversionResult` purity/thread-safety, generic decimal/datetime typing (1.1–1.8) | 8/8 done | `accepted-with-open-items` (`epic-1-retro-2026-09-03.md`) — all 7 action items done |
 | **Epic 2** | EF Database-First entities, SQL Server test harness, P60 XSD/DTO, deserialization/mapping, descriptor-vs-table compatibility check, derived fields, coherence warnings, transactional persistence + anti-duplicate guard (2.1–2.8) | 8/8 done | `accepted-with-open-items` (`epic-2-retro-2026-09-07.md`) — action items done, 2 reconciled at closure (see §3) |
 | **Epic 3** | Structural repositioning as a library, inbox scanning/file lifecycle, per-file orchestration, double journalization, worker loop + graceful shutdown, loop robustness, E2E coverage harness (3.0–3.6) | 7/7 done | `accepted-with-open-items` (`epic-3-retro-2026-09-11.md`) — action items done, 1 reconciled at closure (see §3) |
-| **Epic 4** | Downstream-table dispatch: 10 `L_D_*` entities, mapping annex, OF/Coulée + Consignes mappers, bundle orchestrator, single-transaction persister, 10-table E2E suite, plus 5 post-retro hardening stories (4.1–4.7, 4.2-bis, 4.3-bis, 4.9, 4.10, 4.11) | 11/11 base + 5/5 hardening = done | `accepted-with-open-items`, 3 retro passes (`epic-4-retro-2026-09-17.md`, `-18.md`, `-21.md`) — every routed action item done as of this closure (see §3) |
+| **Epic 4** | Downstream-table dispatch: 10 `L_D_*` entities, mapping annex, OF/Coulée + Consignes mappers, bundle orchestrator, single-transaction persister, 10-table E2E suite, plus 5 post-retro hardening stories (4.1–4.7, 4.2-bis, 4.3-bis, 4.9, 4.10, 4.11), then 4 production-parity stories (4.4-bis, 4.12, 4.13, 4.14) | 11/11 base + 5/5 hardening + 4/4 parity = done | `accepted-with-open-items`, 4 retro passes (`epic-4-retro-2026-09-17.md`, `-18.md`, `-21.md`, `-25.md`) — every routed action item done as of this closure (see §3) |
 
 Every epic closed with the same verdict shape: **accepted-with-open-items**, never a hard rejection.
 Each round of open items was either fixed by a dedicated follow-up story or explicitly accepted as a
@@ -65,9 +62,25 @@ story exists for a specific, traceable reason:
   questions the process owner answered (an OF cannot be resubmitted; a Coulée is created once and reused
   as-is) — both confirmed current behavior correct, documented in code comments only, no behavior change.
 
+After the 2026-09-22 closure, a production test session (2026-09-22/24) reopened the epic for
+`L_D_CONSIGNES` parity with the legacy output:
+
+- **Manual-session fixes `1ab5ea7`, `547bf2a`.** Explicit EF decimal precision (EF's decimal(18,2) default
+  rounded scale-3 columns), downstream OF zero-padding, blank-user fallback, and the withdrawal of
+  AC-FR20-3 (hot/cold and Coulée origin are independent — process-owner decision).
+- **4.4-bis — L_D_CONSIGNES sub-fields** (`48c92f6`, `4abad8c`). One row per positional sub-field per
+  section, not only the full code.
+- **4.12 — LibelleConsigne** (`ec65715`, `d51055c`, `2b7944b`). Pure port of the legacy `GetLibelle` over
+  a SELECT-only snapshot of the 13 `L_P_CONSIGNES_*` reference tables.
+- **4.13 — ConsigneGPAO=0 working copy** (`bee5328`, `b1cd725`). Every consigne is written twice (`1` raw
+  GPAO, `0` working copy), with the composite labels of `BuildLibelleConsigne` on the `0` rows.
+- **4.14 — Schema parity lock for `DownstreamColumnPrecisions`.** The `(precision, scale)` map added by
+  `1ab5ea7` is now locked against `scripts/schema/01-ascolsi-tables.sql` at the Unit tier, like its two
+  siblings (retro #4, D-2).
+
 ## 3. Action-item reconciliation at closure
 
-All `sprint-status.yaml` action items are `done` as of this closure. Three older items were superseded by
+All `sprint-status.yaml` action items are `done` as of this closure (re-checked 2026-09-25). Three older items were superseded by
 later work and are now marked `done` with a pointer to what actually closed them, rather than left
 formally `open`:
 
@@ -90,6 +103,20 @@ overflow) is not producible through a real fixed-width P60 fixture — every rea
 than the width needed to overflow its target column — approved by the user during implementation and
 recorded in `deferred-work.md` § "Deferred from: implementation of story-4.11". B-5 stays proven at the
 Unit tier (`DecimalMagnitudeGuardTests`, since Story 4.10).
+
+The fourth retro pass (`epic-4-retro-2026-09-25.md`) left four items, all traced to the two
+manual-session fix commits, and all four are `done` at this re-close:
+
+- **D-1** (AC-FR20-3 still declared in the contract) — AC-FR20-3 marked withdrawn in `PRD.md`,
+  `epics.md` and `epic-4-context.md` (`sprint-change-proposal-2026-09-25.md` §4.1–4.3, commit `1fcfbf2`).
+- **D-2** (no Unit-tier parity lock on `DownstreamColumnPrecisions`) — Story 4.14,
+  `DownstreamColumnPrecisionsParityTests`. The EF wiring of that map (each entity actually calling
+  `ApplyDownstreamColumnPrecisions`) is still unlocked at the Unit tier; recorded in `deferred-work.md`
+  § "Deferred from: code review of story-4.14".
+- **D-3** (this document stale) — this re-close.
+- **D-4** (behavior-changing fixes landed without review) — process rule recorded as project memory
+  `manual-session-fix-review`: such a fix goes through `/run-review` or a story before commit, and a
+  changed declared AC is reconciled in the same commit. It binds agent sessions only.
 
 ## 4. Deferred work — not resolved at closure
 
@@ -130,7 +157,15 @@ starting punch list.
 
 ## 5. Final test state
 
-Re-run at closure time (`dotnet test TextToXml.sln`, commit `8f6e79e`):
+At the 2026-09-25 re-close (Story 4.14 working tree):
+
+- **Unit** (`Category=Unit`, re-run): **1026 passed, 0 failed, 0 skipped** — 192 in `TextToXml.Tests`,
+  834 in `Kape22Importer.Tests` (1023 at retro #4, plus the 3 Story 4.14 tests).
+- **Integration** (`Category=Integration`, not re-run: Story 4.14 is test-only, Unit tier): **1092
+  passed, 0 failed, 18 skipped**, as recorded by retro #4 (`epic-4-retro-2026-09-25.md`) against a
+  reachable local SQL Server.
+
+At the 2026-09-22 closure (commit `8f6e79e`), for reference:
 
 - **Unit** (`Category=Unit`): **691 passed, 0 failed, 0 skipped** — 192 in `TextToXml.Tests`, 499 in
   `Kape22Importer.Tests`.
@@ -144,7 +179,7 @@ Re-run at closure time (`dotnet test TextToXml.sln`, commit `8f6e79e`):
 
 ## 6. Closure
 
-TextToXml / Kape22Importer is closed as of 2026-09-22, last commit `8f6e79e`
-(`chore(story-4.11): apply review patches`). No story is in progress; no Epic 5 is planned. Any further
+TextToXml / Kape22Importer is closed as of 2026-09-25 (re-close after the 2026-09-24 reopening), with
+the Story 4.14 commit on top of `1fcfbf2`. The first closure was 2026-09-22, commit `8f6e79e`. No story is in progress; no Epic 5 is planned. Any further
 work on this codebase starts as a new, explicitly re-opened initiative, not a continuation of Epic 4's
 sprint.

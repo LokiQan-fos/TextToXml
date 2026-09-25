@@ -10,11 +10,14 @@ namespace Kape22Importer.Tests;
 // One column of a CREATE TABLE, parsed out of a scripts/schema/*.sql file. SqlType is the raw
 // upper-cased type token (for example "DATETIME"), kept so the parity test can catch store-type drift.
 // MaxLength is the declared character length of a bounded string column, or null for a non-string
-// column and for NVARCHAR(MAX) / NCHAR without a length. DecimalMagnitude is the exclusive upper bound
-// (10^(p-s)) of a DECIMAL(p,s)/NUMERIC(p,s) column - null for every other column, and for MONEY, which
-// carries no (p,s) token to read (Story 4.10, B-5). Properties are declared in alphabetical order
-// (CC-4).
-internal sealed record SqlColumn(Type ClrType, decimal? DecimalMagnitude, bool IsNullable, int? MaxLength, string Name, string SqlType);
+// column and for NVARCHAR(MAX) / NCHAR without a length. DecimalPrecision is the (precision, scale) of a
+// DECIMAL(p,s)/NUMERIC(p,s) column (Story 4.14) - null for every other column, and for MONEY, which
+// carries no (p,s) token to read. DecimalMagnitude is its exclusive upper bound, 10^(p-s) (Story 4.10,
+// B-5), derived from the same parse. Properties are declared in alphabetical order (CC-4).
+internal sealed record SqlColumn(Type ClrType, (int Precision, int Scale)? DecimalPrecision, bool IsNullable, int? MaxLength, string Name, string SqlType)
+{
+    public decimal? DecimalMagnitude => DecimalPrecision is (int precision, int scale) ? (decimal)Math.Pow(10, precision - scale) : null;
+}
 
 // Minimal reader for the generated scripts/schema/*.sql files, used only to lock the EF model against
 // the real schema (risk R-3). It understands just the subset those generated files use: one column per
@@ -59,7 +62,7 @@ internal static class SqlTableSchema
             string sqlType = column.Groups["type"].Value.ToUpperInvariant();
             columns.Add(new SqlColumn(
                 ClrTypeFor(sqlType),
-                DecimalMagnitudeFor(sqlType, column.Groups["length"].Value),
+                DecimalPrecisionFor(sqlType, column.Groups["length"].Value),
                 isNullable,
                 MaxLengthFor(sqlType, column.Groups["length"].Value),
                 column.Groups["name"].Value,
@@ -81,11 +84,10 @@ internal static class SqlTableSchema
         return int.TryParse(lengthToken, out int length) ? length : null;
     }
 
-    // The exclusive upper bound of a DECIMAL(p,s)/NUMERIC(p,s) column's magnitude, 10^(p-s) - the
-    // largest integer part its scale leaves room for. lengthToken is the raw "p,s" capture (MONEY and
-    // every non-decimal type have no such token, or a single-number one for other types, so both parse
-    // gracefully to null instead of throwing).
-    private static decimal? DecimalMagnitudeFor(string sqlType, string lengthToken)
+    // The (precision, scale) of a DECIMAL(p,s)/NUMERIC(p,s) column. lengthToken is the raw "p,s" capture
+    // (MONEY and every non-decimal type have no such token, or a single-number one for other types, so
+    // both parse gracefully to null instead of throwing).
+    private static (int Precision, int Scale)? DecimalPrecisionFor(string sqlType, string lengthToken)
     {
         if (ClrTypeFor(sqlType) != typeof(decimal))
         {
@@ -94,7 +96,7 @@ internal static class SqlTableSchema
 
         string[] parts = lengthToken.Split(',');
         return parts.Length == 2 && int.TryParse(parts[0], out int precision) && int.TryParse(parts[1], out int scale)
-            ? (decimal)Math.Pow(10, precision - scale)
+            ? (precision, scale)
             : null;
     }
 

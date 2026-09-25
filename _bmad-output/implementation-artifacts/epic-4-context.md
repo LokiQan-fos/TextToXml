@@ -35,6 +35,7 @@ rows: each consigne is written twice, as a `ConsigneGPAO=1` row and as a
 - Story 4.4-bis: Decompose `L_D_CONSIGNES` into per-section decoded sub-fields
 - Story 4.12: Populate `L_D_CONSIGNES.LibelleConsigne` (port of `GetLibelle`)
 - Story 4.13: `ConsigneGPAO=0` working-copy row + composite labels (port of `BuildLibelleConsigne`)
+- Story 4.14: Unit-tier schema parity lock for `DownstreamColumnPrecisions`
 
 ## Requirements & Constraints
 
@@ -142,3 +143,7 @@ rows: each consigne is written twice, as a `ConsigneGPAO=1` row and as a
 - Upstream dependencies: Epic 2 (the `L_D_KAPE22` insert and the
   `(NumeroFichier, OF)` anti-duplicate guard) and Epic 3 (dual logging and
   `error/` routing). Replaying a Fichier means redepositing it, with no DB action.
+- Story 4.14 closes retro #4 item D-2 (the `(precision, scale)` map added by
+  manual-session commit `1ab5ea7` had no Unit-tier parity test, unlike
+  `DownstreamColumnMagnitudes`). Its closure also re-closes `PROJECT-CLOSED.md`
+  (item D-3).

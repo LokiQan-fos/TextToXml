@@ -24,7 +24,7 @@ public class DownstreamColumnMagnitudesParityTests
 
     // Every column a real DecimalScale.Apply call site targets has a matching DownstreamColumnMagnitudes
     // entry carrying its real DECIMAL(p,s) bound (10^(p-s)), and vice versa. A column name that repeats
-    // across two tables (the six Tolerance* columns, shared between L_D_ORDRE_FABRICATION and
+    // across two tables (the four Tolerance* columns, shared between L_D_ORDRE_FABRICATION and
     // L_D_SECTIONCHARGE_LINGOT) must carry the same bound in both.
     [Fact]
     [Trait("AC", "4.10-B5")]
