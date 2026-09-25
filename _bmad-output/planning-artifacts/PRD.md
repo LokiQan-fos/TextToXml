@@ -1,7 +1,7 @@
 ---
 title: TextToXml
 created: 2026-09-02
-updated: 2026-09-04
+updated: 2026-09-25
 status: validé — prêt pour epics & stories
 ---
 
@@ -115,11 +115,13 @@ part ailleurs.*
 | D21 | Chaîne(s) de connexion : compte **`sa`** existant (comme les autres workers), lu depuis la configuration, jamais en dur. | utilisateur (Q12) |
 | D22 | Avant l'`INSERT` `L_D_KAPE22`, le worker vérifie qu'aucune ligne `L_D_LOG_COMMANDE` `… — OK` n'existe déjà pour ce `NumeroFichier` + `OF` (garde‑fou anti‑doublon sur crash post‑commit). Si trouvée → fichier déplacé en `archive/`, log `Warning`, pas de ré‑insertion. | utilisateur (Q21) |
 | D23 | Chevauchements de tranches entre Champs (ex. `Segment` et `NumeroFichier` du message, `Position=9`) : **acceptés** par `TextToXml` (Champs = tranches indépendantes, aucune erreur de layout). | données (`P60.xml` corrigé) |
-| D24 | Formats `P62` / `SerrageBil` / `SortieStock` : **hors périmètre**, fournis à titre d'exemple. v1 = **P60 uniquement**. `format="Semicolon"` → `LayoutInvalid`. | utilisateur (Q19) |
+| D24 | Formats `P62` / `SerrageBil` / `SortieStock` : **hors périmètre**, fournis à titre d'exemple. v1 = **P60 uniquement** ; P89 ajouté en Étape 1 seule par l'Épic 5 (D30). `format="Semicolon"` → `LayoutInvalid`. | utilisateur (Q19) |
 | D25 | `L_D_LOG_COMMANDE` : `NumLingot = 0`, `Trace = 1` pour toutes les lignes P60. | utilisateur |
 | D26 | PRD validé, **déplacé dans `_bmad-output/planning-artifacts/PRD.md`** (convention BMAD, §9). | utilisateur |
 | D27 | **Champ typé à valeur vide dans le XML normalisé.** Un Champ `datatype` `int` / `decimal` / `datetime` dont la Valeur brute est vide/espaces **n'émet pas d'élément** (élément **omis**). `P60.xsd` type ces Champs **fort** (`xs:int` / `xs:decimal` / `xs:dateTime`) en `minOccurs="0"` (`nillable="true"` admis) ; le DTO `Kape22File` reçoit `int?` / `decimal?` / `DateTime?`. Un Champ `string` (ou sans `datatype`) vide émet toujours son élément vide `<Id></Id>` (chaîne vide = `xs:string` valide). L'obligation NOT NULL reste jugée en Étape 2 (D17). **Révise `AC-FR5-4` / `AC-FR5-6`** ; impose une modif `NormalizedXmlBuilder` (Épic 1) avant la Story 2.3. | utilisateur (rétro Épic 1, 2026‑09‑04) |
 | D28 | **Types étendus `TextToXml` (généricité, hors P60).** `datatype="decimal"` : analyse pilotée par `decimalSeparator` seul (caractère unique, défaut `.`) ; `convert` ignoré pour `decimal` en v1 ; forme canonique `xs:decimal`, zéros de fin retirés. `datatype="datetime"` : `convert="{0:<masque>}"` **obligatoire** (`DescriptorValidator` rejette un `datetime` sans masque → `LayoutInvalid`), sert **uniquement** à l'analyse (`ParseExact`, `InvariantCulture`) ; le XML normalisé porte **toujours** de l'**ISO‑8601** (`yyyy-MM-dd` / `yyyy-MM-ddTHH:mm:ss`). Le format d'affichage français est une préoccupation d'Étape 2, jamais `TextToXml`. Contrats `CTR-1` / `CTR-2` / `CTR-3` (Story 1.8). | utilisateur (contrat Story 1.8, 2026‑09‑03) |
+| D29 | **Encodage P89 : UTF-8.** Les Fichiers P89 sont en UTF-8 (mesuré sur 248 Fichiers réels). `TextToXml` reste figée en Windows-1252 (§5, AC-FR16-4) : le format P89 transcode **strictement** UTF-8 → Windows-1252 **avant** `Converter.Convert` (octet UTF-8 invalide ou caractère hors Windows-1252 ⇒ Fichier en échec, jamais de caractère de remplacement). | utilisateur + données réelles (2026‑09‑25) |
+| D30 | **P89 : Étape 1 seule.** Le format P89 est livré jusqu'au XML normalisé validé par `P89.xsd` (Épic 5). Mapping, persistance et worker P89 : **plus tard**, épic non planifié. Le layout réel décale de +5 toutes les Positions à partir de `AnomaliePitsFour1` par rapport au template fourni (`Reserve9` Size 6) ; Ligne Détail = 3442 caractères. | utilisateur (2026‑09‑25) |
 
 ## 1. Vision
 
@@ -1004,14 +1006,48 @@ test que FR-11, schéma étendu aux 10 tables)* :
 §4.3 (le double journal `MQTTnetServices.Logs` + `L_D_LOG_COMMANDE` couvre
 aussi les causes d'échec FR-20/FR-21, sans nouveau canal).
 
+### 4.7 Conversion P89 — Étape 1 seule (`P89Converter`)
+
+#### FR-22 : Conversion d'un dossier de Fichiers P89 en XML normalisé
+
+**Description :** l'exécutable console `P89Converter` (`src/P89Converter`, ne
+référence que `TextToXml`) traite chaque Fichier `LP89_*` du dossier source
+(défaut `P89/raw`) : transcodage strict UTF-8 → Windows-1252 (D29),
+`Converter.Convert` avec `Templates/P89.xml`, validation contre
+`Templates/P89.xsd`, écriture de `<nom>_<yyyyMMddHHmmss>.xml` dans le dossier
+de sortie (défaut `P89/xml`), puis déplacement du Fichier source dans le dossier
+des Fichiers traités (défaut `P89/Done`) sous le même suffixe horodaté. Le reste
+du traitement P89 est hors périmètre (D30).
+
+**Consequences (testables) :**
+- `AC-FR22-1` : les Fichiers P89 de référence (fixtures) se convertissent sans
+  Error et leur XML est valide contre `P89.xsd` ; le dernier Champ du bloc
+  message (`LG24`, Position 3438, Size 4) finit à 3442 caractères.
+- `AC-FR22-2` : `P89.xsd` est à jour de `P89.xml` (`gen.ps1 -Check -Format P89`
+  sans écart) ; `gen.ps1 -Check` (P60) reste sans écart.
+- `AC-FR22-3` : un Fichier contenant un octet UTF-8 invalide, ou un caractère
+  absent de Windows-1252, est en échec avec une raison d'encodage ; aucun
+  caractère n'est remplacé.
+- `AC-FR22-4` : le XML est écrit sous `<nom>_<yyyyMMddHHmmss>.xml` (horloge
+  injectée) ; deux conversions d'un même `<nom>` à des instants différents ne
+  s'écrasent pas (rotation 999 → 001).
+- `AC-FR22-5` : succès ⇒ le Fichier source quitte le dossier source et se
+  retrouve dans le dossier des traités sous `<nom>_<yyyyMMddHHmmss>`.
+- `AC-FR22-6` : échec (Error de conversion, XSD, encodage) ⇒ aucun XML écrit,
+  le Fichier reste dans le dossier source, chaque raison est affichée sur la
+  sortie d'erreur ; les autres Fichiers du dossier sont tout de même traités
+  (pas de fail-fast, §5) ; code retour 1 dès qu'un Fichier échoue, 0 sinon.
+- `AC-FR22-7` : `TextToXml` n'est pas modifiée (AC-FR16-4 inchangé).
+
 ## 5. Non‑Goals (explicites)
 
 - Pas de conversion **partielle** : 1 erreur ⇒ 0 insertion, fichier en `error/`.
 - Pas de **fail‑fast** en Étape 1/2 : on collecte **toutes** les erreurs (sauf
   Descripteur cassé).
 - Pas de flux **sortant** LSI → SAP, pas d'**accusé de réception**.
-- Pas de **détection d'encodage** ni d'option d'encodage : tous les fichiers
-  entrants sont `Windows-1252` (figé).
+- Pas de **détection d'encodage** ni d'option d'encodage **dans `TextToXml`** :
+  la bibliothèque lit du `Windows-1252` (figé). Un format dont les Fichiers sont
+  dans un autre encodage connu transcode avant l'appel (P89 : UTF-8, D29).
 - Pas de **microservice générique multi‑format** : 1 microservice par format
   (imposé). **Mais** l'Étape 1 (`TextToXml`) est, elle, entièrement générique.
 - Pas de **ventilation** de `L_D_KAPE22` vers les autres tables `AscoLSI` :
@@ -1329,6 +1365,10 @@ généricité de `TextToXml` :
   découpe (non implémentée), type `decimal`.
 - **`SortieStock`** (`Fixed`, dialecte `Type="C/N"` + `Remarque`) → un futur
   format devra être migré au vocabulaire de `P60.xml` (`datatype`, `Description`).
+
+- **`P89`** (`Fixed`, header/message/footer, 12 anomalies de 260 caractères,
+  24 paires `PS`/`LG`) → **traité en Étape 1** par l'Épic 5 (FR-22, D29, D30).
+  Fichiers UTF-8 ; layout corrigé (+5 à partir de `AnomaliePitsFour1`).
 
 Chacun aura, le moment venu, son propre microservice + `<format>.xml` +
 `<format>.xsd` + entité EF.

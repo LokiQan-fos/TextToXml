@@ -414,6 +414,13 @@ la cause précise via le circuit existant (`L_D_LOG_COMMANDE` +
 **Architecture :** `_bmad-output/planning-artifacts/architecture/architecture-kape22-dispatch-2026-09-14/ARCHITECTURE-SPINE.md`.
 **Séquencement (7 stories) :** 4.1 → 4.2 → {4.3, 4.4} → 4.5 → 4.6 → 4.7.
 
+### Épic 5 : P89 — conversion Fichier → XML normalisé + XSD (Étape 1)
+Convertir les Fichiers P89 (`LP89_682_617_<nnn>`) en XML normalisé validé par
+`P89.xsd`, avec la bibliothèque `TextToXml` inchangée. À l'issue de l'épic :
+`P89Converter` vide `P89/raw` vers `P89/xml` (sortie horodatée) et `P89/Done`,
+`AC-FR22-1..7` sont verts. Mapping / persistance / worker P89 : plus tard.
+**FRs couverts :** FR-22.
+
 ---
 
 ## Épic 1 : Bibliothèque générique `TextToXml` — Fichier → XML normalisé
@@ -2757,6 +2764,57 @@ contre « six » côté magnitudes) sur ce que le schéma montre.
 `PROJECT-CLOSED.md` : `status: closed`, `last_commit`, ligne Épic 4 (4.4-bis,
 4.12, 4.13, 4.14 ; quatre passes de rétro), §5 avec les comptes de tests
 courants, §3 avec la réconciliation D-1..D-4.
+
+**Critères transverses :** CC-1, CC-2, CC-4.
+
+Owner : Dev.
+
+## Épic 5 : P89 — conversion Fichier → XML normalisé + XSD (Étape 1)
+
+Livrer l'Étape 1 du format P89 (D30) : descripteur `Templates/P89.xml` corrigé,
+`Templates/P89.xsd` généré, exécutable `P89Converter`. `TextToXml` n'est pas
+modifiée (AC-FR16-4). Fichiers UTF-8 transcodés avant conversion (D29).
+
+**FRs couverts :** FR-22.
+
+### Story 5.1 : `P89Converter` — dossier P89 brut → XML normalisé horodaté
+
+As an exploitant,
+I want convertir tous les Fichiers `LP89_*` de `P89/raw` en XML normalisé
+validé par `P89.xsd` dans `P89/xml`, le Fichier converti étant rangé dans
+`P89/Done`,
+So that les P89 sont lisibles et validés dès maintenant, en attendant le reste
+du traitement P89, sans qu'une rotation d'index 999 → 001 n'écrase une
+conversion antérieure.
+
+**Origine :** nouveau besoin du 2026-09-25 ;
+sprint-change-proposal-2026-09-25-p89.md.
+
+**Point de départ (session manuelle 2026-09-25, non commité) :**
+`Templates/P89.xml` corrigé (+5, `LG24`), `Templates/P89.xsd`,
+`scripts/gen.ps1 -Format`, `scripts/p89-to-xml.cs` (prototype, 248/248
+Fichiers valides) — à remplacer par `src/P89Converter`.
+
+**Acceptance Criteria:** `AC-FR22-1` à `AC-FR22-7` (PRD §4.7).
+
+**Notes dev :**
+- `src/P89Converter` : console `net10.0`, `ProjectReference` sur `TextToXml`
+  seulement, descripteur et XSD lus depuis `Templates/` (ou embarqués — au
+  choix, justifier). Arguments : `[raw] [xml] [done]`, défauts `P89/raw`,
+  `P89/xml`, `P89/Done`. Horloge = `TimeProvider` (heure locale) pour le
+  suffixe `yyyyMMddHHmmss`.
+- Déplacement vers `Done` **après** l'écriture du XML (un crash entre les deux
+  laisse le Fichier dans `raw`, reconverti au lancement suivant).
+- Supprimer `scripts/p89-to-xml.cs` ; ajouter les deux projets à
+  `TextToXml.sln` ; ajouter une section P89 au `README.md`.
+- Fixtures : 3 Fichiers réels minimum dans `tests/P89Converter.Tests/fixtures/`
+  (dont un avec accents, ex. `LP89_682_617_013`) + variantes fautives
+  (UTF-8 invalide, caractère hors Windows-1252, Ligne tronquée).
+- Test XSD ↔ descripteur (même principe que `P60XsdTests`) plutôt qu'un appel à
+  `gen.ps1` depuis les tests.
+
+**Tests xUnit (TDD, CC-1) :** `tests/P89Converter.Tests`, `Category=Unit`
+(dossiers temporaires, aucune base), `[Trait("AC", "AC-FR22-…")]`.
 
 **Critères transverses :** CC-1, CC-2, CC-4.
 

@@ -85,6 +85,10 @@ development_status:
   4-12-libelle-consigne: done
   4-13-ligne-consignegpao-0-libelles-composites: done
   4-14-verrou-parite-downstream-column-precisions: done
+
+  epic-5: backlog
+  5-1-p89converter-dossier-p89-brut-xml-normalise-horodate: backlog
+  epic-5-retrospective: optional
 action_items:
   - id: "story-4-6-decimal-scale-defect-story-4-3-bis"
     epic: 4

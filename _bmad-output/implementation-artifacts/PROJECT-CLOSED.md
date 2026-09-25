@@ -1,13 +1,17 @@
 ---
-status: 'closed'
-reopened_date: '2026-09-24'
-reopened_reason: 'test/correction session 2 — Stories 4.4-bis, 4.12, 4.13; then Story 4.14 (correct-course 2026-09-25)'
+status: 'reopened'
+reopened_date: '2026-09-25'
+reopened_reason: 'new requirement — Epic 5 P89 conversion (sprint-change-proposal-2026-09-25-p89.md)'
+previous_reopened_date: '2026-09-24'
 closed_date: '2026-09-25'
 previous_closed_date: '2026-09-22'
 last_commit: '1fcfbf2404176014e27cff77fb40d2c72779e5a4'
 ---
 
 # TextToXml / Kape22Importer — Project Closure
+
+> **Reopened 2026-09-25 for Epic 5 (P89, Step 1 only)** — `sprint-change-proposal-2026-09-25-p89.md`.
+> Re-close at Story 5.1 closure.
 
 > **Re-closed 2026-09-25**, after a reopening on 2026-09-24 (test/correction session 2). `last_commit`
 > is the last commit before this re-close; the re-close itself ships in the Story 4.14 commits
