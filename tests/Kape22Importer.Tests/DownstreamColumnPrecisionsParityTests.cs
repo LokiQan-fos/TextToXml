@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Kape22Importer.Tests;
 
-// Story 4.14 (Épic 4 retro #4, D-2): same discipline as DownstreamColumnLengthsParityTests and
+// Story 4.14 (Epic 4 retro #4, D-2): same discipline as DownstreamColumnLengthsParityTests and
 // DownstreamColumnMagnitudesParityTests, for the (precision, scale) map AscoLsiDbContext applies to every
 // decimal downstream column. In scope is every DECIMAL(p,s) column of the 9 tables that map feeds -
 // L_D_CONSIGNES carries none and gets no precisions. Written test-first (CC-1), Unit-only.

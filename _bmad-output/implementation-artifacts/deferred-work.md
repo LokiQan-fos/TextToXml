@@ -1222,3 +1222,9 @@ s'y trouver et rester à confirmer.
 - source_spec: `spec-4-13-ligne-consignegpao-0-libelles-composites.md`
   summary: The worker's single SVT `ConsigneGPAO=1` row (TypeConsigne 0, SizeCodeConsigne 0, Story 4.4-bis) has no production counterpart: production writes no `L_D_CONSIGNES` row at all for the SVT CodeOperations (`DS2`, `NLT`, `VD1`, `VD2`, `VD9`).
   evidence: Read-only SELECT on AFV004-LSI on 2026-09-24 (counts by CodeOperation and ConsigneGPAO); the legacy `CompleteConsignes2` never touches SVT. Story 4.13 only refrains from adding a `ConsigneGPAO=0` row for SVT; whether to drop the existing `1` row is a separate decision.
+
+## Deferred from: code review of story-4.14 (2026-09-25)
+
+- source_spec: `spec-4-14-verrou-parite-downstream-column-precisions.md`
+  summary: No Unit test checks that `AscoLsiDbContext` applies `DownstreamColumnPrecisions` to the entities themselves. Removing one `ApplyDownstreamColumnPrecisions(entity)` call (`AscoLsiDbContext.cs:77-124`) would put that entity back on EF's decimal(18,2) default while every Unit test stays green. The same gap applies if POIDSMETRIQUE, REFROIDISSOIRS, SVT or CONSIGNES, which have no call, ever gain a DECIMAL column.
+  evidence: Raised by three of the step-04 lenses (blind, edge-case, verification-gap). `SchemaModelParityTests.cs:141-171` compares nullability, CLR type and datetime store type, but never `GetPrecision()`/`GetScale()`. The Story 4.14 spec forbids EF-model reflection on purpose ("Never"), and the wiring predates this story (`1ab5ea7`). Cheap fix: compare `property.GetPrecision()/GetScale()` with `SqlColumn.DecimalPrecision` in `SchemaModelParityTests`.

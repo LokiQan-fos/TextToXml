@@ -84,12 +84,12 @@ internal static class SqlTableSchema
         return int.TryParse(lengthToken, out int length) ? length : null;
     }
 
-    // The (precision, scale) of a DECIMAL(p,s)/NUMERIC(p,s) column. lengthToken is the raw "p,s" capture
-    // (MONEY and every non-decimal type have no such token, or a single-number one for other types, so
-    // both parse gracefully to null instead of throwing).
+    // The (precision, scale) of a DECIMAL(p,s)/NUMERIC(p,s) column, or null for MONEY (no (p,s) token)
+    // and every non-decimal type. lengthToken is the raw "p,s" capture. A DECIMAL/NUMERIC without an
+    // explicit (p,s) throws rather than returning null, so the parity tests cannot silently drop it.
     private static (int Precision, int Scale)? DecimalPrecisionFor(string sqlType, string lengthToken)
     {
-        if (ClrTypeFor(sqlType) != typeof(decimal))
+        if (sqlType is not ("DECIMAL" or "NUMERIC"))
         {
             return null;
         }
@@ -97,7 +97,7 @@ internal static class SqlTableSchema
         string[] parts = lengthToken.Split(',');
         return parts.Length == 2 && int.TryParse(parts[0], out int precision) && int.TryParse(parts[1], out int scale)
             ? (precision, scale)
-            : null;
+            : throw new InvalidOperationException($"{sqlType} column without an explicit (p,s): '{lengthToken}'.");
     }
 
     private static Type ClrTypeFor(string sqlType) => sqlType.ToUpperInvariant() switch
