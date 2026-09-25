@@ -1,6 +1,6 @@
 # TextToXml
 
-Chaîne d'ingestion des fichiers SAP → LSI. Deux livrables :
+Chaîne d'ingestion des fichiers SAP → LSI. Livrables :
 
 | Projet | Rôle |
 |---|---|
@@ -57,8 +57,8 @@ Voir `_bmad-output/planning-artifacts/PRD.md` et `epics.md` pour le détail fonc
 ```sh
 dotnet build TextToXml.sln
 dotnet test  TextToXml.sln --filter Category=Unit          # aucune base requise
-dotnet test  TextToXml.sln --filter Category=Integration   # instance SQL Server de test requise
-dotnet test  TextToXml.sln                                  # tout
+dotnet test  TextToXml.sln --filter Category=Integration -m:1   # instance SQL Server de test requise ; -m:1 = un projet à la fois (base de test partagée)
+dotnet test  TextToXml.sln -m:1                             # tout
 ```
 
 Les versions de packages sont centralisées dans `Directory.Packages.props`

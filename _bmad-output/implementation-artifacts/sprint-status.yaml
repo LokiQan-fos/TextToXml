@@ -87,7 +87,7 @@ development_status:
   4-14-verrou-parite-downstream-column-precisions: done
 
   epic-5: in-progress
-  5-0-journal-fichier-interface-implementation-lsi: review
+  5-0-journal-fichier-interface-implementation-lsi: done
   5-1-p89converter-dossier-p89-brut-xml-normalise-horodate: in-progress
   5-2-worker-gpaoconvertp89-launcher: backlog
   epic-5-retrospective: optional

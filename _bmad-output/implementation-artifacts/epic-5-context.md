@@ -8,7 +8,9 @@ Deliver Step 1 of the P89 format: raw P89 Fichiers (`LP89_682_617_<nnn>`, `nnn` 
 
 ## Stories
 
+- Story 5.0: Fichier journal — `IFichierJournal` + LSI implementation (`AscoLsiJournal`)
 - Story 5.1: `P89Converter` — raw P89 folder → timestamped normalized XML
+- Story 5.2: worker `GpaoConvertP89` under the `Launcher`
 
 ## Requirements & Constraints
 
@@ -25,11 +27,11 @@ Deliver Step 1 of the P89 format: raw P89 Fichiers (`LP89_682_617_<nnn>`, `nnn` 
 
 - P89 Fichiers are UTF-8 (measured on 248 real Fichiers); the library stays frozen on Windows-1252, so the P89 format transcodes before the library call.
 - The supplied template was wrong: all Positions from `AnomaliePitsFour1` to `LG24` shift by +5 (`Reserve9` Size 6). Corrected template and generated XSD already exist in `Templates/` (uncommitted manual-session work, carried into Story 5.1 as its starting point together with `scripts/gen.ps1 -Format`).
-- `src/P89Converter`: library `net10.0`, references `TextToXml` + `Kape22Importer` (L_D_LOG_COMMANDE entity); descriptor/XSD embedded. Folders and interval from the `P89` section of `GpaoConvertP89.json`. Clock via `TimeProvider` (local time). Worker `GpaoConvertP89` follows the `GpaoImportP60` model (Story 5.1 checkpoint correction, 2026-09-25).
+- `src/P89Converter`: library `net10.0`, references `TextToXml` + `FichierJournal` only (AC-FR22-7); it journals through `IFichierJournal`, the worker injects `AscoLsiJournal` (D31); descriptor/XSD embedded. Folders and interval from the `P89` section of `GpaoConvertP89.json`. Clock via `TimeProvider` (local time). Worker `GpaoConvertP89` follows the `GpaoImportP60` model (Story 5.1 checkpoint correction, 2026-09-25).
 - Move to done happens after the XML write, so a crash between the two leaves the Fichier in raw to be reconverted next run.
-- The prototype `scripts/p89-to-xml.cs` is replaced and deleted; both new projects join `TextToXml.sln`; `README.md` gains a P89 section.
+- The prototype `scripts/p89-to-xml.cs` is replaced and deleted; `P89Converter` and its tests join `TextToXml.sln`; `README.md` gains a P89 section.
 - Tests: `tests/P89Converter.Tests`, `Category=Unit`, temporary folders, no database; at least 3 real fixtures (one with accents) + faulty variants (invalid UTF-8, non-Windows-1252 char, truncated Ligne); an XSD↔descriptor test in the style of `P60XsdTests`.
 
 ## Cross-Story Dependencies
 
-- None inside the epic. Epics 1–4 are done and untouched; the project is reopened for this epic and re-closes at Story 5.1 closure.
+- Strict order 5.0 → 5.1 → 5.2: 5.1 consumes the Story 5.0 journal interface, 5.2 hosts 5.1 and wires `AscoLsiJournal`. Epics 1–4 are done and untouched; the project is reopened for this epic and re-closes at Story 5.2 closure. Migrating P60 onto `IFichierJournal` is outside Epic 5 (`deferred-work.md`).

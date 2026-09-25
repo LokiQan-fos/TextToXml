@@ -87,7 +87,7 @@ in-progress tant que toutes les stories ne sont pas done).
 Exécute successivement :
   dotnet build TextToXml.sln -warnaserror
   dotnet test TextToXml.sln --filter Category=Unit
-  dotnet test TextToXml.sln --filter Category=Integration
+  dotnet test TextToXml.sln --filter Category=Integration -m:1
 Arrête-toi à la première erreur. Puis git status --short pour confirmer les
 fichiers à commiter.
 

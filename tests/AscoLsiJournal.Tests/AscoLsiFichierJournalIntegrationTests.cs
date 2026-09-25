@@ -29,6 +29,7 @@ public class AscoLsiFichierJournalIntegrationTests(SqlServerIntegrationFixture f
         using AscoLsiJournalDbContext verify = this.NewContext();
         L_D_LOG_COMMANDE row = Assert.Single(verify.LogCommandeRows.AsNoTracking());
         Assert.Equal("P89", row.Commande);
+        Assert.Equal(new DateTime(2026, 2, 10, 9, 0, 0), row.Date);
         Assert.Equal("013 — REJETÉ : XSD : élément inattendu", row.Message);
         Assert.Equal(0, row.NumLingot);
         Assert.Equal("2039841", row.OF);
@@ -60,7 +61,8 @@ public class AscoLsiFichierJournalIntegrationTests(SqlServerIntegrationFixture f
     {
         Commande = "P89",
         FichierName = "LP89_682_617_013",
-        Instant = DateTimeOffset.UtcNow,
+        // A winter instant: Paris is UTC+1, so the row Date reads 09:00.
+        Instant = new DateTimeOffset(2026, 2, 10, 8, 0, 0, TimeSpan.Zero),
         NumeroFichier = "013",
         OF = "2039841",
         Reasons = reasons ?? [],

@@ -58,10 +58,13 @@ jobs:
           --filter Category=Unit
           --logger "trx;LogFileName=unit.trx"
 
+      # Story 5.0 review P-9: -m:1 runs one test project at a time. Kape22Importer.Tests,
+      # AscoLsiJournal.Tests and P89Converter.Tests share SqlServerIntegrationFixture, whose ResetData
+      # truncates the same AscoLSI_Test tables, so parallel projects would race on them.
       - name: Test (Category=Integration)
         run: >
           dotnet test TextToXml.sln --no-build --configuration Release
-          --filter Category=Integration
+          --filter Category=Integration -m:1
           --logger "trx;LogFileName=integration.trx"
 
       # Epic 3 retro A-2 / Epic 2 retro A-4: a chore(story-*) commit without "AC -> test" lines in its

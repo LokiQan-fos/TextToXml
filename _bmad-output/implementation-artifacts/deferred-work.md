@@ -1233,6 +1233,16 @@ s'y trouver et rester à confirmer.
   summary: The `throw` branch of `SqlTableSchema.DecimalPrecisionFor` (`SqlTableSchema.cs:89-100`) has no test, and a valid one-argument `DECIMAL(p)` (scale 0) would also throw, with an inaccurate "without an explicit (p,s)" message, breaking every `SqlTableSchema.Read` consumer.
   evidence: Raised by the blind-hunter and edge-case-hunter lenses of the second 4.14 review. No impact today: the generated `scripts/schema/*.sql` only contain two-argument `DECIMAL(p,s)` (34 occurrences, (2,1) to (7,3)). Revisit if a schema script ever emits the one-argument form.
 
+## Deferred from: code review of story-5.0 (2026-09-25)
+
+- source_spec: `reviews/story-5-0/aggregated-report.md` (F-1)
+  summary: When `NumeroFichier` is null but `OF` is readable, `AscoLsiFichierJournal.Record` writes `" — OK"` / `" — REJETÉ : ..."` with no Fichier number (`AscoLsiFichierJournal.cs:34-37`); neither D8 nor the matrix fixes the text for this case.
+  evidence: Raised by the blind-hunter and edge-case-hunter lenses (and the acceptance-auditor, out of mandate), found by reading the message construction. P60 cannot produce it; for P89 it only exists if `NumeroFichier` and `OF` are read separately. Story 5.1 settles it (fallback on `FichierName` or an explicit marker) with a test.
+
+- source_spec: `reviews/story-5-0/aggregated-report.md` (F-2)
+  summary: The constructor `ArgumentException` names the parameter `InitiatingServer`, not the full configuration key (`AscoLsiJournal:InitiatingServer`), so an operator cannot tell which setting to fix.
+  evidence: Raised by the blind-hunter lens, found by reading `AscoLsiFichierJournal.cs:14, 63-66`. The library does not read configuration; the key belongs to the worker. Story 5.2 validates and names the full key at startup (AC-FR22-8).
+
 ## Deferred from: Story 5.1 spec checkpoint, D31 journal interface (2026-09-25)
 
 - source_spec: `PRD.md` D31, FR-23; `epics.md` Épic 5 (séquencement)

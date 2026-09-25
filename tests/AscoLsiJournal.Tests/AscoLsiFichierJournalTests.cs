@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Transactions;
 using Microsoft.EntityFrameworkCore;
 using TextToXml.Tests;
 
@@ -34,6 +35,16 @@ public class AscoLsiFichierJournalTests
         Assert.Equal("2039841", row.OF);
         Assert.True(row.Trace);
         Assert.Equal(InitiatingServer, row.User);
+    }
+
+    // AC-FR23-2: a summer instant is written in Paris summer time (UTC+2), not with a fixed offset.
+    [Fact]
+    [Trait("AC", "FR23-2")]
+    public void Record_SummerInstant_WritesParisSummerTime_AcFr23_2()
+    {
+        this.Journal(InitiatingServer).Record(Entry(instant: new DateTimeOffset(2026, 7, 10, 8, 0, 0, TimeSpan.Zero)));
+
+        Assert.Equal(new DateTime(2026, 7, 10, 10, 0, 0), Assert.Single(this.Rows()).Date);
     }
 
     // AC-FR23-2: a blank initiating server falls back to the machine name, never a blank User.
@@ -85,6 +96,7 @@ public class AscoLsiFichierJournalTests
     // AC-FR23-3 / D15: without a readable OF no row can be written.
     [Theory]
     [InlineData(null)]
+    [InlineData("")]
     [InlineData(" ")]
     [Trait("AC", "FR23-3")]
     public void Record_UnreadableOf_WritesNoRow_AcFr23_3(string? of)
@@ -105,11 +117,37 @@ public class AscoLsiFichierJournalTests
         Assert.Empty(this.Rows());
     }
 
-    private static FichierJournal.FichierJournalEntry Entry(string? of = "2039841", string[]? reasons = null) => new()
+    // AC-FR23-4 / D31: the context is created with any ambient transaction suppressed, so a caller rolling
+    // back its business transaction cannot take the journal row with it. Holds without a SQL Server.
+    [Fact]
+    [Trait("AC", "FR23-4")]
+    public void Record_InsideACallerTransaction_WritesOutsideIt_AcFr23_4()
+    {
+        Transaction? seenByContext = null;
+        AscoLsiFichierJournal journal = new(
+            () =>
+            {
+                seenByContext = Transaction.Current;
+                return this.NewContext();
+            },
+            InitiatingServer);
+
+        using (new TransactionScope())
+        {
+            journal.Record(Entry());
+        }
+
+        Assert.Null(seenByContext);
+    }
+
+    private static FichierJournal.FichierJournalEntry Entry(
+        DateTimeOffset? instant = null,
+        string? of = "2039841",
+        string[]? reasons = null) => new()
     {
         Commande = "P89",
         FichierName = "LP89_682_617_013",
-        Instant = Instant,
+        Instant = instant ?? Instant,
         NumeroFichier = "013",
         OF = of,
         Reasons = reasons ?? [],

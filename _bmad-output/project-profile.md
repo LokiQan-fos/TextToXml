@@ -25,7 +25,7 @@ amont au lieu de les dupliquer — toute règle vit dans son fichier d'origine.
 
 - Build strict : `dotnet build TextToXml.sln -warnaserror`
 - Tests unitaires : `dotnet test TextToXml.sln --filter Category=Unit`
-- Tests d'intégration : `dotnet test TextToXml.sln --filter Category=Integration`
+- Tests d'intégration : `dotnet test TextToXml.sln --filter Category=Integration -m:1` (`-m:1` : un projet de test à la fois, car `Kape22Importer.Tests`, `AscoLsiJournal.Tests` et `P89Converter.Tests` partagent `SqlServerIntegrationFixture` et vident la même base `AscoLSI_Test`)
 - Gates d'architecture (inclus dans Category=Unit) :
   `AcTraitCoverageTests`, `AcCoverageCompletenessTests`, `SolutionStructureTests`,
   `FormatIsolationTests`

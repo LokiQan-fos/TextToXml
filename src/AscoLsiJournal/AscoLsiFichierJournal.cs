@@ -32,7 +32,7 @@ public sealed class AscoLsiFichierJournal : IFichierJournal
         }
 
         string numeroFichier = entry.NumeroFichier ?? string.Empty;
-        string message = entry.Succeeded
+        string message = entry.Reasons.Count == 0
             ? $"{numeroFichier} — OK"
             : $"{numeroFichier} — REJETÉ : {string.Join(" ; ", entry.Reasons)}";
 

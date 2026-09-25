@@ -22,6 +22,4 @@ public sealed class FichierJournalEntry
     public string? OF { get; init; }
 
     public IReadOnlyList<string> Reasons { get; init; } = [];
-
-    public bool Succeeded => this.Reasons.Count == 0;
 }
