@@ -313,10 +313,11 @@ public sealed class InboxScanner(
 
     // AC-FR15-3: a returned result carrying a File-level PersistenceError is Kape22Persister reporting a
     // caught DbException (AC-FR11-5), or Kape22FichierProcessor reporting one from its reference-data read
-    // through the same helper (Story 4.12) - AscoLSI is unreachable. Only that helper emits PersistenceError
-    // (a P60Deserializer schema failure is SchemaInvalid, an unexpected throw is UnexpectedFailure), so
-    // it is a precise signal for "leave the Fichier in processing/ and retry", distinct from a Converter,
-    // schema or Mapper rejection (which belongs in error/).
+    // through the same helper (Story 4.12) - AscoLSI is unreachable - or, since Story 6.1, Kape22Persister
+    // reporting a Fichier journal it could not read or write (AC-FR24-5). Only those two paths emit
+    // PersistenceError (a P60Deserializer schema failure is SchemaInvalid, an unexpected throw is
+    // UnexpectedFailure), so it is a precise signal for "leave the Fichier in processing/ and retry",
+    // distinct from a Converter, schema or Mapper rejection (which belongs in error/).
     private static bool IsPersistenceFailure(FichierProcessingResult result) =>
         result.Errors.Any(error => error is { Block: Block.File, Code: ErrorCode.PersistenceError });
 

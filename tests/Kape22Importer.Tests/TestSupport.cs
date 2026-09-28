@@ -2,9 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Xml.Linq;
+using AscoLsiJournal;
+using FichierJournal;
 using Kape22Importer.Persistence;
 using Microsoft.EntityFrameworkCore;
 using TextToXml;
@@ -172,12 +175,28 @@ internal sealed class FixedClock(DateTimeOffset utcNow) : TimeProvider
 
 // Hands out a fresh AscoLsiDbContext on every call, all bound to one EF in-memory database so a write
 // from an earlier Import is visible to a later one, and records every context handed out (Story 3.2,
-// AC-FR13-4). Reused by the Story 3.3 double-logging unit tests.
+// AC-FR13-4). Reused by the Story 3.3 double-logging unit tests. Story 6.1: Journal is the real LSI
+// journal the host injects, over its own in-memory database, and LogRows reads back what it wrote.
 internal sealed class InMemoryContextFactory
 {
     private readonly string databaseName = Guid.NewGuid().ToString();
 
+    private readonly string journalDatabaseName = Guid.NewGuid().ToString();
+
+    public InMemoryContextFactory()
+    {
+        this.Journal = new AscoLsiFichierJournal(this.JournalContext, SqlServerIntegrationFixture.JournalInitiatingServer);
+    }
+
     public List<AscoLsiDbContext> Handed { get; } = [];
+
+    public AscoLsiFichierJournal Journal { get; }
+
+    public L_D_LOG_COMMANDE[] LogRows()
+    {
+        using AscoLsiJournalDbContext context = this.JournalContext();
+        return [.. context.LogCommandeRows.AsNoTracking().OrderBy(row => row.Id)];
+    }
 
     public AscoLsiDbContext Next()
     {
@@ -190,4 +209,23 @@ internal sealed class InMemoryContextFactory
 
     private DbContextOptions<AscoLsiDbContext> Build() =>
         new DbContextOptionsBuilder<AscoLsiDbContext>().UseInMemoryDatabase(this.databaseName).Options;
+
+    private AscoLsiJournalDbContext JournalContext() =>
+        new(new DbContextOptionsBuilder<AscoLsiJournalDbContext>().UseInMemoryDatabase(this.journalDatabaseName).Options);
+}
+
+// Story 6.1: an IFichierJournal whose writes fail the way an unreachable LSI database does, after
+// keeping the entries it was handed; HasSuccess fails only when failReads is set, and otherwise answers
+// false.
+internal sealed class FailingJournal(Exception failure, bool failReads = false) : IFichierJournal
+{
+    public List<FichierJournalEntry> Attempted { get; } = [];
+
+    public bool HasSuccess(FichierJournalEntry entry) => failReads ? throw failure : false;
+
+    public void Record(FichierJournalEntry entry)
+    {
+        this.Attempted.Add(entry);
+        throw failure;
+    }
 }

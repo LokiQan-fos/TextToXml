@@ -113,16 +113,18 @@ public class SolutionStructureTests
     }
 
     [Fact]
-    public void Kape22Importer_ReferencesOnlyTextToXmlAndPortalSharedLibrary()
+    public void Kape22Importer_ReferencesOnlyTextToXmlPortalSharedLibraryAndFichierJournal()
     {
         string[] references = ElementValues("src/Kape22Importer/Kape22Importer.csproj", "ProjectReference")
             .Select(ProjectName)
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();
 
+        // Story 6.1 (D31): the journal contract joins the two shared references; the LSI implementation
+        // (AscoLsiJournal) stays out of the importer.
         Assert.True(
-            references.SequenceEqual(new[] { "PortalSharedLibrary", "TextToXml" }),
-            $"Kape22Importer must reference exactly TextToXml and PortalSharedLibrary. Found: {string.Join(", ", references)}.");
+            references.SequenceEqual(new[] { "FichierJournal", "PortalSharedLibrary", "TextToXml" }),
+            $"Kape22Importer must reference exactly TextToXml, PortalSharedLibrary and FichierJournal. Found: {string.Join(", ", references)}.");
     }
 
     private static string ProjectName(string includePath) =>

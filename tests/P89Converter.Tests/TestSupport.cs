@@ -109,6 +109,9 @@ internal sealed class RecordingJournal(Exception? failure = null) : IFichierJour
 
     public List<FichierJournalEntry> Entries { get; } = [];
 
+    // P89 never asks: it has no anti-duplicate guard.
+    public bool HasSuccess(FichierJournalEntry entry) => throw new NotSupportedException();
+
     public void Record(FichierJournalEntry entry)
     {
         if (this.failure is not null)

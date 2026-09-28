@@ -20,9 +20,9 @@ namespace Kape22Importer.Tests;
 // worker uses to write MQTTnetServices.dbo.Logs. Kape22FichierProcessor logs through ILogger; here a
 // Serilog logger backed by the MSSqlServer sink is wired behind that ILogger, a Fichier is processed,
 // the sink is flushed, and dbo.Logs is read back to prove the line lands with the right Level and the
-// "[Kape22Importer][<Event>] : ..." message. The L_D_LOG_COMMANDE half stays on Kape22Persister and is
-// asserted alongside. Integration category (AR-12): needs a reachable local SQL Server test instance
-// (AscoLSI_Test + MQTTnetServices_Test) and skips cleanly otherwise. Commit + reset regime: ResetData
+// "[Kape22Importer][<Event>] : ..." message. The L_D_LOG_COMMANDE half stays on Kape22Persister (through
+// the injected LSI journal since Story 6.1) and is asserted alongside. Integration category (AR-12):
+// needs a reachable local SQL Server test instance (AscoLSI_Test + MQTTnetServices_Test) and skips cleanly otherwise. Commit + reset regime: ResetData
 // and ResetMqttLogs first, because the rows are read back after the transaction commits. Written
 // test-first (CC-1). Vocabulary follows the PRD glossary (CC-5).
 [Collection(SqlServerIntegrationCollection.Name)]
@@ -72,7 +72,7 @@ public class DoubleJournalIntegrationTests(SqlServerIntegrationFixture fixture)
 
         using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
         Assert.Single(verify.Kape22Rows.AsNoTracking());
-        Assert.EndsWith("— OK", Assert.Single(verify.LogCommandeRows.AsNoTracking()).Message);
+        Assert.EndsWith("— OK", Assert.Single(fixture.LogRows()).Message);
     }
 
     // AC-FR14-2: a rejection with a readable OF lands one Error row in Logs listing the errors, and the
@@ -93,7 +93,7 @@ public class DoubleJournalIntegrationTests(SqlServerIntegrationFixture fixture)
 
         using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
         Assert.Empty(verify.Kape22Rows.AsNoTracking());
-        Assert.Contains("REJETÉ", Assert.Single(verify.LogCommandeRows.AsNoTracking()).Message);
+        Assert.Contains("REJETÉ", Assert.Single(fixture.LogRows()).Message);
     }
 
     // AC-FR14-3 (D15): a structural rejection (Converter fails, OF never read) still lands one Error row
@@ -113,7 +113,7 @@ public class DoubleJournalIntegrationTests(SqlServerIntegrationFixture fixture)
         Assert.Contains("[Kape22Importer][ImportRejected]", row.Message);
 
         using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
-        Assert.Empty(verify.LogCommandeRows.AsNoTracking());
+        Assert.Empty(fixture.LogRows());
     }
 
     // AC-FR14-8: an imported Fichier carrying coherence Warnings lands the Information success row plus a
@@ -141,15 +141,16 @@ public class DoubleJournalIntegrationTests(SqlServerIntegrationFixture fixture)
         Assert.Contains(nameof(ErrorCode.InterBlockMismatch), warning.Message);
     }
 
-    // AC-FR11-6 (D22): a Fichier whose key already carries a committed "— OK" L_D_LOG_COMMANDE row comes
-    // back AlreadyImported with no new L_D_KAPE22 row, and lands one Warning row in Logs prefixed
-    // "[Kape22Importer][AlreadyImported]" - through the real sink, not a RecordingLogger.
+    // AC-FR11-6 (D22 revised): a Fichier whose key already carries a committed L_D_KAPE22 row comes back
+    // AlreadyImported with no new L_D_KAPE22 row, records the missing "— OK" entry (AC-FR24-4), and
+    // lands one Warning row in Logs prefixed "[Kape22Importer][AlreadyImported]" - through the real sink,
+    // not a RecordingLogger.
     [SkippableFact]
     [Trait("AC", "FR11-6")]
     public void Import_FichierAlreadyImported_WritesTheAlreadyImportedWarningRowToMqttLogs_AcFr11_6()
     {
         Ready();
-        SeedOkLogRow();
+        SeedKape22Row();
 
         ImportResult result = RunWithSerilog(ReferenceFichierName, InsertableReferenceFichier());
 
@@ -162,8 +163,8 @@ public class DoubleJournalIntegrationTests(SqlServerIntegrationFixture fixture)
         Assert.Contains("[Kape22Importer][AlreadyImported]", row.Message);
 
         using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
-        Assert.Empty(verify.Kape22Rows.AsNoTracking());
-        Assert.Single(verify.LogCommandeRows.AsNoTracking());
+        Assert.Single(verify.Kape22Rows.AsNoTracking());
+        Assert.EndsWith("— OK", Assert.Single(fixture.LogRows()).Message);
     }
 
     private void Ready()
@@ -173,22 +174,12 @@ public class DoubleJournalIntegrationTests(SqlServerIntegrationFixture fixture)
         fixture.ResetMqttLogs();
     }
 
-    // Seeds the committed "<NumeroFichier> — OK" L_D_LOG_COMMANDE row the D22 guard keys on, matching
-    // what Kape22Persister.OkLogRowExists compares (the trimmed Detail OF, "<NumeroFichier> — OK").
-    private void SeedOkLogRow()
+    // Seeds the committed L_D_KAPE22 row the revised D22 guard keys on (same NumeroFichier + OF as the
+    // insertable reference Fichier).
+    private void SeedKape22Row()
     {
-        MapResult<L_D_KAPE22> reference = MapReferenceFichier();
         using AscoLsiDbContext context = fixture.NewAscoLsiContext();
-        context.LogCommandeRows.Add(new L_D_LOG_COMMANDE
-        {
-            Commande = "P60",
-            Date = new DateTime(2026, 2, 9, 12, 0, 0),
-            Message = $"{reference.NumeroFichier} — OK",
-            NumLingot = 0,
-            OF = reference.OF!,
-            Trace = true,
-            User = InitiatingServer,
-        });
+        context.Kape22Rows.Add(MapReferenceBundle().Kape22!);
         context.SaveChanges();
     }
 
@@ -215,7 +206,7 @@ public class DoubleJournalIntegrationTests(SqlServerIntegrationFixture fixture)
             ILogger<Kape22FichierProcessor> logger = factory.CreateLogger<Kape22FichierProcessor>();
 
             return new Kape22FichierProcessor(
-                fixture.NewAscoLsiContext, Configuration(), Options(), WinterClock(), logger)
+                fixture.NewAscoLsiContext, Configuration(), fixture.NewJournal(), Options(), WinterClock(), logger)
                 .Import(fichierName, content);
         }
         finally

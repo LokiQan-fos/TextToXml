@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using AscoLsiJournal;
 using Kape22Importer.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -28,13 +29,19 @@ public class SchemaModelParityTests
             EntityType(typeof(L_D_KAPE22)));
     }
 
+    // Story 6.1 (FR-24): L_D_LOG_COMMANDE is now mapped by the LSI journal's own context.
     [Fact]
     [Trait("AC", "2.1")]
     public void L_D_LOG_COMMANDE_ModelMatchesGeneratedSchema()
     {
+        DbContextOptions<AscoLsiJournalDbContext> options = new DbContextOptionsBuilder<AscoLsiJournalDbContext>()
+            .UseSqlServer("Server=model-only;Database=AscoLSI_Test;Trusted_Connection=True;")
+            .Options;
+        using AscoLsiJournalDbContext context = new(options);
+
         AssertParity(
             SqlTableSchema.Read("01-ascolsi-tables.sql", "L_D_LOG_COMMANDE"),
-            EntityType(typeof(L_D_LOG_COMMANDE)));
+            context.Model.FindEntityType(typeof(L_D_LOG_COMMANDE))!);
     }
 
     // Story 4.1: same parity mechanism, extended to the 10 downstream tables (AFV004-LSI sys.columns,

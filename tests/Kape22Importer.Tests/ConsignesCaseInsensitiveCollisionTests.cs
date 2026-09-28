@@ -39,7 +39,7 @@ public class ConsignesCaseInsensitiveCollisionTests
         Assert.Equal(bundle.SectionChargeChutage!.CodeOperation, bundle.SectionChargeDecoupe!.CodeOperation, StringComparer.OrdinalIgnoreCase);
 
         using AscoLsiDbContext context = contexts.Next();
-        ImportResult result = new Kape22Persister(context, Configuration(), WinterClock()).Persist(bundle);
+        ImportResult result = new Kape22Persister(context, Configuration(), contexts.Journal, ReferenceFichierName, WinterClock()).Persist(bundle);
 
         Assert.False(result.Success);
         ConversionError error = Assert.Single(result.Errors);

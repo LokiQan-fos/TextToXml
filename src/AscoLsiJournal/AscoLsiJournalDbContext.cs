@@ -17,6 +17,10 @@ public class AscoLsiJournalDbContext(DbContextOptions<AscoLsiJournalDbContext> o
             entity.HasKey(row => row.Id);
             entity.Property(row => row.Id).ValueGeneratedOnAdd();
             entity.Property(row => row.Commande).HasMaxLength(LogCommandeColumnLengths.Commande);
+
+            // The real column is legacy datetime, not datetime2: pin the store type so EF sends datetime
+            // parameters, as the P60 copy of this mapping did before Story 6.1 (schema parity, risk R-3).
+            entity.Property(row => row.Date).HasColumnType("datetime");
             entity.Property(row => row.OF).HasMaxLength(LogCommandeColumnLengths.OF);
             entity.Property(row => row.User).HasMaxLength(LogCommandeColumnLengths.User);
         });

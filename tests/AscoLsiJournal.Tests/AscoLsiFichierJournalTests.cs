@@ -163,13 +163,61 @@ public class AscoLsiFichierJournalTests
         Assert.Null(seenByContext);
     }
 
+    // AC-FR24-4 (D22 revised): HasSuccess answers from the same "<NumeroFichier> — OK" rule Record writes,
+    // for the entry's Commande and OF.
+    [Fact]
+    [Trait("AC", "FR24-4")]
+    public void HasSuccess_AfterRecordingTheSuccessEntry_IsTrue_AcFr24_4()
+    {
+        AscoLsiFichierJournal journal = this.Journal(InitiatingServer);
+        journal.Record(Entry());
+
+        Assert.True(journal.HasSuccess(Entry()));
+    }
+
+    // AC-FR24-4: a failure row, another OF, another Commande or another NumeroFichier is not a success of
+    // this Fichier.
+    [Fact]
+    [Trait("AC", "FR24-4")]
+    public void HasSuccess_WithoutAMatchingOkRow_IsFalse_AcFr24_4()
+    {
+        AscoLsiFichierJournal journal = this.Journal(InitiatingServer);
+        journal.Record(Entry(reasons: ["XSD : r1"]));
+        journal.Record(Entry(of: "2039842"));
+        journal.Record(Entry(numeroFichier: "014"));
+        journal.Record(Entry(commande: "P60"));
+
+        Assert.False(journal.HasSuccess(Entry()));
+    }
+
+    // AC-FR24-4 (F-1 of the Story 5.0 review): with an unreadable NumeroFichier, HasSuccess finds the
+    // "<FichierName> — OK" row Record wrote, the same message head.
+    [Fact]
+    [Trait("AC", "FR24-4")]
+    public void HasSuccess_UnreadableNumeroFichier_MatchesTheFichierNameOkRow_AcFr24_4()
+    {
+        AscoLsiFichierJournal journal = this.Journal(InitiatingServer);
+        journal.Record(Entry(numeroFichier: null));
+
+        Assert.True(journal.HasSuccess(Entry(numeroFichier: " ")));
+    }
+
+    // AC-FR24-4 / D15: without a readable OF no row can exist, so there is no success to find.
+    [Fact]
+    [Trait("AC", "FR24-4")]
+    public void HasSuccess_UnreadableOf_IsFalse_AcFr24_4()
+    {
+        Assert.False(this.Journal(InitiatingServer).HasSuccess(Entry(of: " ")));
+    }
+
     private static FichierJournal.FichierJournalEntry Entry(
+        string commande = "P89",
         DateTimeOffset? instant = null,
         string? numeroFichier = "013",
         string? of = "2039841",
         string[]? reasons = null) => new()
     {
-        Commande = "P89",
+        Commande = commande,
         FichierName = "LP89_682_617_013",
         Instant = instant ?? Instant,
         NumeroFichier = numeroFichier,

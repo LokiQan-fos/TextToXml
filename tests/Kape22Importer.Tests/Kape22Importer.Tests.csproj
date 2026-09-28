@@ -35,6 +35,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Story 6.1: the tests compose the real LSI journal the host injects, to keep asserting the L_D_LOG_COMMANDE rows (FR-24). The importer itself never references it (AC-FR24-1). -->
+    <ProjectReference Include="..\..\src\AscoLsiJournal\AscoLsiJournal.csproj" />
     <ProjectReference Include="..\..\src\Kape22Importer\Kape22Importer.csproj" />
   </ItemGroup>
 

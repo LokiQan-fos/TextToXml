@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
+using AscoLsiJournal;
 using Kape22Importer.Persistence;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -21,9 +22,9 @@ namespace Kape22Importer.Tests;
 // cause - cold Coulee missing, inconsistent ingot/furnace distribution, a simulated SQL failure - each
 // proving zero rows land in any of the 11 AscoLSI dispatch tables (L_D_KAPE22 + 10 downstream) and that
 // the cause stays readable
-// through the double-journal circuit (L_D_LOG_COMMANDE for the two business rejections,
-// MQTTnetServices.Logs for all three). This extends SM-2 (EndToEndImportIntegrationTests, AC-FR21-4)
-// with the rollback side of the same real-pipeline proof; only TransactionalPersistenceTests proved it at
+// through the double-journal circuit (L_D_LOG_COMMANDE and MQTTnetServices.Logs for all three - the SQL
+// failure's journal row since Story 6.1, FR-24). This extends SM-2 (EndToEndImportIntegrationTests,
+// AC-FR21-4) with the rollback side of the same real-pipeline proof; only TransactionalPersistenceTests proved it at
 // the Persister-unit level before this story. Reuses DoubleJournalIntegrationTests' Serilog/MSSqlServer
 // wiring (RunWithSerilog/ReadMqttLogs) and TransactionalPersistenceTests' "list every
 // *Rows.AsNoTracking(), assert empty" rollback pattern (lines 127-141, 291-330). No production code
@@ -68,11 +69,11 @@ public class RejectionAtomicityIntegrationTests(SqlServerIntegrationFixture fixt
         RetentionDays = 30,
     };
 
-    private static IConfiguration Configuration(string? commande = null) =>
+    private static IConfiguration Configuration() =>
         new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Import:Commande"] = commande ?? "P60",
+                ["Import:Commande"] = "P60",
                 ["Import:InitiatingServer"] = InitiatingServer,
             })
             .Build();
@@ -98,7 +99,7 @@ public class RejectionAtomicityIntegrationTests(SqlServerIntegrationFixture fixt
         Assert.Contains("[Kape22Importer][ImportRejected]", row.Message);
 
         using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
-        L_D_LOG_COMMANDE log = Assert.Single(verify.LogCommandeRows.AsNoTracking());
+        L_D_LOG_COMMANDE log = Assert.Single(fixture.LogRows());
         Assert.Contains("REJETÉ", log.Message);
 
         AssertAllElevenTablesEmpty(verify);
@@ -125,25 +126,31 @@ public class RejectionAtomicityIntegrationTests(SqlServerIntegrationFixture fixt
         Assert.Contains("[Kape22Importer][ImportRejected]", row.Message);
 
         using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
-        L_D_LOG_COMMANDE log = Assert.Single(verify.LogCommandeRows.AsNoTracking());
+        L_D_LOG_COMMANDE log = Assert.Single(fixture.LogRows());
         Assert.Contains("REJETÉ", log.Message);
 
         AssertAllElevenTablesEmpty(verify);
     }
 
-    // AC-FR11-3 / AC-FR21-2 / AC-FR21-5: an over-long Commande (configuration, not the Fichier) fails the
-    // L_D_LOG_COMMANDE insert of the one SaveChanges that also stages L_D_KAPE22 and every downstream
-    // entity - the whole transaction rolls back, so all 11 dispatch tables AND L_D_LOG_COMMANDE stay
-    // empty; only MQTTnetServices.Logs carries the cause (precedent:
-    // TransactionalPersistenceTests.Persist_BundleSuccess_LogRowInsertFails_RollsBackKape22Row_AcFr11_3).
+    // AC-FR21-2 / AC-FR21-5 / AC-FR24-3: a genuine SQL failure on the one SaveChanges - an
+    // L_D_ORDRE_FABRICATION row already on file for this OF, with no L_D_KAPE22 row so the D22 guard lets
+    // the Fichier through - rolls back L_D_KAPE22 and every downstream entity; the cause is readable in
+    // MQTTnetServices.Logs and, since Story 6.1, in a REJETÉ journal row written after the rollback and
+    // naming the table. Before Epic 6 an over-long Commande forced this failure through the log row
+    // itself; that row now lives outside the transaction (AC-FR24-5, TransactionalPersistenceTests).
     [SkippableFact]
     [Trait("AC", "FR21-5")]
-    public void Import_SimulatedSqlFailure_LeavesAllElevenTablesAndLogCommandeEmptyWithReadableCause_AcFr21_5()
+    [Trait("AC", "FR24-3")]
+    public void Import_SimulatedSqlFailure_RollsBackEveryDispatchTableAndJournalsTheCause_AcFr21_5()
     {
         Ready();
-        byte[] content = InsertableReferenceFichier();
+        using (AscoLsiDbContext seed = fixture.NewAscoLsiContext())
+        {
+            seed.OrdreFabricationRows.Add(MapReferenceBundle().OrdreFabrication!);
+            seed.SaveChanges();
+        }
 
-        ImportResult result = RunWithSerilog(ReferenceFichierName, content, commande: new string('P', 100));
+        ImportResult result = RunWithSerilog(ReferenceFichierName, InsertableReferenceFichier());
 
         Assert.False(result.Success);
         Assert.Contains(result.Errors, error => error.Code == ErrorCode.PersistenceError);
@@ -152,10 +159,23 @@ public class RejectionAtomicityIntegrationTests(SqlServerIntegrationFixture fixt
         Assert.Equal("Error", row.Level);
         Assert.Contains("[Kape22Importer][ImportRejected]", row.Message);
 
-        using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
-        Assert.Empty(verify.LogCommandeRows.AsNoTracking());
+        L_D_LOG_COMMANDE log = Assert.Single(fixture.LogRows());
+        Assert.Contains("REJETÉ", log.Message);
+        Assert.Contains("L_D_ORDRE_FABRICATION", log.Message, StringComparison.Ordinal);
 
-        AssertAllElevenTablesEmpty(verify);
+        // Every dispatch table stays empty except L_D_ORDRE_FABRICATION, which keeps only the seeded row.
+        using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
+        Assert.Empty(verify.Kape22Rows.AsNoTracking());
+        Assert.Single(verify.OrdreFabricationRows.AsNoTracking());
+        Assert.Empty(verify.CouleeRows.AsNoTracking());
+        Assert.Empty(verify.SectionChargeChutageRows.AsNoTracking());
+        Assert.Empty(verify.SectionChargeDecoupeRows.AsNoTracking());
+        Assert.Empty(verify.SectionChargeLingotRows.AsNoTracking());
+        Assert.Empty(verify.SectionChargePitsRows.AsNoTracking());
+        Assert.Empty(verify.SectionChargePoidsMetriqueRows.AsNoTracking());
+        Assert.Empty(verify.SectionChargeRefroidissoirsRows.AsNoTracking());
+        Assert.Empty(verify.SectionChargeSvtRows.AsNoTracking());
+        Assert.Empty(verify.ConsignesRows.AsNoTracking());
     }
 
     // AC-FR20-3 removed 2026-09-22 (Kape22ImportBundleMapper.cs Design Notes): hot/cold and
@@ -182,7 +202,7 @@ public class RejectionAtomicityIntegrationTests(SqlServerIntegrationFixture fixt
 
         using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
         Assert.Single(verify.Kape22Rows.AsNoTracking());
-        Assert.EndsWith("— OK", Assert.Single(verify.LogCommandeRows.AsNoTracking()).Message);
+        Assert.EndsWith("— OK", Assert.Single(fixture.LogRows()).Message);
     }
 
     // C-5: AC-FR20-4 - every OF needs an enfournement instruction (L_D_SECTIONCHARGE_PITS); a blank
@@ -206,7 +226,7 @@ public class RejectionAtomicityIntegrationTests(SqlServerIntegrationFixture fixt
         Assert.Contains("[Kape22Importer][ImportRejected]", row.Message);
 
         using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
-        L_D_LOG_COMMANDE log = Assert.Single(verify.LogCommandeRows.AsNoTracking());
+        L_D_LOG_COMMANDE log = Assert.Single(fixture.LogRows());
         Assert.Contains("REJETÉ", log.Message);
 
         AssertAllElevenTablesEmpty(verify);
@@ -237,7 +257,7 @@ public class RejectionAtomicityIntegrationTests(SqlServerIntegrationFixture fixt
         Assert.Contains("[Kape22Importer][ImportRejected]", row.Message);
 
         using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
-        L_D_LOG_COMMANDE log = Assert.Single(verify.LogCommandeRows.AsNoTracking());
+        L_D_LOG_COMMANDE log = Assert.Single(fixture.LogRows());
         Assert.Contains("REJETÉ", log.Message);
 
         AssertAllElevenTablesEmpty(verify);
@@ -252,8 +272,8 @@ public class RejectionAtomicityIntegrationTests(SqlServerIntegrationFixture fixt
 
     // The "list every *Rows.AsNoTracking(), assert empty" pattern from TransactionalPersistenceTests.cs
     // (lines 127-141, 291-330), covering all 11 AscoLSI dispatch tables (L_D_KAPE22 + the 10 Story 4.1
-    // downstream tables) - never L_D_LOG_COMMANDE, which is asserted separately per scenario since two of
-    // the three causes commit a REJETÉ row there on purpose.
+    // downstream tables) - never L_D_LOG_COMMANDE, which is asserted separately per scenario since every
+    // cause records a REJETÉ row there on purpose.
     private static void AssertAllElevenTablesEmpty(AscoLsiDbContext verify)
     {
         Assert.Empty(verify.Kape22Rows.AsNoTracking());
@@ -270,9 +290,8 @@ public class RejectionAtomicityIntegrationTests(SqlServerIntegrationFixture fixt
     }
 
     // Processes one Fichier with an ILogger backed by the real Serilog MSSqlServer sink, then flushes the
-    // sink so ReadMqttLogs sees the row (DoubleJournalIntegrationTests' own RunWithSerilog, parameterized
-    // here with an optional Commande override for the simulated-SQL-failure fixture).
-    private ImportResult RunWithSerilog(string fichierName, byte[] content, string? commande = null)
+    // sink so ReadMqttLogs sees the row (DoubleJournalIntegrationTests' own RunWithSerilog).
+    private ImportResult RunWithSerilog(string fichierName, byte[] content)
     {
         MSSqlServerSinkOptions sinkOptions = new()
         {
@@ -293,7 +312,7 @@ public class RejectionAtomicityIntegrationTests(SqlServerIntegrationFixture fixt
             ILogger<Kape22FichierProcessor> logger = factory.CreateLogger<Kape22FichierProcessor>();
 
             return new Kape22FichierProcessor(
-                fixture.NewAscoLsiContext, Configuration(commande), Options(), WinterClock(), logger)
+                fixture.NewAscoLsiContext, Configuration(), fixture.NewJournal(), Options(), WinterClock(), logger)
                 .Import(fichierName, content);
         }
         finally

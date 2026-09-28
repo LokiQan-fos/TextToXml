@@ -38,7 +38,7 @@ public class StringLengthGuardTests
         Assert.True(bundle.Success, "the mutation must only trip the length guard, not an upstream FR-20 control.");
 
         using AscoLsiDbContext context = contexts.Next();
-        ImportResult result = new Kape22Persister(context, Configuration(), WinterClock()).Persist(bundle);
+        ImportResult result = new Kape22Persister(context, Configuration(), contexts.Journal, ReferenceFichierName, WinterClock()).Persist(bundle);
 
         Assert.False(result.Success);
         ConversionError error = Assert.Single(result.Errors);
@@ -68,7 +68,7 @@ public class StringLengthGuardTests
         Assert.NotEmpty(bundle.Consignes);
 
         using AscoLsiDbContext context = contexts.Next();
-        ImportResult result = new Kape22Persister(context, Configuration(), WinterClock()).Persist(bundle);
+        ImportResult result = new Kape22Persister(context, Configuration(), contexts.Journal, ReferenceFichierName, WinterClock()).Persist(bundle);
 
         Assert.False(result.Success);
         ConversionError error = Assert.Single(result.Errors);
@@ -97,7 +97,7 @@ public class StringLengthGuardTests
         Assert.True(bundle.Success, "the mutation must only affect MarqueCommerciale's length, not an upstream FR-20 control.");
 
         using AscoLsiDbContext context = contexts.Next();
-        ImportResult result = new Kape22Persister(context, Configuration(), WinterClock()).Persist(bundle);
+        ImportResult result = new Kape22Persister(context, Configuration(), contexts.Journal, ReferenceFichierName, WinterClock()).Persist(bundle);
 
         Assert.True(result.Success, string.Join("; ", result.Errors.Select(error => error.Message)));
 

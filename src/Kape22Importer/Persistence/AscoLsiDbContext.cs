@@ -18,8 +18,6 @@ public class AscoLsiDbContext(DbContextOptions<AscoLsiDbContext> options) : DbCo
 
     public DbSet<L_D_KAPE22> Kape22Rows => Set<L_D_KAPE22>();
 
-    public DbSet<L_D_LOG_COMMANDE> LogCommandeRows => Set<L_D_LOG_COMMANDE>();
-
     public DbSet<L_D_ORDRE_FABRICATION> OrdreFabricationRows => Set<L_D_ORDRE_FABRICATION>();
 
     public DbSet<L_D_SECTIONCHARGE_CHUTAGE> SectionChargeChutageRows => Set<L_D_SECTIONCHARGE_CHUTAGE>();
@@ -51,19 +49,6 @@ public class AscoLsiDbContext(DbContextOptions<AscoLsiDbContext> options) : DbCo
             {
                 entity.Property(column).HasMaxLength(maxLength);
             }
-        });
-
-        modelBuilder.Entity<L_D_LOG_COMMANDE>(entity =>
-        {
-            entity.ToTable("L_D_LOG_COMMANDE");
-            entity.HasKey(row => row.Id);
-            entity.Property(row => row.Id).ValueGeneratedOnAdd();
-
-            // The bounded string column lengths mirror scripts/schema/01-ascolsi-tables.sql (Annexe
-            // C.2), so an over-long value surfaces as a model error rather than only at the database.
-            entity.Property(row => row.Commande).HasMaxLength(LogCommandeColumnLengths.Commande);
-            entity.Property(row => row.OF).HasMaxLength(LogCommandeColumnLengths.OF);
-            entity.Property(row => row.User).HasMaxLength(LogCommandeColumnLengths.User);
         });
 
         // Story 4.1: the 10 downstream dispatch tables. None has an identity column (AFV004-LSI

@@ -21,6 +21,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Story 6.1 (FR-24, D31): the importer records each outcome through the journal contract; the host supplies the LSI implementation. -->
+    <ProjectReference Include="..\FichierJournal\FichierJournal.csproj" />
     <ProjectReference Include="..\TextToXml\TextToXml.csproj" />
     <!--
       PortalSharedLibrary supplies the shared identity and logging used by every portal worker (PRD D20, R-2).

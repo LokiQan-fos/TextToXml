@@ -62,9 +62,11 @@ public class EndToEndPerformanceTests
     // the D22 guard never short-circuits a first insert.
     private static InboxScanner Scanner(InMemoryFileSource source)
     {
+        InMemoryContextFactory contexts = new();
         Kape22FichierProcessor processor = new(
-            new InMemoryContextFactory().Next,
+            contexts.Next,
             Configuration(),
+            contexts.Journal,
             Options(),
             new FixedClock(Now),
             NullLogger<Kape22FichierProcessor>.Instance);

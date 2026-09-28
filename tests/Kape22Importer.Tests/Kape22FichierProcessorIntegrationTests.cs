@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using AscoLsiJournal;
 using Kape22Importer.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -49,7 +50,7 @@ public class Kape22FichierProcessorIntegrationTests(SqlServerIntegrationFixture 
             .Build();
 
     private Kape22FichierProcessor Processor(string? commande = null) =>
-        new(fixture.NewAscoLsiContext, Configuration(commande), Options(), WinterClock(), NullLogger<Kape22FichierProcessor>.Instance);
+        new(fixture.NewAscoLsiContext, Configuration(commande), fixture.NewJournal(), Options(), WinterClock(), NullLogger<Kape22FichierProcessor>.Instance);
 
     private void Ready()
     {
@@ -78,7 +79,7 @@ public class Kape22FichierProcessorIntegrationTests(SqlServerIntegrationFixture 
         using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
         L_D_KAPE22 inserted = Assert.Single(verify.Kape22Rows.AsNoTracking());
         Assert.Equal(inserted.Id, result.InsertedId);
-        L_D_LOG_COMMANDE log = Assert.Single(verify.LogCommandeRows.AsNoTracking());
+        L_D_LOG_COMMANDE log = Assert.Single(fixture.LogRows());
         Assert.EndsWith("— OK", log.Message);
     }
 
@@ -98,7 +99,7 @@ public class Kape22FichierProcessorIntegrationTests(SqlServerIntegrationFixture 
 
         using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
         Assert.Empty(verify.Kape22Rows.AsNoTracking());
-        Assert.Empty(verify.LogCommandeRows.AsNoTracking());
+        Assert.Empty(fixture.LogRows());
     }
 
     // AC-FR13-3: Converter succeeds, Kape22Mapper rejects -> no L_D_KAPE22 row, one "REJETÉ"
@@ -119,7 +120,7 @@ public class Kape22FichierProcessorIntegrationTests(SqlServerIntegrationFixture 
 
         using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
         Assert.Empty(verify.Kape22Rows.AsNoTracking());
-        L_D_LOG_COMMANDE log = Assert.Single(verify.LogCommandeRows.AsNoTracking());
+        L_D_LOG_COMMANDE log = Assert.Single(fixture.LogRows());
         Assert.Contains("REJETÉ", log.Message);
     }
 
@@ -143,16 +144,16 @@ public class Kape22FichierProcessorIntegrationTests(SqlServerIntegrationFixture 
 
         using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
         Assert.Single(verify.Kape22Rows.AsNoTracking());
-        List<string> messages = verify.LogCommandeRows.AsNoTracking().Select(row => row.Message).ToList();
+        List<string> messages = fixture.LogRows().Select(row => row.Message).ToList();
         Assert.Contains(messages, message => message.Contains("REJETÉ"));
         Assert.Contains(messages, message => message.EndsWith("— OK"));
     }
 
-    // AC-FR6-4 extended to ImportResult: when the mapper rejects a Fichier and the REJETÉ
-    // L_D_LOG_COMMANDE insert then fails too (an over-long Commande from configuration), Import returns
-    // the mapper rejection reason (RequiredFieldMissing, LineNumber 2) and the File-level
-    // PersistenceError (LineNumber 0) as one list re-sorted by LineNumber - the File-level entry first -
-    // not in the order Kape22Persister.PersistenceFailure produced them.
+    // AC-FR6-4 extended to ImportResult: when the mapper rejects a Fichier and the REJETÉ journal write
+    // then fails too (an over-long Commande from configuration), Import returns the mapper rejection
+    // reason (RequiredFieldMissing, LineNumber 2) and the File-level PersistenceError (LineNumber 0) as
+    // one list re-sorted by LineNumber - the File-level entry first - not in the order Kape22Persister
+    // produced them.
     [SkippableFact]
     [Trait("AC", "FR6-4")]
     public void Import_MapperRejectionThenLogRowInsertFails_ErrorsAreSortedByLineNumber_AcFr6_4()

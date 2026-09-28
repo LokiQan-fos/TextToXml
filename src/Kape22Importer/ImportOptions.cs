@@ -21,8 +21,9 @@ public sealed class ImportOptions
     // Reception folder scanned each tick (D1).
     public string InboxPath { get; set; } = string.Empty;
 
-    // L_D_LOG_COMMANDE.User / MQTTnetServices.Logs origin (D8). Bound for Story 3.3; Kape22Persister
-    // currently reads the "Import:InitiatingServer" key directly and falls back to Environment.MachineName.
+    // L_D_LOG_COMMANDE.User / MQTTnetServices.Logs origin (D8). Since Story 6.1 the host passes the
+    // "Import:InitiatingServer" key to the LSI journal (AscoLsiFichierJournal), which falls back to
+    // Environment.MachineName; the importer itself no longer reads it.
     public string InitiatingServer { get; set; } = string.Empty;
 
     // Delay between two scans of the inbox.

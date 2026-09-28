@@ -6,6 +6,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Transactions;
+using AscoLsiJournal;
 using Kape22Importer.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -241,13 +242,7 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
 
         // The P60 is a forecast: an operator may edit some of these values afterwards through the legacy
         // CommandeENC screen, which logs every edit to L_D_LOG_COMMANDE (see OperatorAdjustedColumns).
-        List<string> operatorChanges = ReadProductionRows<L_D_LOG_COMMANDE>(rows => rows
-            .Where(row => row.OF == PadOf(of) && row.Commande == "MCC" && row.Message.StartsWith("Changement de Consigne "))
-            .OrderBy(row => row.Date)
-            .ThenBy(row => row.Id)
-            .ToList())
-            .Select(row => row.Message)
-            .ToList();
+        List<string> operatorChanges = ReadProductionOperatorChanges(PadOf(of));
 
         List<string> regressions = [];
         L_D_ORDRE_FABRICATION testOrdre = RoundTrip(
@@ -687,6 +682,23 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
 
         using AscoLsiDbContext production = new(options);
         return query(production.Set<TEntity>().AsNoTracking());
+    }
+
+    // READ-ONLY production access to the operator edit log, in edit order. Story 6.1: L_D_LOG_COMMANDE is
+    // mapped by the LSI journal's own context, no longer by AscoLsiDbContext.
+    private static List<string> ReadProductionOperatorChanges(string paddedOf)
+    {
+        DbContextOptions<AscoLsiJournalDbContext> options = new DbContextOptionsBuilder<AscoLsiJournalDbContext>()
+            .UseSqlServer(ProductionConnectionString)
+            .Options;
+
+        using AscoLsiJournalDbContext production = new(options);
+        return production.LogCommandeRows.AsNoTracking()
+            .Where(row => row.OF == paddedOf && row.Commande == "MCC" && row.Message.StartsWith("Changement de Consigne "))
+            .OrderBy(row => row.Date)
+            .ThenBy(row => row.Id)
+            .Select(row => row.Message)
+            .ToList();
     }
 
     // Trailing spaces on a fixed-width NCHAR column are storage padding, not a data difference.

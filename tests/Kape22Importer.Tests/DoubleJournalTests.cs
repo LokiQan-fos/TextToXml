@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
+using FichierJournal;
 using Kape22Importer.Persistence;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -14,8 +15,9 @@ namespace Kape22Importer.Tests;
 
 // Story 3.3 (FR-14): the double logging Kape22FichierProcessor runs after every Fichier - one
 // MQTTnetServices.Logs line, always, through ILogger (Serilog sink in production), plus, via
-// Kape22Persister, one L_D_LOG_COMMANDE line when the OF is readable. These Category=Unit tests capture
-// the ILogger side with a RecordingLogger over an EF in-memory AscoLsiDbContext: the level and the
+// Kape22Persister, one L_D_LOG_COMMANDE line when the OF is readable (Story 6.1: through the injected LSI
+// journal, here over its own EF in-memory database). These Category=Unit tests capture the ILogger side
+// with a RecordingLogger over an EF in-memory AscoLsiDbContext: the level and the
 // "[Kape22Importer][<Event>] : ..." shape for success (AC-FR14-1), rejection with a readable OF
 // (AC-FR14-2), structural rejection with no readable OF (AC-FR14-3), an import carrying coherence
 // Warnings (AC-FR14-8) and the already-imported skip, the best-effort contract (a throwing Logs sink
@@ -49,8 +51,8 @@ public class DoubleJournalTests
             .Build();
 
     private static Kape22FichierProcessor Processor(
-        Func<AscoLsiDbContext> newContext, ILogger<Kape22FichierProcessor> logger) =>
-        new(newContext, Configuration(), Options(), WinterClock(), logger);
+        InMemoryContextFactory contexts, ILogger<Kape22FichierProcessor> logger, IFichierJournal? journal = null) =>
+        new(contexts.Next, Configuration(), journal ?? contexts.Journal, Options(), WinterClock(), logger);
 
     // AC-FR14-1: a success writes exactly one Logs line, Information, prefixed
     // "[Kape22Importer][ImportSucceeded] :" and carrying the file name, NumeroFichier, OF, InsertedId,
@@ -63,7 +65,7 @@ public class DoubleJournalTests
         InMemoryContextFactory contexts = new();
         RecordingLogger<Kape22FichierProcessor> logger = new();
 
-        ImportResult result = Processor(contexts.Next, logger)
+        ImportResult result = Processor(contexts, logger)
             .Import(ReferenceFichierName, InsertableReferenceFichier());
 
         Assert.True(result.Success);
@@ -79,7 +81,7 @@ public class DoubleJournalTests
 
         using AscoLsiDbContext verify = contexts.Reader();
         Assert.Single(verify.Kape22Rows);
-        Assert.EndsWith("— OK", Assert.Single(verify.LogCommandeRows).Message);
+        Assert.EndsWith("— OK", Assert.Single(contexts.LogRows()).Message);
     }
 
     // AC-FR14-2: a rejection with a readable OF writes one Logs line, Error, prefixed
@@ -92,7 +94,7 @@ public class DoubleJournalTests
         InMemoryContextFactory contexts = new();
         RecordingLogger<Kape22FichierProcessor> logger = new();
 
-        ImportResult result = Processor(contexts.Next, logger)
+        ImportResult result = Processor(contexts, logger)
             .Import(ReferenceFichierName, BlankClientReferenceFichier());
 
         Assert.False(result.Success);
@@ -104,7 +106,7 @@ public class DoubleJournalTests
 
         using AscoLsiDbContext verify = contexts.Reader();
         Assert.Empty(verify.Kape22Rows);
-        Assert.Contains("REJETÉ", Assert.Single(verify.LogCommandeRows).Message);
+        Assert.Contains("REJETÉ", Assert.Single(contexts.LogRows()).Message);
     }
 
     // AC-FR14-3 (D15): a structural rejection - Converter.Convert fails, the OF is never read - still
@@ -116,7 +118,7 @@ public class DoubleJournalTests
         InMemoryContextFactory contexts = new();
         RecordingLogger<Kape22FichierProcessor> logger = new();
 
-        ImportResult result = Processor(contexts.Next, logger).Import(ReferenceFichierName, []);
+        ImportResult result = Processor(contexts, logger).Import(ReferenceFichierName, []);
 
         Assert.False(result.Success);
         var entry = Assert.Single(logger.Entries);
@@ -124,7 +126,7 @@ public class DoubleJournalTests
         Assert.StartsWith("[Kape22Importer][ImportRejected] :", entry.Message);
 
         using AscoLsiDbContext verify = contexts.Reader();
-        Assert.Empty(verify.LogCommandeRows);
+        Assert.Empty(contexts.LogRows());
     }
 
     // AC-FR14-8: an imported Fichier carrying coherence Warnings gets a second Logs line, Warning,
@@ -140,7 +142,7 @@ public class DoubleJournalTests
         RecordingLogger<Kape22FichierProcessor> logger = new();
         byte[] footerRecordsNotThree = WithText(InsertableReferenceFichier(), "00003", "00009");
 
-        ImportResult result = Processor(contexts.Next, logger)
+        ImportResult result = Processor(contexts, logger)
             .Import("P60_999_682_001", footerRecordsNotThree);
 
         Assert.True(result.Success);
@@ -154,9 +156,9 @@ public class DoubleJournalTests
         Assert.Contains(nameof(ErrorCode.InterBlockMismatch), warning.Message);
     }
 
-    // The explicit anti-duplicate discriminator (D22, reconciliation A-3): a Fichier whose D22 key
-    // already carries a committed "— OK" row comes back with AlreadyImported == true (not just the
-    // structural Success && InsertedId == null shape), and the Logs line is a Warning prefixed
+    // The explicit anti-duplicate discriminator (D22 revised, reconciliation A-3): a Fichier whose D22
+    // key already carries a committed L_D_KAPE22 row comes back with AlreadyImported == true (not just
+    // the structural Success && InsertedId == null shape), and the Logs line is a Warning prefixed
     // "[Kape22Importer][AlreadyImported] :".
     [Fact]
     [Trait("AC", "FR11-6")]
@@ -164,9 +166,9 @@ public class DoubleJournalTests
     {
         InMemoryContextFactory contexts = new();
         RecordingLogger<Kape22FichierProcessor> logger = new();
-        SeedOkLogRow(contexts);
+        SeedKape22Row(contexts);
 
-        ImportResult result = Processor(contexts.Next, logger)
+        ImportResult result = Processor(contexts, logger)
             .Import(ReferenceFichierName, InsertableReferenceFichier());
 
         Assert.True(result.Success);
@@ -178,8 +180,9 @@ public class DoubleJournalTests
         Assert.StartsWith("[Kape22Importer][AlreadyImported] :", entry.Message);
     }
 
-    // AC-FR14-7: the L_D_KAPE22 insert has already committed by the time the Logs line is written, so a
-    // Logs sink that throws must not turn a successful import into a failure or lose the row.
+    // AC-FR14-7 (revised Epic 6): the L_D_KAPE22 insert has already committed by the time the Logs line
+    // is written, so a Logs sink that throws must not turn a successful import into a failure or lose the
+    // row; the "— OK" journal entry is recorded after that commit.
     [Fact]
     [Trait("AC", "FR14-7")]
     public void Import_LogsSinkThrows_DoesNotPreventTheInsert_AcFr14_7()
@@ -187,7 +190,7 @@ public class DoubleJournalTests
         InMemoryContextFactory contexts = new();
         RecordingLogger<Kape22FichierProcessor> logger = new() { Throw = true };
 
-        ImportResult result = Processor(contexts.Next, logger)
+        ImportResult result = Processor(contexts, logger)
             .Import(ReferenceFichierName, InsertableReferenceFichier());
 
         Assert.True(result.Success);
@@ -195,7 +198,7 @@ public class DoubleJournalTests
 
         using AscoLsiDbContext verify = contexts.Reader();
         Assert.Single(verify.Kape22Rows);
-        Assert.EndsWith("— OK", Assert.Single(verify.LogCommandeRows).Message);
+        Assert.EndsWith("— OK", Assert.Single(contexts.LogRows()).Message);
     }
 
     // AC-FR6-4 extended to ImportResult: Kape22FichierProcessor.Import concatenates conversion.Warnings
@@ -210,7 +213,7 @@ public class DoubleJournalTests
         InMemoryContextFactory contexts = new();
         byte[] footerRecordsNotThree = WithText(InsertableReferenceFichier(), "00003", "00009");
 
-        ImportResult result = Processor(contexts.Next, new RecordingLogger<Kape22FichierProcessor>())
+        ImportResult result = Processor(contexts,new RecordingLogger<Kape22FichierProcessor>())
             .Import("P60_999_682_001", footerRecordsNotThree);
 
         Assert.True(result.Success);
@@ -238,22 +241,62 @@ public class DoubleJournalTests
         Assert.Equal(["file", "detail-a", "detail-b", "footer"], sorted.Select(entry => entry.Message));
     }
 
-    // Seeds the committed "<NumeroFichier> — OK" L_D_LOG_COMMANDE row the D22 guard keys on, matching
-    // exactly what Kape22Persister.OkLogRowExists compares (untrimmed OF, "<NumeroFichier> — OK").
-    private static void SeedOkLogRow(InMemoryContextFactory contexts)
+    // AC-FR24-5: the rows are committed but the journal write fails - the result keeps InsertedId next to
+    // a File-level PersistenceError (the Fichier stays in processing/), and the Logs line is a Warning
+    // prefixed "[Kape22Importer][JournalPending] :", not an import rejection.
+    [Fact]
+    [Trait("AC", "FR24-5")]
+    public void Import_JournalFailsAfterCommit_KeepsInsertedIdAndLogsAJournalPendingWarning_AcFr24_5()
     {
-        MapResult<L_D_KAPE22> reference = MapReferenceFichier();
+        InMemoryContextFactory contexts = new();
+        RecordingLogger<Kape22FichierProcessor> logger = new();
+        FailingJournal journal = new(new InvalidOperationException("journal down"));
+
+        ImportResult result = Processor(contexts, logger, journal)
+            .Import(ReferenceFichierName, InsertableReferenceFichier());
+
+        Assert.NotNull(result.InsertedId);
+        ConversionError error = Assert.Single(result.Errors);
+        Assert.Equal(ErrorCode.PersistenceError, error.Code);
+        Assert.Contains("journal down", error.Message, StringComparison.Ordinal);
+
+        var entry = Assert.Single(logger.Entries);
+        Assert.Equal(LogLevel.Warning, entry.Level);
+        Assert.StartsWith("[Kape22Importer][JournalPending] :", entry.Message);
+
+        using AscoLsiDbContext verify = contexts.Reader();
+        Assert.Single(verify.Kape22Rows);
+    }
+
+    // AC-FR24-4 / AC-FR24-5: a guard hit whose journal read or write fails is an import still pending its
+    // journal entry, not a rejection - the Logs line is the JournalPending Warning, never ImportRejected.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    [Trait("AC", "FR24-5")]
+    public void Import_GuardHitWhenTheJournalFails_LogsAJournalPendingWarning_AcFr24_5(bool failReads)
+    {
+        InMemoryContextFactory contexts = new();
+        RecordingLogger<Kape22FichierProcessor> logger = new();
+        SeedKape22Row(contexts);
+        FailingJournal journal = new(new InvalidOperationException("journal down"), failReads);
+
+        ImportResult result = Processor(contexts, logger, journal)
+            .Import(ReferenceFichierName, InsertableReferenceFichier());
+
+        Assert.True(result.AlreadyImported);
+        Assert.Equal(ErrorCode.PersistenceError, Assert.Single(result.Errors).Code);
+        var entry = Assert.Single(logger.Entries);
+        Assert.Equal(LogLevel.Warning, entry.Level);
+        Assert.StartsWith("[Kape22Importer][JournalPending] :", entry.Message);
+    }
+
+    // Seeds the committed L_D_KAPE22 row the revised D22 guard keys on (same NumeroFichier + OF as the
+    // insertable reference Fichier).
+    private static void SeedKape22Row(InMemoryContextFactory contexts)
+    {
         using AscoLsiDbContext context = contexts.Next();
-        context.LogCommandeRows.Add(new L_D_LOG_COMMANDE
-        {
-            Commande = "P60",
-            Date = new DateTime(2026, 2, 9, 12, 0, 0),
-            Message = $"{reference.NumeroFichier} — OK",
-            NumLingot = 0,
-            OF = reference.OF!,
-            Trace = true,
-            User = InitiatingServer,
-        });
+        context.Kape22Rows.Add(MapReferenceBundle().Kape22!);
         context.SaveChanges();
     }
 }

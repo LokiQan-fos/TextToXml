@@ -1255,7 +1255,7 @@ s'y trouver et rester à confirmer.
 
 ## Deferred from: Story 5.1 spec checkpoint, D31 journal interface (2026-09-25)
 
-- source_spec: **PLANNED 2026-09-28: Story 6.1** — `PRD.md` D31, FR-23; `epics.md` Épic 5 (séquencement)
+- source_spec: **RESOLVED 2026-09-28 by Story 6.1** (`spec-6-1-journal-p60-via-ifichierjournal.md`): `Kape22Persister` records through `IFichierJournal` after the AD-1 commit for every outcome, the D22 guard reads `L_D_KAPE22`, the P60 entity/lengths/row rules are deleted; `Kape22Importer.ParisTime` stays (it serves D4, `DateReception` and the archive folder, not the journal). — `PRD.md` D31, FR-23; `epics.md` Épic 5 (séquencement)
   summary: Migrate P60 (`Kape22Importer`) onto `IFichierJournal` / `AscoLsiJournal`: write the `L_D_LOG_COMMANDE` row outside the AD-1 transaction for every outcome (success, business rejection, SQL failure), add a detailed SQL rejection reason (column, type, length) to the journal, move the D22 anti-duplicate guard from the "— OK" log row to `L_D_KAPE22` (NumeroFichier + OF), then delete the P60 copies of the entity, column lengths, `ParisTime` and row rules.
   evidence: User decision 2026-09-25 (the journal is the import result, independent of the business transaction). Today an SQL failure on `L_D_KAPE22` writes no `L_D_LOG_COMMANDE` row (`Kape22Persister.PersistenceFailure`, Logs only) and the "— OK" row shares the AD-1 `SaveChanges`. Touches AD-1, D22, AC-FR11-x / AC-FR21-x of a closed epic: plan it with `/bmad-correct-course`, not inside Épic 5.
 
@@ -1328,3 +1328,9 @@ s'y trouver et rester à confirmer.
 - source_spec: **PLANNED 2026-09-28: Story 6.4** — `reviews/story-5-2/aggregated-report.md` (F-5, low)
   summary: A `ReadConfig` that throws after the base constructor can leak the `AbstractService` SQL sink.
   evidence: edge-case-hunter lens, `GPAO/ConvertP89/Client.cs:33-35`; same constructor order in `GPAO/ImportP60/Client.cs`. Only happens on an invalid configuration, which already blocks startup. Fix with P60.
+
+## Deferred from: code review of story-6.1 (2026-09-28)
+
+- source_spec: `spec-6-1-journal-p60-via-ifichierjournal.md`
+  summary: `Import:Commande` longer than `L_D_LOG_COMMANDE.Commande` (50) is not rejected at `GpaoImportP60` startup; every journal write then fails, and committed Fichiers loop in `processing/` (guard hit + failed journal each tick) until the setting is fixed.
+  evidence: Raised by the edge-case-hunter lens. No duplicate business data (D22 guard), and the `JournalPending` Warning names the cause every tick; startup validation of the worker's configuration keys belongs to Story 6.4 (AC-FR25-4).

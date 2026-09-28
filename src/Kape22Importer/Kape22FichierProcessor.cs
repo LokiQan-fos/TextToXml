@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data.Common;
 using System.Linq;
 using System.Xml.Linq;
+using FichierJournal;
 using Kape22Importer.Persistence;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -24,12 +25,13 @@ namespace Kape22Importer;
 // FichierProcessingResult seam that InboxScanner consumes; callers that need InsertedId or
 // XmlArchivePath (Story 3.3 double logging, Story 3.6 end-to-end) call Import directly.
 // Story 3.3 (FR-14): after every Fichier - success or rejection - Import emits the MQTTnetServices.Logs
-// line through ILogger (Journal), while Kape22Persister writes the L_D_LOG_COMMANDE line when the OF is
-// readable. Import also re-sorts the concatenated Warnings by LineNumber (AC-FR6-4 extended to
-// ImportResult).
+// line through ILogger (Journal), while Kape22Persister records the outcome in the Fichier journal when
+// the OF is readable (Story 6.1: through the injected IFichierJournal, L_D_LOG_COMMANDE in LSI). Import
+// also re-sorts the concatenated Warnings by LineNumber (AC-FR6-4 extended to ImportResult).
 public sealed class Kape22FichierProcessor(
     Func<AscoLsiDbContext> newContext,
     IConfiguration configuration,
+    IFichierJournal fichierJournal,
     ImportOptions options,
     TimeProvider timeProvider,
     ILogger<Kape22FichierProcessor> logger)
@@ -47,7 +49,7 @@ public sealed class Kape22FichierProcessor(
 
         // The first stage turns the raw bytes into the normalized XML. A failure here stops the pipeline
         // with no Xml, so the Fichier goes to error/ with only its .errors.json (AC-FR13-2). This is the
-        // structural rejection with no readable OF: no L_D_LOG_COMMANDE row, only the Logs line (D15,
+        // structural rejection with no readable OF: no journal entry, only the Logs line (D15,
         // AC-FR14-3).
         ConversionResult conversion = Converter.Convert(content, EmbeddedDescriptor.Xml);
         if (!conversion.Success)
@@ -66,7 +68,7 @@ public sealed class Kape22FichierProcessor(
         // The next stage maps the normalized XML onto a Kape22ImportBundle (Kape22Mapper.Map plus the
         // Story 4.3/4.4 downstream mappers and FR-20's business controls). A failure at either level is
         // not short-circuited here: Kape22Persister.Persist is still called with the failed bundle so it
-        // writes the "<NumeroFichier> — REJETÉ" L_D_LOG_COMMANDE line when the OF is readable
+        // records the "<NumeroFichier> — REJETÉ" journal entry when the OF is readable
         // (AC-FR11-4). The normalized XML rides along on the result so InboxScanner can drop <nom>.xml
         // next to the Fichier in error/ for diagnosis (AC-FR13-3). The context belongs to this Fichier
         // alone, so its transaction and EF change tracker never touch another Fichier's (AC-FR13-4).
@@ -102,7 +104,7 @@ public sealed class Kape22FichierProcessor(
         IReadOnlyList<ConversionError> warnings = SortedByLine([.. conversion.Warnings, .. bundle.Warnings]);
 
         // The final stage persists over that same per-Fichier context.
-        ImportResult persisted = new Kape22Persister(context, configuration, timeProvider).Persist(bundle);
+        ImportResult persisted = new Kape22Persister(context, configuration, fichierJournal, fichierName, timeProvider).Persist(bundle);
 
         ImportResult result = persisted with
         {
@@ -142,11 +144,26 @@ public sealed class Kape22FichierProcessor(
     {
         try
         {
+            if (!result.Success && (result.InsertedId is not null || result.AlreadyImported))
+            {
+                // AC-FR24-4/24-5: the rows are committed (now, or by an earlier run the D22 guard found)
+                // but the Fichier journal could not be read or written; the Fichier stays in processing/
+                // and a later tick's guard completes the journal.
+                logger.LogWarning(
+                    "[Kape22Importer][JournalPending] : {Fichier} NumeroFichier={NumeroFichier} OF={OF} InsertedId={InsertedId} importé, journal non écrit : {Errors}",
+                    fichierName,
+                    numeroFichier,
+                    of?.Trim(),
+                    result.InsertedId,
+                    string.Join(" ; ", result.Errors.Select(error => error.Message)));
+                return;
+            }
+
             if (!result.Success)
             {
                 // AC-FR14-2 / AC-FR14-3: rejection - list every Error. Coherence Warnings, if any, are
                 // not listed here; the "second Warning line" of AC-FR14-8 is a fresh-success signal
-                // only. The L_D_LOG_COMMANDE "REJETÉ" line (readable OF only) is Kape22Persister's; this
+                // only. The "REJETÉ" journal entry (readable OF only) is Kape22Persister's; this
                 // is the always-written Logs line.
                 logger.LogError(
                     "[Kape22Importer][ImportRejected] : {Fichier} — {ErrorCount} erreur(s) : {Errors}",

@@ -4,6 +4,7 @@ using System.Data;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using AscoLsiJournal;
 using Kape22Importer.Persistence;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -20,6 +21,9 @@ namespace Kape22Importer.Tests;
 // rollback by default; commit + reset where a test depends on committed state).
 public sealed class SqlServerIntegrationFixture
 {
+    // Story 6.1: the initiating server every test journal writes as L_D_LOG_COMMANDE.User.
+    public const string JournalInitiatingServer = "AFS017";
+
     // Split a script into batches on lines containing only GO, the way sqlcmd does.
     private static readonly Regex BatchSeparator = new(
         @"^\s*GO\s*$",
@@ -135,6 +139,22 @@ public sealed class SqlServerIntegrationFixture
 
         return new AscoLsiDbContext(options);
     }
+
+    // Story 6.1: the committed L_D_LOG_COMMANDE rows, in write order.
+    public List<L_D_LOG_COMMANDE> LogRows()
+    {
+        using AscoLsiJournalDbContext context = NewJournalContext();
+        return [.. context.LogCommandeRows.AsNoTracking().OrderBy(row => row.Id)];
+    }
+
+    // Story 6.1: the LSI journal the host injects, writing L_D_LOG_COMMANDE on the test instance.
+    public AscoLsiFichierJournal NewJournal() => new(NewJournalContext, JournalInitiatingServer);
+
+    // A fresh journal context on the test instance, to seed or read back L_D_LOG_COMMANDE.
+    public AscoLsiJournalDbContext NewJournalContext() =>
+        new(new DbContextOptionsBuilder<AscoLsiJournalDbContext>()
+            .UseSqlServer(WithShortLoginTimeout(AscoLsiConnectionString))
+            .Options);
 
     // A short login timeout keeps an instance that dies mid-run a quick failure rather than a long hang.
     private static string WithShortLoginTimeout(string connectionString) =>

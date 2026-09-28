@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using AscoLsiJournal;
 using Kape22Importer.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -175,7 +176,17 @@ public class AscoLsiDbContextModelTests
 
     private static IEntityType Kape22Entity() => Model().FindEntityType(typeof(L_D_KAPE22))!;
 
-    private static IEntityType LogCommandeEntity() => Model().FindEntityType(typeof(L_D_LOG_COMMANDE))!;
+    // Story 6.1 (FR-24): L_D_LOG_COMMANDE left AscoLsiDbContext for the LSI journal's own context, which
+    // this Annexe C.2 check now reads.
+    private static IEntityType LogCommandeEntity()
+    {
+        DbContextOptions<AscoLsiJournalDbContext> options = new DbContextOptionsBuilder<AscoLsiJournalDbContext>()
+            .UseSqlServer("Server=model-only;Database=AscoLSI_Test;Trusted_Connection=True;")
+            .Options;
+
+        using AscoLsiJournalDbContext context = new(options);
+        return context.Model.FindEntityType(typeof(L_D_LOG_COMMANDE))!;
+    }
 
     private static IModel Model()
     {

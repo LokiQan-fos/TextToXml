@@ -23,17 +23,18 @@ public class FormatIsolationTests
         "\"847\"", "\"682\"", "\"DiametreProduit\"", "\"Coulee\"", "\"Records\"",
     ];
 
-    // AC-FR16-1: the only shared code Kape22Importer references is TextToXml and PortalSharedLibrary.
+    // AC-FR16-1: the only shared code Kape22Importer references is TextToXml, PortalSharedLibrary and,
+    // since Story 6.1 (D31, AC-FR24-1), the FichierJournal contract.
     [Fact]
     [Trait("AC", "FR16-1")]
-    public void Kape22Importer_ReferencesOnlyTextToXmlAndPortalSharedLibrary_AcFr16_1()
+    public void Kape22Importer_ReferencesOnlyTextToXmlPortalSharedLibraryAndFichierJournal_AcFr16_1()
     {
         string[] references = Includes("src/Kape22Importer/Kape22Importer.csproj", "ProjectReference")
             .Select(path => Path.GetFileNameWithoutExtension(path.Replace('\\', '/')))
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(new[] { "PortalSharedLibrary", "TextToXml" }, references);
+        Assert.Equal(new[] { "FichierJournal", "PortalSharedLibrary", "TextToXml" }, references);
     }
 
     // AC-FR16-2: the variation points of a format (<format>.xml, <format>.xsd, the DTO, the entity and

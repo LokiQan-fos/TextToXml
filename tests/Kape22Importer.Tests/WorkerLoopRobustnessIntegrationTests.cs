@@ -61,6 +61,7 @@ public class WorkerLoopRobustnessIntegrationTests(SqlServerIntegrationFixture fi
         Kape22FichierProcessor processor = new(
             fixture.NewAscoLsiContext,
             Configuration(),
+            fixture.NewJournal(),
             Options(),
             new FixedClock(Now),
             NullLogger<Kape22FichierProcessor>.Instance);
@@ -142,6 +143,7 @@ public class WorkerLoopRobustnessIntegrationTests(SqlServerIntegrationFixture fi
         Kape22FichierProcessor processor = new(
             DeadDatabaseContext,
             Configuration(),
+            fixture.NewJournal(),
             Options(),
             new FixedClock(Now),
             NullLogger<Kape22FichierProcessor>.Instance);

@@ -701,7 +701,8 @@ schéma miroir `L_D_KAPE22` + `L_D_LOG_COMMANDE`)* :
   **0 insert**, fichier déplacé en `archive/`, log `Warning`
   « déjà importé, ignoré » (voir aussi `AC-FR24-4`).
 - `AC-FR11-7` : retraitement d'un fichier **jamais** importé avec succès (pas de
-  ligne `OK`) → import normal.
+  ligne `L_D_KAPE22` même `NumeroFichier` + `OF`, D22 révisé Épic 6 ; une entrée
+  de journal `— OK` seule ne suffit pas) → import normal.
 - `AC-FR11-8` : chaînes de connexion (`AscoLSI`, `MQTTnetServices`) lues de la
   configuration, jamais en dur ; compte `sa` existant (§0bis D21).
 
@@ -843,8 +844,9 @@ jamais modifiée : **Étape 1 = 0 ligne de code** (le descripteur `<format>.xml`
 
 **Consequences (testables / vérifiables en revue) :**
 - `AC-FR16-1` : le seul code partagé référencé par `Kape22Importer` est
-  `TextToXml` (+ `PortalSharedLibrary` pour l'identité/log) — inspection des
-  `ProjectReference`.
+  `TextToXml` (+ `PortalSharedLibrary` pour l'identité/log, + `FichierJournal`
+  pour le contrat du journal depuis l'Épic 6, D31, `AC-FR24-1`) — inspection
+  des `ProjectReference`.
 - `AC-FR16-2` : les points de variation d'un format sont **exactement** :
   `<format>.xml`, `<format>.xsd`, DTO, entité + `DbContext`, table de mapping,
   `appsettings`. Test d'architecture : les types de `Kape22Importer` hors
@@ -1104,7 +1106,8 @@ transaction AD-1, pour chaque issue.
 
 **Consequences (testables) :**
 - `AC-FR24-1` : `Kape22Importer` ne contient plus d'entité, de longueurs de
-  colonnes, de `ParisTime` ni de règle de ligne `L_D_LOG_COMMANDE` ; il
+  colonnes, de conversion `ParisTime` ni de règle de ligne `L_D_LOG_COMMANDE`
+  (son `ParisTime` reste pour D4, `DateReception` et le dossier d'archive) ; il
   référence `FichierJournal`, pas `AscoLsiJournal`.
 - `AC-FR24-2` : succès → un seul `SaveChanges()` (AD-1) sans
   `L_D_LOG_COMMANDE`, puis une entrée de journal de succès (`NumeroFichier`,

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using AscoLsiJournal;
 using Kape22Importer.Persistence;
 using Microsoft.Extensions.Configuration;
 using TextToXml;
@@ -39,7 +40,7 @@ public class DecimalMagnitudeGuardTests
         Assert.True(bundle.Success, "the mutation must only trip the magnitude guard, not an upstream FR-20 control.");
 
         using AscoLsiDbContext context = contexts.Next();
-        ImportResult result = new Kape22Persister(context, Configuration(), WinterClock()).Persist(bundle);
+        ImportResult result = new Kape22Persister(context, Configuration(), contexts.Journal, ReferenceFichierName, WinterClock()).Persist(bundle);
 
         Assert.False(result.Success);
         ConversionError error = Assert.Single(result.Errors);
@@ -51,7 +52,7 @@ public class DecimalMagnitudeGuardTests
         Assert.Empty(verify.Kape22Rows);
         Assert.Empty(verify.OrdreFabricationRows);
         Assert.Empty(verify.CouleeRows);
-        L_D_LOG_COMMANDE log = Assert.Single(verify.LogCommandeRows);
+        L_D_LOG_COMMANDE log = Assert.Single(contexts.LogRows());
         Assert.Contains("REJETÉ", log.Message);
     }
 
@@ -73,7 +74,7 @@ public class DecimalMagnitudeGuardTests
         Assert.NotNull(bundle.SectionChargeLingot);
 
         using AscoLsiDbContext context = contexts.Next();
-        ImportResult result = new Kape22Persister(context, Configuration(), WinterClock()).Persist(bundle);
+        ImportResult result = new Kape22Persister(context, Configuration(), contexts.Journal, ReferenceFichierName, WinterClock()).Persist(bundle);
 
         Assert.False(result.Success);
         ConversionError error = Assert.Single(result.Errors);
@@ -102,7 +103,7 @@ public class DecimalMagnitudeGuardTests
         Assert.True(bundle.Success, "the mutation must only affect DiametreProduit's magnitude, not an upstream FR-20 control.");
 
         using AscoLsiDbContext context = contexts.Next();
-        ImportResult result = new Kape22Persister(context, Configuration(), WinterClock()).Persist(bundle);
+        ImportResult result = new Kape22Persister(context, Configuration(), contexts.Journal, ReferenceFichierName, WinterClock()).Persist(bundle);
 
         Assert.True(result.Success, string.Join("; ", result.Errors.Select(error => error.Message)));
 
@@ -130,7 +131,7 @@ public class DecimalMagnitudeGuardTests
         Assert.NotNull(bundle.SectionChargeChutage);
 
         using AscoLsiDbContext context = contexts.Next();
-        ImportResult result = new Kape22Persister(context, Configuration(), WinterClock()).Persist(bundle);
+        ImportResult result = new Kape22Persister(context, Configuration(), contexts.Journal, ReferenceFichierName, WinterClock()).Persist(bundle);
 
         Assert.False(result.Success);
         ConversionError error = Assert.Single(result.Errors);
@@ -160,7 +161,7 @@ public class DecimalMagnitudeGuardTests
         Assert.NotNull(bundle.SectionChargeDecoupe);
 
         using AscoLsiDbContext context = contexts.Next();
-        ImportResult result = new Kape22Persister(context, Configuration(), WinterClock()).Persist(bundle);
+        ImportResult result = new Kape22Persister(context, Configuration(), contexts.Journal, ReferenceFichierName, WinterClock()).Persist(bundle);
 
         Assert.False(result.Success);
         ConversionError error = Assert.Single(result.Errors);
@@ -190,7 +191,7 @@ public class DecimalMagnitudeGuardTests
         Assert.NotNull(bundle.SectionChargePits);
 
         using AscoLsiDbContext context = contexts.Next();
-        ImportResult result = new Kape22Persister(context, Configuration(), WinterClock()).Persist(bundle);
+        ImportResult result = new Kape22Persister(context, Configuration(), contexts.Journal, ReferenceFichierName, WinterClock()).Persist(bundle);
 
         Assert.False(result.Success);
         ConversionError error = Assert.Single(result.Errors);

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using AscoLsiJournal;
 using Kape22Importer.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -67,6 +68,7 @@ public class EndToEndImportIntegrationTests(SqlServerIntegrationFixture fixture)
         Kape22FichierProcessor processor = new(
             fixture.NewAscoLsiContext,
             Configuration(),
+            fixture.NewJournal(),
             Options(),
             new FixedClock(Now),
             NullLogger<Kape22FichierProcessor>.Instance);
@@ -104,7 +106,7 @@ public class EndToEndImportIntegrationTests(SqlServerIntegrationFixture fixture)
         List<L_D_KAPE22> rows = verify.Kape22Rows.AsNoTracking().ToList();
         Assert.Equal(10, rows.Count);
 
-        List<L_D_LOG_COMMANDE> logRows = verify.LogCommandeRows.AsNoTracking().ToList();
+        List<L_D_LOG_COMMANDE> logRows = fixture.LogRows();
         Assert.Equal(10, logRows.Count);
 
         foreach (string name in TenFichiers)

@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using AscoLsiJournal;
+using FichierJournal;
 using Kape22Importer.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -52,7 +54,13 @@ public class Kape22FichierProcessorTests
         () => throw new XunitException("Persistence was reached; the Converter failure should have stopped the pipeline.");
 
     private static Kape22FichierProcessor Processor(Func<AscoLsiDbContext> newContext) =>
-        new(newContext, Configuration(), Options(), WinterClock(), NullLogger<Kape22FichierProcessor>.Instance);
+        Processor(newContext, new FailingJournal(new XunitException("The journal was reached; the Converter failure should have stopped the pipeline.")));
+
+    private static Kape22FichierProcessor Processor(InMemoryContextFactory contexts) =>
+        Processor(contexts.Next, contexts.Journal);
+
+    private static Kape22FichierProcessor Processor(Func<AscoLsiDbContext> newContext, IFichierJournal journal) =>
+        new(newContext, Configuration(), journal, Options(), WinterClock(), NullLogger<Kape22FichierProcessor>.Instance);
 
     // AC-FR13-2: Converter.Convert fails -> no normalized XML is produced, Kape22Mapper and
     // Kape22Persister are never reached, and ImportResult.Errors carries the Step 1 error.
@@ -93,7 +101,7 @@ public class Kape22FichierProcessorTests
     {
         InMemoryContextFactory contexts = new();
 
-        ImportResult result = Processor(contexts.Next).Import(ReferenceFichierName, InsertableReferenceFichier());
+        ImportResult result = Processor(contexts).Import(ReferenceFichierName, InsertableReferenceFichier());
 
         Assert.True(result.Success);
         Assert.NotNull(result.InsertedId);
@@ -103,7 +111,7 @@ public class Kape22FichierProcessorTests
         using AscoLsiDbContext verify = contexts.Reader();
         L_D_KAPE22 inserted = Assert.Single(verify.Kape22Rows);
         Assert.Equal(inserted.Id, result.InsertedId);
-        L_D_LOG_COMMANDE log = Assert.Single(verify.LogCommandeRows);
+        L_D_LOG_COMMANDE log = Assert.Single(contexts.LogRows());
         Assert.EndsWith("— OK", log.Message);
         AssertDownstreamRowsFromReferenceFichier(verify);
     }
@@ -117,7 +125,7 @@ public class Kape22FichierProcessorTests
     {
         InMemoryContextFactory contexts = new();
 
-        ImportResult result = Processor(contexts.Next).Import(ReferenceFichierName, BlankClientReferenceFichier());
+        ImportResult result = Processor(contexts).Import(ReferenceFichierName, BlankClientReferenceFichier());
 
         Assert.False(result.Success);
         Assert.NotNull(result.NormalizedXml);
@@ -127,7 +135,7 @@ public class Kape22FichierProcessorTests
 
         using AscoLsiDbContext verify = contexts.Reader();
         Assert.Empty(verify.Kape22Rows);
-        L_D_LOG_COMMANDE log = Assert.Single(verify.LogCommandeRows);
+        L_D_LOG_COMMANDE log = Assert.Single(contexts.LogRows());
         Assert.Contains("REJETÉ", log.Message);
     }
 
@@ -141,7 +149,7 @@ public class Kape22FichierProcessorTests
     {
         InMemoryContextFactory contexts = new();
 
-        ImportResult result = Processor(contexts.Next).Import("P60_999_682_001", BlankClientReferenceFichier());
+        ImportResult result = Processor(contexts).Import("P60_999_682_001", BlankClientReferenceFichier());
 
         Assert.False(result.Success);
         Assert.Contains(result.Warnings, warning => warning.Code == ErrorCode.FileNameMismatch);
@@ -154,7 +162,7 @@ public class Kape22FichierProcessorTests
     public void Import_EachCall_BuildsItsOwnContext_AcFr13_4()
     {
         InMemoryContextFactory contexts = new();
-        Kape22FichierProcessor processor = Processor(contexts.Next);
+        Kape22FichierProcessor processor = Processor(contexts);
 
         processor.Import(ReferenceFichierName, BlankClientReferenceFichier());
         processor.Import(ReferenceFichierName, ReadValidFixture(ReferenceFichierName));
@@ -170,7 +178,7 @@ public class Kape22FichierProcessorTests
     public void Import_RejectedFichierBeforeACleanOne_LeavesTheCleanImportIntact_AcFr13_4()
     {
         InMemoryContextFactory contexts = new();
-        Kape22FichierProcessor processor = Processor(contexts.Next);
+        Kape22FichierProcessor processor = Processor(contexts);
 
         ImportResult rejected = processor.Import(ReferenceFichierName, BlankClientReferenceFichier());
         ImportResult clean = processor.Import(ReferenceFichierName, InsertableReferenceFichier());
@@ -180,7 +188,7 @@ public class Kape22FichierProcessorTests
 
         using AscoLsiDbContext verify = contexts.Reader();
         Assert.Single(verify.Kape22Rows);
-        List<string> messages = verify.LogCommandeRows.Select(row => row.Message).ToList();
+        List<string> messages = contexts.LogRows().Select(row => row.Message).ToList();
         Assert.Contains(messages, message => message.Contains("REJETÉ"));
         Assert.Contains(messages, message => message.EndsWith("— OK"));
     }
@@ -194,7 +202,7 @@ public class Kape22FichierProcessorTests
     {
         InMemoryContextFactory contexts = new();
 
-        ImportResult result = Processor(contexts.Next).Import(ReferenceFichierName, InsertableReferenceFichier());
+        ImportResult result = Processor(contexts).Import(ReferenceFichierName, InsertableReferenceFichier());
 
         Assert.True(result.Success);
         Assert.NotNull(result.InsertedId);

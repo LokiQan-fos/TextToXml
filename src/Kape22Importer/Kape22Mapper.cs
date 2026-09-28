@@ -138,7 +138,7 @@ public sealed class Kape22Mapper(TimeProvider? timeProvider = null)
         errors.AddRange(RequiredFieldCheck.Check(file));
 
         // AC-FR11-4 / D22: the Header roulette and the trimmed Detail OF ride along even on a rejection,
-        // so the persister can write the REJETÉ L_D_LOG_COMMANDE line and key the anti-duplicate guard.
+        // so the persister can record the REJETÉ journal entry and key the anti-duplicate guard.
         // entity.OF is already trimmed above (A-3) - on both the success and failure paths, since the
         // reflective loop and that trim run unconditionally before this line - so this reads it back
         // instead of re-trimming the raw DTO field, keeping the one trim site truly the only one.
@@ -173,9 +173,9 @@ public sealed class Kape22Mapper(TimeProvider? timeProvider = null)
 // when Errors is empty; Value is null on failure. Warnings are the non-blocking coherence signals of
 // FR-10 (D16) and never influence Success.
 // NumeroFichier (Header roulette) and OF (trimmed Detail Champ) are exposed even on a mapping failure,
-// as long as deserialization succeeded, so the Story 2.8 persister can write the "REJETÉ"
-// L_D_LOG_COMMANDE line (AC-FR11-4). Both stay null when deserialization itself failed, which is the
-// D15 "OF unreadable" path where no L_D_LOG_COMMANDE row is written.
+// as long as deserialization succeeded, so the Story 2.8 persister can record the "REJETÉ" journal
+// entry (AC-FR11-4). Both stay null when deserialization itself failed, which is the D15 "OF
+// unreadable" path where no journal entry is recorded.
 // Properties are declared in alphabetical order (CC-4).
 public sealed record MapResult<T>
 {
