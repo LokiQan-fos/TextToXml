@@ -21,15 +21,14 @@ namespace Kape22Importer.Tests;
 // Story 4.7 (FR-21, AC-FR21-5): AD-1 atomicity on the rejection path, one dedicated E2E fixture per
 // cause - cold Coulee missing, inconsistent ingot/furnace distribution, a simulated SQL failure - each
 // proving zero rows land in any of the 11 AscoLSI dispatch tables (L_D_KAPE22 + 10 downstream) and that
-// the cause stays readable
-// through the double-journal circuit (L_D_LOG_COMMANDE and MQTTnetServices.Logs for all three - the SQL
-// failure's journal row since Story 6.1, FR-24). This extends SM-2 (EndToEndImportIntegrationTests,
-// AC-FR21-4) with the rollback side of the same real-pipeline proof; only TransactionalPersistenceTests proved it at
-// the Persister-unit level before this story. Reuses DoubleJournalIntegrationTests' Serilog/MSSqlServer
-// wiring (RunWithSerilog/ReadMqttLogs) and TransactionalPersistenceTests' "list every
-// *Rows.AsNoTracking(), assert empty" rollback pattern (lines 127-141, 291-330). No production code
-// changes; test-only (spec-4-7). AR-12: Integration category, skips cleanly without a reachable local SQL
-// Server test instance. Commit + reset regime (ResetData/ResetMqttLogs first) since the rows are read
+// the cause stays readable through the double-journal circuit (L_D_LOG_COMMANDE and MQTTnetServices.Logs
+// for all three - the SQL failure's journal row since Story 6.1, FR-24). This extends SM-2
+// (EndToEndImportIntegrationTests, AC-FR21-4) with the rollback side of the same real-pipeline proof;
+// only TransactionalPersistenceTests proved it at the Persister-unit level before this story. Reuses
+// DoubleJournalIntegrationTests' Serilog/MSSqlServer wiring (RunWithSerilog/ReadMqttLogs) and
+// TransactionalPersistenceTests' "list every *Rows.AsNoTracking(), assert empty" rollback pattern (lines
+// 127-141, 291-330). No production code changes; test-only (spec-4-7). AR-12: Integration category,
+// skips cleanly without a reachable local SQL Server test instance. Commit + reset regime (ResetData/ResetMqttLogs first) since the rows are read
 // back after the transaction commits or rolls back.
 [Collection(SqlServerIntegrationCollection.Name)]
 [Trait("Category", TestCategory.Integration)]

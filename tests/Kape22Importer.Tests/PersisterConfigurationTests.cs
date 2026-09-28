@@ -14,8 +14,8 @@ namespace Kape22Importer.Tests;
 // connection reaches the DbContext through configuration. This keeps a guard attached to the AC-FR11-8
 // name: it scans src/Kape22Importer for a literal connection string and checks an over-long
 // Import:InitiatingServer is rejected at construction (by the LSI journal since Story 6.1). The
-// "connection flows from configuration" behaviour is exercised end to end by TransactionalPersistenceTests. Written test-first (CC-1).
-// Unit-only (AR-12).
+// "connection flows from configuration" behaviour is exercised end to end by
+// TransactionalPersistenceTests. Written test-first (CC-1). Unit-only (AR-12).
 [Trait("Category", TestCategory.Unit)]
 public class PersisterConfigurationTests
 {

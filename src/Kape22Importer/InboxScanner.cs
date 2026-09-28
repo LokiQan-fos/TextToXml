@@ -218,10 +218,10 @@ public sealed class InboxScanner(
             result = UnexpectedFailure(exception);
         }
 
-        // AC-FR15-3: the processor reported that AscoLSI is unreachable - Kape22Persister caught a
-        // DbException, not anything wrong with the Fichier. The Fichier is left in processing/ for a
-        // later retry (the next tick's stranded scan picks it up), never moved to error/, and the outage
-        // is logged at Warning.
+        // AC-FR15-3: the processor reported that AscoLSI is unreachable, or (Story 6.1, AC-FR24-5) that
+        // the Fichier journal could not be read or written - not anything wrong with the Fichier (see
+        // IsPersistenceFailure). The Fichier is left in processing/ for a later retry (the next tick's
+        // stranded scan picks it up), never moved to error/, and the outage is logged at Warning.
         if (IsPersistenceFailure(result))
         {
             logger.LogWarning(

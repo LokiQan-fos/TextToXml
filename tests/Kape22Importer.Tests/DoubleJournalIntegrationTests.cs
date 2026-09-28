@@ -22,9 +22,10 @@ namespace Kape22Importer.Tests;
 // the sink is flushed, and dbo.Logs is read back to prove the line lands with the right Level and the
 // "[Kape22Importer][<Event>] : ..." message. The L_D_LOG_COMMANDE half stays on Kape22Persister (through
 // the injected LSI journal since Story 6.1) and is asserted alongside. Integration category (AR-12):
-// needs a reachable local SQL Server test instance (AscoLSI_Test + MQTTnetServices_Test) and skips cleanly otherwise. Commit + reset regime: ResetData
-// and ResetMqttLogs first, because the rows are read back after the transaction commits. Written
-// test-first (CC-1). Vocabulary follows the PRD glossary (CC-5).
+// needs a reachable local SQL Server test instance (AscoLSI_Test + MQTTnetServices_Test) and skips
+// cleanly otherwise. Commit + reset regime: ResetData and ResetMqttLogs first, because the rows are read
+// back after the transaction commits. Written test-first (CC-1). Vocabulary follows the PRD glossary
+// (CC-5).
 [Collection(SqlServerIntegrationCollection.Name)]
 [Trait("Category", TestCategory.Integration)]
 public class DoubleJournalIntegrationTests(SqlServerIntegrationFixture fixture)

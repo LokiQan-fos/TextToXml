@@ -20,11 +20,11 @@ namespace Kape22Importer.Tests;
 // PersistenceError (never an exception) on a SQL failure, the D22 anti-duplicate guard in front of all of
 // it, and the AC-FR20-5 cold-Coulee existence guard between the two. Story 6.1 (FR-24): the
 // L_D_LOG_COMMANDE rows are written by the real LSI journal after the business transaction. Written
-// test-first (CC-1): red until Kape22Persister ships. Integration category (AR-12): needs a reachable local SQL Server test
-// instance, skips cleanly otherwise. Every test runs in the commit + reset regime (ResetData first),
-// never under an ambient TransactionScope, because the transaction boundaries themselves are under test
-// (AC-FR11-3/11-5/21-1/21-2) and the guard needs committed state (AC-FR11-6/11-7). Vocabulary follows the
-// PRD glossary (CC-5).
+// test-first (CC-1): red until Kape22Persister ships. Integration category (AR-12): needs a reachable
+// local SQL Server test instance, skips cleanly otherwise. Every test runs in the commit + reset regime
+// (ResetData first), never under an ambient TransactionScope, because the transaction boundaries
+// themselves are under test (AC-FR11-3/11-5/21-1/21-2) and the guard needs committed state
+// (AC-FR11-6/11-7). Vocabulary follows the PRD glossary (CC-5).
 [Collection(SqlServerIntegrationCollection.Name)]
 [Trait("Category", TestCategory.Integration)]
 public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)

@@ -213,7 +213,7 @@ public class DoubleJournalTests
         InMemoryContextFactory contexts = new();
         byte[] footerRecordsNotThree = WithText(InsertableReferenceFichier(), "00003", "00009");
 
-        ImportResult result = Processor(contexts,new RecordingLogger<Kape22FichierProcessor>())
+        ImportResult result = Processor(contexts, new RecordingLogger<Kape22FichierProcessor>())
             .Import("P60_999_682_001", footerRecordsNotThree);
 
         Assert.True(result.Success);
