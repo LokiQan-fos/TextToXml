@@ -82,10 +82,13 @@ Le suffixe horodaté évite qu'une rotation d'index 999 → 001 n'écrase une
 conversion antérieure ; aucun fichier n'est jamais écrasé.
 
 Configuration (`GpaoConvertP89.json`, copiée à côté du `Launcher`) : la section
-`P89` — `SourcePath`, `XmlPath`, `DonePath`, `ErrorPath` (obligatoires, sinon le
-worker refuse de démarrer), `PollingInterval` (défaut 30 s) — et, pour le
-journal, `ConnectionStrings:AscoLSI` et `AscoLsiJournal:InitiatingServer`
-(`L_D_LOG_COMMANDE.User`, nom de machine si vide).
+`P89` — `SourcePath`, `XmlPath`, `DonePath`, `ErrorPath` (obligatoires, chemins
+absolus et distincts deux à deux, sinon le worker refuse de démarrer ;
+l'imbrication reste permise), `PollingInterval` (défaut 30 s) — et, pour le
+journal, `ConnectionStrings:AscoLSI` (obligatoire) et
+`AscoLsiJournal:InitiatingServer` (`L_D_LOG_COMMANDE.User`, nom de machine si
+vide, trop long ⇒ refus de démarrer). Le worker valide ces clés à la
+construction et nomme la ou les clés fautives.
 
 Après une modification de `Templates/P89.xml` : `pwsh scripts/gen.ps1 -Format P89`
 régénère `Templates/P89.xsd` (`-Check -Format P89` pour vérifier sans écrire).

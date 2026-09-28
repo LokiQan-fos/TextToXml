@@ -1051,8 +1051,12 @@ via `IFichierJournal` (D31) ; livraison découpée en Stories 5.0 / 5.1 / 5.2.
 - `AC-FR22-7` : `TextToXml` n'est pas modifiée (AC-FR16-4 inchangé) ;
   `P89Converter` ne référence que `TextToXml` et `FichierJournal`.
 - `AC-FR22-8` : `GpaoConvertP89` est enregistré dans `WorkerRegistry` et
-  `workers.json` ; un dossier `P89:*Path` non configuré empêche le démarrage du
-  worker avec un message nommant la clé.
+  `workers.json` ; un dossier `P89:*Path` non configuré, relatif ou mal formé
+  (les quatre dossiers doivent être des chemins absolus et distincts), deux
+  dossiers `P89:*Path` identiques (casse et séparateur final ignorés), un
+  `ConnectionStrings:AscoLSI` absent ou un `AscoLsiJournal:InitiatingServer`
+  trop long empêchent le démarrage du worker avec un message nommant la ou les
+  clés.
 
 #### FR-23 : Journal de Fichier — interface et implémentation LSI
 

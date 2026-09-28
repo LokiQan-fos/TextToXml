@@ -1239,7 +1239,7 @@ s'y trouver et rester à confirmer.
   summary: When `NumeroFichier` is null but `OF` is readable, `AscoLsiFichierJournal.Record` writes `" — OK"` / `" — REJETÉ : ..."` with no Fichier number (`AscoLsiFichierJournal.cs:34-37`); neither D8 nor the matrix fixes the text for this case.
   evidence: Raised by the blind-hunter and edge-case-hunter lenses (and the acceptance-auditor, out of mandate), found by reading the message construction. P60 cannot produce it; for P89 it only exists if `NumeroFichier` and `OF` are read separately. Story 5.1 settles it (fallback on `FichierName` or an explicit marker) with a test.
 
-- source_spec: `reviews/story-5-0/aggregated-report.md` (F-2)
+- source_spec: `reviews/story-5-0/aggregated-report.md` (F-2) — **RESOLVED 2026-09-28 by Story 5.2**: `GpaoConvertP89.Client.ReadConfig` rethrows the journal's `ArgumentException` as an `InvalidOperationException` naming `AscoLsiJournal:InitiatingServer` (test `ReadConfig_InitiatingServerTooLong_ThrowsNamingTheFullKey_AcFr22_8`, PRD AC-FR22-8).
   summary: The constructor `ArgumentException` names the parameter `InitiatingServer`, not the full configuration key (`AscoLsiJournal:InitiatingServer`), so an operator cannot tell which setting to fix.
   evidence: Raised by the blind-hunter lens, found by reading `AscoLsiFichierJournal.cs:14, 63-66`. The library does not read configuration; the key belongs to the worker. Story 5.2 validates and names the full key at startup (AC-FR22-8).
 
@@ -1261,11 +1261,11 @@ s'y trouver et rester à confirmer.
 
 ## Deferred from: code review of story-5.1, iteration 2 (2026-09-25)
 
-- source_spec: `spec-5-1-p89converter-dossier-p89-brut-xml-normalise-horodate.md`
+- source_spec: `spec-5-1-p89converter-dossier-p89-brut-xml-normalise-horodate.md` — **RESOLVED 2026-09-28 by Story 5.2** at the worker: `Client.RunTickCore` hands any exception (missing `SourcePath` included) to `onError` (`LogError`), `Actions` never throws and the next tick retries (test `RunTickCore_MissingSourceFolder_ReportsTheErrorOnEveryTickWithoutThrowing`). The library is unchanged.
   summary: `P89FolderConverter.RunTick` can still throw: `Process` only catches `IOException` / `UnauthorizedAccessException`, so an unexpected exception (e.g. `XmlException`, `TypeInitializationException` from the embedded templates) aborts the rest of the tick, and a missing or unreachable `SourcePath` raises `DirectoryNotFoundException` from `Directory.GetFiles`.
   evidence: Raised by the blind-hunter and edge-case-hunter lenses. `Converter.Convert` reports failures as Errors rather than exceptions, so no known Fichier triggers it; the project prefers pre-checks over widened catches (Epic 4, A-5). Story 5.2 owns the worker tick: guard `RunTick` there (log + next tick) and validate/await `SourcePath`.
 
-- source_spec: `spec-5-1-p89converter-dossier-p89-brut-xml-normalise-horodate.md`
+- source_spec: `spec-5-1-p89converter-dossier-p89-brut-xml-normalise-horodate.md` — **KEPT, Story 5.2 decision 2026-09-28**: the worker logs each Deferred outcome as a Warning on every tick (test `LogOutcome_Deferred_LogsAWarningWithEveryReason_AcFr22_6`); an attempt counter / quarantine stays out of Epic 5.
   summary: A Deferred Fichier (locked file, done-name collision, journal down) is retried every tick with no attempt counter, quarantine or escalation beyond the per-tick outcome.
   evidence: Raised by the blind-hunter lens. Same regime as P60 deferrals; how the worker surfaces repeated Deferred outcomes (Logs level, alerting) belongs to Story 5.2 or a later ops story.
 
@@ -1275,11 +1275,11 @@ s'y trouver et rester à confirmer.
 
 ## Deferred from: code review of story-5.1, iteration 3 (2026-09-28)
 
-- source_spec: `reviews/story-5-1/aggregated-report.md` (F-1)
+- source_spec: `reviews/story-5-1/aggregated-report.md` (F-1) — **RESOLVED 2026-09-28 by Story 5.2** at the worker: `Client.FrequencyFor` turns an absent or sub-second `P89:PollingInterval` into 30 s (tests `FrequencyFor_UnderOneSecond_IsThirty_AcFr22_8`, `ReadConfig_AbsentPollingInterval_FallsBackToThirtySeconds_AcFr22_8`). `P89Options` is unchanged.
   summary: `P89Options.PollingInterval` defaults to `TimeSpan.Zero` while `README.md:86` announces 30 s; the library never reads `PollingInterval` nor `SectionName`, which belong to the worker.
   evidence: Raised by the review lenses, found by reading `src/P89Converter/P89Options.cs:19` against the README. Story 5.2 (worker `GpaoConvertP89`) sets the default, or moves both members into its own options.
 
-- source_spec: `reviews/story-5-1/aggregated-report.md` (F-2)
+- source_spec: `reviews/story-5-1/aggregated-report.md` (F-2) — **RESOLVED 2026-09-28 by Story 5.2** at the worker: `Client.ReadConfig` rejects a blank, absent, relative or malformed folder and two keys naming the same folder (full path, case and trailing separator ignored), naming the key(s); nesting stays allowed (top-level scan). The library is unchanged.
   summary: `P89FolderConverter` validates none of its options: no null guard in the constructor, an empty path makes `Directory.CreateDirectory("")` throw `ArgumentException` in `RunTick`, and overlapping folders (Xml or Done under Source) would be rescanned in a loop.
   evidence: Raised by the review lenses, found by reading `src/P89Converter/P89FolderConverter.cs:37-52`. The README assigns refusing to start on an incomplete configuration to Story 5.2; validate there, together with the deferred `RunTick` guard.
 
@@ -1295,6 +1295,16 @@ s'y trouver et rester à confirmer.
   summary: A UTF-8 Fichier with a BOM is rejected with an Encodage reason, because U+FEFF does not exist in Windows-1252.
   evidence: Raised by the review lenses, found by reading `src/P89Converter/P89FichierConverter.cs:33`. Real Fichiers carry no BOM (checked on `P89/raw/LP89_682_617_001`, which starts with `P89`); the rejection goes to error, not silent. Handle if the producer changes.
 
-- source_spec: `reviews/story-5-1/aggregated-report.md` (closure, integration run)
+- source_spec: `reviews/story-5-1/aggregated-report.md` (closure, integration run) — **RESOLVED 2026-09-28 by Story 5.2**: `GpaoConvertP89` builds its journal from `AscoLsiFichierJournal` (references `MicroService` + `P89Converter` + `AscoLsiJournal`, no `Kape22Importer`); `MicroServices.sln` builds with 0 warnings.
   summary: The iteration-1 worker `GpaoConvertP89` (MicroServices `GPAO/ConvertP89`, SVN-added, never committed) no longer compiles: `Client.cs` still uses `Kape22Importer.Persistence` and EF, which it used to reach through `P89Converter` before the 5.1 rescope. Building `MicroServices.sln` fails, so `GpaoImportP60WorkerEndToEndTests.WorkerEndToEnd_ImportsArchivesAndMatchesProduction` fails until Story 5.2.
   evidence: Found by `dotnet test TextToXml.sln --filter Category=Integration -m:1` at the 5.1 closure (1 failed, 1091 passed, 18 skipped): CS0246 `Kape22Importer` and CS0234 `EntityFrameworkCore` in `Client.cs(2,7)` and `(6,17)`. Story 5.2 rewires the worker onto `AscoLsiFichierJournal` (user decision 2026-09-28: commit the 5.1 closure and track it).
+
+## Deferred from: code review of story-5.2 (2026-09-28)
+
+- source_spec: `spec-5-2-worker-gpaoconvertp89-launcher.md`
+  summary: `Client.Actions` calls `await Connect()` outside its `try`, so a broker connect that throws reaches the Publisher timer callback, which stops the worker; the "never throws" comment does not hold for that line.
+  evidence: Raised by the blind-hunter and edge-case-hunter lenses, found by reading `GPAO/ConvertP89/Client.cs` `Actions`. Same shape in `GPAO/ImportP60/Client.cs:137`, so not introduced by this story; fix both workers together (move the connect inside the guarded body).
+
+- source_spec: `spec-5-2-worker-gpaoconvertp89-launcher.md`
+  summary: When a tick outlives the 4 s `ShutdownBudget`, `Stop()` returns and `WorkerAdapter.StopAsync` disconnects and disposes the `Client` (and its `CancellationTokenSource`) while the `Task.Run` tick may still be moving and journaling Fichiers.
+  evidence: Raised by the edge-case-hunter and blind-hunter lenses, found by reading `Client.Stop`/`Dispose` against `Launcher/Adapters/WorkerAdapter.cs:48-56`. Same pattern in `GpaoImportP60.Client`; a Fichier in flight finishes its own move/journal steps, so no loss, but the orphaned tick logs through a disposed client. Revisit with the shared Publisher re-entrancy fix.
