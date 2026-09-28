@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 16:00
-last_updated: 09-28-2026 16:00
+last_updated: 09-28-2026 13:30
 project: TextToXml
 project_key: NOKEY
 tracking_system: file-system
@@ -90,7 +90,7 @@ development_status:
   5-0-journal-fichier-interface-implementation-lsi: done
   5-1-p89converter-dossier-p89-brut-xml-normalise-horodate: done
   5-2-worker-gpaoconvertp89-launcher: done
-  epic-5-retrospective: optional
+  epic-5-retrospective: done
 action_items:
   - id: "story-4-6-decimal-scale-defect-story-4-3-bis"
     epic: 4
@@ -549,7 +549,9 @@ action_items:
       epics.md:2420, epic-4-context.md:51 (see Q-1: withdrawn vs deleted)."
     owner: "PM"
     status: done
-    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-25.md -> sprint-change-proposal-2026-09-25.md §4.1-4.3: AC-FR20-3 marked withdrawn in PRD.md, epics.md (inventory, Story 4.5, Story 4.11 C-5) and epic-4-context.md, DONE 2026-09-25."
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-25.md -> sprint-change-proposal-2026-09-25.md
+      §4.1-4.3: AC-FR20-3 marked withdrawn in PRD.md, epics.md (inventory, Story 4.5,
+      Story 4.11 C-5) and epic-4-context.md, DONE 2026-09-25."
   - id: "epic-4-retro4-item-d2-precisions-schema-parity-test"
     epic: 4
     action: "Add a Unit-tier parity test locking DownstreamColumnPrecisions against
@@ -557,7 +559,9 @@ action_items:
       optionally assert DownstreamColumnMagnitudes = 10^(p-s) of it."
     owner: "Dev"
     status: done
-    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-25.md -> Story 4-14-verrou-parite-downstream-column-precisions (sprint-change-proposal-2026-09-25.md §4.4): DownstreamColumnPrecisionsParityTests (AC-1, AC-2), DONE 2026-09-25."
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-25.md -> Story
+      4-14-verrou-parite-downstream-column-precisions (sprint-change-proposal-2026-09-25.md
+      §4.4): DownstreamColumnPrecisionsParityTests (AC-1, AC-2), DONE 2026-09-25."
   - id: "epic-4-retro4-item-d3-project-closed-refresh"
     epic: 4
     action: "Bring PROJECT-CLOSED.md in line with sprint-status.yaml (status open
@@ -565,7 +569,9 @@ action_items:
       or state why it stays open."
     owner: "SM"
     status: done
-    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-25.md -> banner fixed by sprint-change-proposal-2026-09-25.md §4.5; full re-close done by Story 4.14 (PROJECT-CLOSED.md status closed), DONE 2026-09-25."
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-25.md -> banner
+      fixed by sprint-change-proposal-2026-09-25.md §4.5; full re-close done by Story
+      4.14 (PROJECT-CLOSED.md status closed), DONE 2026-09-25."
   - id: "epic-4-retro4-item-d4-review-manual-session-fixes"
     epic: 4
     action: "Route behavior-changing fix(...) commits from manual test sessions through
@@ -573,4 +579,36 @@ action_items:
       AC as a spec change in the same commit (1ab5ea7 and 547bf2a had no review record)."
     owner: "SM / user"
     status: done
-    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-25.md -> project memory manual-session-fix-review (sprint-change-proposal-2026-09-25.md §4.6), DONE 2026-09-25."
+    ref: "_bmad-output/implementation-artifacts/epic-4-retro-2026-09-25.md -> project
+      memory manual-session-fix-review (sprint-change-proposal-2026-09-25.md §4.6),
+      DONE 2026-09-25."
+  - id: "epic-5-retro-item-1-reclose-project-closed-and-context"
+    epic: 5
+    action: "Re-close PROJECT-CLOSED.md (status, closed_date, last_commit, Epic 5
+      row with 5.0-5.2 and this retro, current test counts) and fix epic-5-context.md:40
+      (5.2 is in review -> done)."
+    owner: "SM"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-5-retro-2026-09-28.md"
+  - id: "epic-5-retro-item-2-ci-comment-fixture-sharers"
+    epic: 5
+    action: "Fix the .github/workflows/ci.yml:61-63 comment: P89Converter.Tests does
+      not share SqlServerIntegrationFixture (only AscoLsiJournal.Tests and Kape22Importer.Tests
+      do)."
+    owner: "Dev"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-5-retro-2026-09-28.md"
+  - id: "epic-5-retro-item-3-correct-course-shared-worker-debt"
+    epic: 5
+    action: "Run /bmad-correct-course to plan the P60/P89 shared debt: P60 migration
+      onto IFichierJournal plus the 9 other fix-with-P60 / fix-once entries of deferred-work.md:1249-1329."
+    owner: "PM"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-5-retro-2026-09-28.md"
+  - id: "epic-5-retro-item-4-closure-check-project-closed"
+    epic: 5
+    action: "Add a check to the /commit-review closure step: when a story closes an
+      epic, PROJECT-CLOSED.md and epic-<N>-context.md are updated in the same commit."
+    owner: "SM"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-5-retro-2026-09-28.md"
