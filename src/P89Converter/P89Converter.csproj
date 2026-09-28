@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <!-- The tests drive the XSD seam of P89FichierConverter / P89FolderConverter with a stricter schema. -->
+    <InternalsVisibleTo Include="P89Converter.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The P89 Descripteur and schema are embedded so the worker never reads them from disk (AR-5 pattern). -->
+    <EmbeddedResource Include="..\..\Templates\P89.xml" LogicalName="P89Converter.Templates.P89.xml" />
+    <EmbeddedResource Include="..\..\Templates\P89.xsd" LogicalName="P89Converter.Templates.P89.xsd" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- FichierJournal is the journal contract only (D31); the host injects the LSI implementation. -->
+    <ProjectReference Include="..\FichierJournal\FichierJournal.csproj" />
+    <ProjectReference Include="..\TextToXml\TextToXml.csproj" />
+  </ItemGroup>
+
+</Project>

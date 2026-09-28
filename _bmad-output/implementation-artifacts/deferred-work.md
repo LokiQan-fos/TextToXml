@@ -1235,13 +1235,23 @@ s'y trouver et rester à confirmer.
 
 ## Deferred from: code review of story-5.0 (2026-09-25)
 
-- source_spec: `reviews/story-5-0/aggregated-report.md` (F-1)
+- source_spec: `reviews/story-5-0/aggregated-report.md` (F-1) — **RESOLVED 2026-09-25 by Story 5.1**: a blank `NumeroFichier` falls back to the `FichierName` at the head of the message (`AscoLsiFichierJournal.Record`, test `Record_UnreadableNumeroFichier_StartsTheMessageWithTheFichierName_AcFr23_3`, PRD AC-FR23-3).
   summary: When `NumeroFichier` is null but `OF` is readable, `AscoLsiFichierJournal.Record` writes `" — OK"` / `" — REJETÉ : ..."` with no Fichier number (`AscoLsiFichierJournal.cs:34-37`); neither D8 nor the matrix fixes the text for this case.
   evidence: Raised by the blind-hunter and edge-case-hunter lenses (and the acceptance-auditor, out of mandate), found by reading the message construction. P60 cannot produce it; for P89 it only exists if `NumeroFichier` and `OF` are read separately. Story 5.1 settles it (fallback on `FichierName` or an explicit marker) with a test.
 
 - source_spec: `reviews/story-5-0/aggregated-report.md` (F-2)
   summary: The constructor `ArgumentException` names the parameter `InitiatingServer`, not the full configuration key (`AscoLsiJournal:InitiatingServer`), so an operator cannot tell which setting to fix.
   evidence: Raised by the blind-hunter lens, found by reading `AscoLsiFichierJournal.cs:14, 63-66`. The library does not read configuration; the key belongs to the worker. Story 5.2 validates and names the full key at startup (AC-FR22-8).
+
+## Deferred from: code review of story-5.1 (2026-09-25)
+
+- source_spec: `spec-5-1-p89converter-dossier-p89-brut-xml-normalise-horodate.md`
+  summary: `P89FolderConverter.RunTick` reads every `LP89_*` file as soon as it is listed, with no stability gate; a Fichier still being copied into the source folder would be read truncated and moved to the error folder for good.
+  evidence: Raised by the blind-hunter and edge-case-hunter lenses. Same weakness as P60, whose `InboxScanner.TryStableInboxFichiers` gate is already recorded above as a near no-op on a real share (two probes without delay). Fix both together: skip a Fichier whose `LastWriteTimeUtc` is younger than a quiet period, or compare two probes separated by a delay.
+
+- source_spec: `spec-5-1-p89converter-dossier-p89-brut-xml-normalise-horodate.md`
+  summary: `GpaoConvertP89.Client.Actions` does not guard against a second Publisher timer tick starting while the previous one is still running; two ticks over the same source folder would race (duplicate XML and log rows, `IOException`s).
+  evidence: Raised by the edge-case-hunter and blind-hunter lenses. Pre-existing pattern shared by every `Publisher` worker (`GpaoImportP60` included; Publisher timer re-entrancy was already left open after Story 3.4). Fix once in `MicroService.Publisher` rather than per worker.
 
 ## Deferred from: Story 5.1 spec checkpoint, D31 journal interface (2026-09-25)
 

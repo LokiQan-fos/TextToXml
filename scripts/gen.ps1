@@ -1,4 +1,5 @@
-# Regenerates Templates/P60.xsd and src/Kape22Importer/Kape22File.cs from Templates/P60.xml.
+# Regenerates Templates/<Format>.xsd from Templates/<Format>.xml, plus src/Kape22Importer/Kape22File.cs
+# for P60 (the only format with a DTO).
 #
 # Templates/P60.xml is the single source of truth for the P60 format (AR-5). This script derives the
 # two dependent artifacts mechanically so an evolution of the descriptor never has to be transcribed
@@ -11,18 +12,23 @@
 # (Kape22File_MirrorsP60Xsd), so a stale regeneration fails the build.
 #
 # Usage:
-#   pwsh scripts/gen.ps1            Rewrites the two files.
-#   pwsh scripts/gen.ps1 -Check     Exits non-zero if either file is out of date (no write).
+#   pwsh scripts/gen.ps1            Rewrites the two P60 files.
+#   pwsh scripts/gen.ps1 -Check     Exits non-zero if either P60 file is out of date (no write).
+#   pwsh scripts/gen.ps1 -Format P89    Rewrites Templates/P89.xsd only.
+#
+# A datatype="datetime" Champ maps to xs:date (xs:dateTime when its convert pattern carries a time)
+# + minOccurs="0": Step 1 emits it as ISO-8601 and omits it when blank. P60 has no such Champ.
 
 [CmdletBinding()]
 param(
-    [switch] $Check
+    [switch] $Check,
+    [string] $Format = 'P60'
 )
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$descriptorPath = Join-Path $repoRoot 'Templates\P60.xml'
-$xsdPath = Join-Path $repoRoot 'Templates\P60.xsd'
+$descriptorPath = Join-Path $repoRoot "Templates\$Format.xml"
+$xsdPath = Join-Path $repoRoot "Templates\$Format.xsd"
 $dtoPath = Join-Path $repoRoot 'src\Kape22Importer\Kape22File.cs'
 $newline = "`r`n"
 
@@ -36,6 +42,7 @@ function Get-Fields([string] $bloc) {
         [pscustomobject]@{
             Id   = $_.Id
             Type = if ($_.datatype) { $_.datatype } else { 'string' }
+            HasTime = $_.convert -cmatch '[Hhms]'
         }
     }
 }
@@ -44,13 +51,24 @@ function Build-Xsd {
     $lines = New-Object System.Collections.Generic.List[string]
     $lines.Add('<?xml version="1.0" encoding="utf-8"?>')
     $lines.Add('<!--')
-    $lines.Add('  Static schema for the P60 (KAPE22) normalized XML document produced by TextToXml (AR-3, D10).')
-    $lines.Add('  Generated from Templates/P60.xml by scripts/gen.ps1 - do not edit by hand. One xs:element per')
-    $lines.Add('  <value>, same order as the descriptor (xs:sequence, R-4), xs:int for datatype="int" and')
-    $lines.Add('  xs:string otherwise (D6). A typed element is minOccurs="0" because Step 1 omits a blank typed')
-    $lines.Add('  Champ (PRD D27); a string element is always emitted, even empty (AC-FR5-6). The Kape22File DTO')
-    $lines.Add('  is generated from the same source and committed (AR-4). No target namespace: the normalized')
-    $lines.Add('  XML is namespace-free.')
+    $title = if ($Format -eq 'P60') { 'P60 (KAPE22)' } else { $Format }
+    $lines.Add("  Static schema for the $title normalized XML document produced by TextToXml (AR-3, D10).")
+    $lines.Add("  Generated from Templates/$Format.xml by scripts/gen.ps1 - do not edit by hand. One xs:element per")
+    if ($Format -eq 'P60') {
+        # Kept word for word so the committed P60.xsd stays byte-identical.
+        $lines.Add('  <value>, same order as the descriptor (xs:sequence, R-4), xs:int for datatype="int" and')
+        $lines.Add('  xs:string otherwise (D6). A typed element is minOccurs="0" because Step 1 omits a blank typed')
+        $lines.Add('  Champ (PRD D27); a string element is always emitted, even empty (AC-FR5-6). The Kape22File DTO')
+        $lines.Add('  is generated from the same source and committed (AR-4). No target namespace: the normalized')
+        $lines.Add('  XML is namespace-free.')
+    }
+    else {
+        $lines.Add('  <value>, same order as the descriptor (xs:sequence, R-4): xs:int for datatype="int", xs:date or')
+        $lines.Add('  xs:dateTime for datatype="datetime", xs:string otherwise (D6, D28). A typed element is')
+        $lines.Add('  minOccurs="0" because Step 1 omits a blank typed Champ (PRD D27); a string element is always')
+        $lines.Add('  emitted, even empty (AC-FR5-6). No DTO is generated for this format. No target namespace: the')
+        $lines.Add('  normalized XML is namespace-free.')
+    }
     $lines.Add('-->')
     $lines.Add('<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="unqualified">')
     $lines.Add('  <xs:element name="file">')
@@ -69,6 +87,10 @@ function Build-Xsd {
         foreach ($field in Get-Fields $bloc) {
             if ($field.Type -eq 'int') {
                 $lines.Add("      <xs:element name=""$($field.Id)"" type=""xs:int"" minOccurs=""0"" />")
+            }
+            elseif ($field.Type -eq 'datetime') {
+                $xsType = if ($field.HasTime) { 'xs:dateTime' } else { 'xs:date' }
+                $lines.Add("      <xs:element name=""$($field.Id)"" type=""$xsType"" minOccurs=""0"" />")
             }
             else {
                 $lines.Add("      <xs:element name=""$($field.Id)"" type=""xs:string"" />")
@@ -127,10 +149,10 @@ function Build-Dto {
     return ($lines -join $newline) + $newline
 }
 
-$targets = @(
-    [pscustomobject]@{ Path = $xsdPath; Content = Build-Xsd },
-    [pscustomobject]@{ Path = $dtoPath; Content = Build-Dto }
-)
+$targets = @([pscustomobject]@{ Path = $xsdPath; Content = Build-Xsd })
+if ($Format -eq 'P60') {
+    $targets += [pscustomobject]@{ Path = $dtoPath; Content = Build-Dto }
+}
 
 $stale = @()
 foreach ($target in $targets) {

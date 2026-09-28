@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Static schema for the P89 normalized XML document produced by TextToXml (AR-3, D10).
+  Generated from Templates/P89.xml by scripts/gen.ps1 - do not edit by hand. One xs:element per
+  <value>, same order as the descriptor (xs:sequence, R-4): xs:int for datatype="int", xs:date or
+  xs:dateTime for datatype="datetime", xs:string otherwise (D6, D28). A typed element is
+  minOccurs="0" because Step 1 omits a blank typed Champ (PRD D27); a string element is always
+  emitted, even empty (AC-FR5-6). No DTO is generated for this format. No target namespace: the
+  normalized XML is namespace-free.
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="unqualified">
+  <xs:element name="file">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="header" type="header" />
+        <xs:element name="message" type="message" />
+        <xs:element name="footer" type="footer" />
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:complexType name="header">
+    <xs:sequence>
+      <xs:element name="File" type="xs:string" />
+      <xs:element name="Date" type="xs:int" minOccurs="0" />
+      <xs:element name="NumeroFichier" type="xs:int" minOccurs="0" />
+      <xs:element name="Segment" type="xs:string" />
+      <xs:element name="Emet" type="xs:string" />
+      <xs:element name="Recepteur" type="xs:string" />
+      <xs:element name="libre" type="xs:string" />
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="message">
+    <xs:sequence>
+      <xs:element name="File" type="xs:string" />
+      <xs:element name="Date" type="xs:int" minOccurs="0" />
+      <xs:element name="NumeroFichier" type="xs:int" minOccurs="0" />
+      <xs:element name="Segment" type="xs:string" />
+      <xs:element name="Element" type="xs:string" />
+      <xs:element name="Transaction" type="xs:string" />
+      <xs:element name="HeureEnvoi" type="xs:int" minOccurs="0" />
+      <xs:element name="DateEnvoi" type="xs:date" minOccurs="0" />
+      <xs:element name="Reserve1" type="xs:string" />
+      <xs:element name="OF" type="xs:int" minOccurs="0" />
+      <xs:element name="Reserve2" type="xs:string" />
+      <xs:element name="Nuance" type="xs:string" />
+      <xs:element name="Coulee" type="xs:string" />
+      <xs:element name="Reserve3" type="xs:string" />
+      <xs:element name="Profil" type="xs:string" />
+      <xs:element name="Section" type="xs:int" minOccurs="0" />
+      <xs:element name="LettreType" type="xs:string" />
+      <xs:element name="Montage" type="xs:int" minOccurs="0" />
+      <xs:element name="Reserve4" type="xs:string" />
+      <xs:element name="ConsigneScarfing" type="xs:string" />
+      <xs:element name="Reserve5" type="xs:string" />
+      <xs:element name="TauxHydrogene" type="xs:string" />
+      <xs:element name="PoidsUnitaireMise" type="xs:int" minOccurs="0" />
+      <xs:element name="Reserve6" type="xs:string" />
+      <xs:element name="NombreMisesLam" type="xs:int" minOccurs="0" />
+      <xs:element name="PoidsMisesLam" type="xs:int" minOccurs="0" />
+      <xs:element name="PoidsRebutsTrain" type="xs:int" minOccurs="0" />
+      <xs:element name="TempsMarche" type="xs:int" minOccurs="0" />
+      <xs:element name="PoidsSortiesRefroid" type="xs:int" minOccurs="0" />
+      <xs:element name="NombreSousProduit" type="xs:int" minOccurs="0" />
+      <xs:element name="Reserve7" type="xs:string" />
+      <xs:element name="CodePesee" type="xs:string" />
+      <xs:element name="Reserve8" type="xs:string" />
+      <xs:element name="SectionChargeRefroid" type="xs:string" />
+      <xs:element name="ConsigneRefroid" type="xs:string" />
+      <xs:element name="ConsigneXC" type="xs:string" />
+      <xs:element name="Reserve9" type="xs:string" />
+      <xs:element name="AnomaliePitsFour1" type="xs:string" />
+      <xs:element name="AnomaliePitsFour2" type="xs:string" />
+      <xs:element name="AnomalieBlooming1" type="xs:string" />
+      <xs:element name="AnomalieBlooming2" type="xs:string" />
+      <xs:element name="AnomalieCisaille1500T" type="xs:string" />
+      <xs:element name="AnomalieScarfing" type="xs:string" />
+      <xs:element name="AnomalieBillette1" type="xs:string" />
+      <xs:element name="AnomalieBillette2" type="xs:string" />
+      <xs:element name="AnomalieDecoupe" type="xs:string" />
+      <xs:element name="AnomalieMarquage" type="xs:string" />
+      <xs:element name="AnomalieRefroid" type="xs:string" />
+      <xs:element name="AnomalieArrets" type="xs:string" />
+      <xs:element name="PS1" type="xs:string" />
+      <xs:element name="LG1" type="xs:string" />
+      <xs:element name="PS2" type="xs:string" />
+      <xs:element name="LG2" type="xs:string" />
+      <xs:element name="PS3" type="xs:string" />
+      <xs:element name="LG3" type="xs:string" />
+      <xs:element name="PS4" type="xs:string" />
+      <xs:element name="LG4" type="xs:string" />
+      <xs:element name="PS5" type="xs:string" />
+      <xs:element name="LG5" type="xs:string" />
+      <xs:element name="PS6" type="xs:string" />
+      <xs:element name="LG6" type="xs:string" />
+      <xs:element name="PS7" type="xs:string" />
+      <xs:element name="LG7" type="xs:string" />
+      <xs:element name="PS8" type="xs:string" />
+      <xs:element name="LG8" type="xs:string" />
+      <xs:element name="PS9" type="xs:string" />
+      <xs:element name="LG9" type="xs:string" />
+      <xs:element name="PS10" type="xs:string" />
+      <xs:element name="LG10" type="xs:string" />
+      <xs:element name="PS11" type="xs:string" />
+      <xs:element name="LG11" type="xs:string" />
+      <xs:element name="PS12" type="xs:string" />
+      <xs:element name="LG12" type="xs:string" />
+      <xs:element name="PS13" type="xs:string" />
+      <xs:element name="LG13" type="xs:string" />
+      <xs:element name="PS14" type="xs:string" />
+      <xs:element name="LG14" type="xs:string" />
+      <xs:element name="PS15" type="xs:string" />
+      <xs:element name="LG15" type="xs:string" />
+      <xs:element name="PS16" type="xs:string" />
+      <xs:element name="LG16" type="xs:string" />
+      <xs:element name="PS17" type="xs:string" />
+      <xs:element name="LG17" type="xs:string" />
+      <xs:element name="PS18" type="xs:string" />
+      <xs:element name="LG18" type="xs:string" />
+      <xs:element name="PS19" type="xs:string" />
+      <xs:element name="LG19" type="xs:string" />
+      <xs:element name="PS20" type="xs:string" />
+      <xs:element name="LG20" type="xs:string" />
+      <xs:element name="PS21" type="xs:string" />
+      <xs:element name="LG21" type="xs:string" />
+      <xs:element name="PS22" type="xs:string" />
+      <xs:element name="LG22" type="xs:string" />
+      <xs:element name="PS23" type="xs:string" />
+      <xs:element name="LG23" type="xs:string" />
+      <xs:element name="PS24" type="xs:string" />
+      <xs:element name="LG24" type="xs:string" />
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="footer">
+    <xs:sequence>
+      <xs:element name="File" type="xs:string" />
+      <xs:element name="Date" type="xs:int" minOccurs="0" />
+      <xs:element name="NumeroFichier" type="xs:int" minOccurs="0" />
+      <xs:element name="Segment" type="xs:string" />
+      <xs:element name="Records" type="xs:int" minOccurs="0" />
+      <xs:element name="Libre" type="xs:string" />
+    </xs:sequence>
+  </xs:complexType>
+</xs:schema>

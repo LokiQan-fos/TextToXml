@@ -1072,7 +1072,9 @@ une exception si l'écriture échoue ; l'appelant décide du sort du Fichier.
   initiateur configuré (nom de machine si vide ; trop long ⇒ échec à la
   construction).
 - `AC-FR23-3` : une entrée d'échec écrit `"<NumeroFichier> — REJETÉ : <raisons>"` ;
-  une entrée sans `OF` n'écrit aucune ligne (D15).
+  une entrée sans `OF` n'écrit aucune ligne (D15) ; une entrée avec un `OF`
+  lisible mais sans `NumeroFichier` (P89 : `minOccurs="0"` dans `P89.xsd`) met le
+  `FichierName` à sa place en tête du `Message` (F-1 de la revue 5.0).
 - `AC-FR23-4` : chaque `Record` est une écriture autonome (aucune transaction
   ambiante requise) ; une base injoignable lève une exception, rien n'est écrit.
 

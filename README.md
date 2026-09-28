@@ -8,6 +8,7 @@ Chaîne d'ingestion des fichiers SAP → LSI. Livrables :
 | `src/Kape22Importer` | **Bibliothèque** de format P60 : descripteur, XSD, DTO, entités EF, mapping (`Kape22Mapper`), contrôles de cohérence, scrutation du dossier de réception (`InboxScanner`), orchestration par Fichier (`Kape22FichierProcessor` : archive XML → EF → `AscoLSI`, avec double journalisation) et persistance transactionnelle (`Kape22Persister`). Destinée à être consommée par le worker exécutable (différé — voir ci-dessous). |
 | `src/FichierJournal` | Contrat du journal de Fichier (D31, FR-23) : `IFichierJournal.Record(FichierJournalEntry)`. Aucune dépendance — un format journalise le résultat de ses imports sans connaître l'application cible. |
 | `src/AscoLsiJournal` | Implémentation LSI de `IFichierJournal` : une ligne `L_D_LOG_COMMANDE` par Fichier (D8, D15), écrite hors de toute transaction métier. |
+| `src/P89Converter` | **Bibliothèque** de format P89, Étape 1 seule (Épic 5, FR-22) : descripteur + XSD embarqués, transcodage UTF-8 → Windows-1252, XML normalisé horodaté, journal via `IFichierJournal` (référence `TextToXml` + `FichierJournal` seulement). Consommée par le worker `GpaoConvertP89` de `MicroServices.sln` — voir « P89 » ci-dessous. |
 
 Voir `_bmad-output/planning-artifacts/PRD.md` et `epics.md` pour le détail fonctionnel.
 
@@ -51,6 +52,43 @@ Voir `_bmad-output/planning-artifacts/PRD.md` et `epics.md` pour le détail fonc
   harnais crée uniquement les tables de `scripts/schema/`. Sans instance
   configurée, ces tests sont **ignorés** (pas en échec) ; les tests `Unit` n'en
   ont pas besoin.
+
+## P89 (Épic 5, Étape 1 seule)
+
+`P89FolderConverter.RunTick` (bibliothèque `P89Converter`, hébergée par le
+worker `GpaoConvertP89` de `MicroServices.sln` — Story 5.2) traite le dossier
+source à chaque tick :
+
+1. chaque Fichier `LP89_*` du dossier source est transcodé **strictement** de
+   UTF-8 vers Windows-1252 (D29 — un octet invalide ou un caractère hors
+   Windows-1252 met le Fichier en échec, jamais de caractère de remplacement) ;
+2. converti par `TextToXml` avec `Templates/P89.xml`, puis validé contre
+   `Templates/P89.xsd` (tous deux embarqués dans `P89Converter.dll`) ;
+3. chaque Fichier traité, succès ou échec, donne une entrée
+   `IFichierJournal.Record` (`Commande="P89"`, `NumeroFichier`/`OF` bruts,
+   `null` si illisibles, raisons en cas d'échec). Le worker injecte
+   `AscoLsiJournal`, qui décide de la ligne `L_D_LOG_COMMANDE` (D8, D15 :
+   `"<NumeroFichier> — OK"` / `"<NumeroFichier> — REJETÉ : <raisons>"`, aucune
+   ligne sans `OF` lisible, `FichierName` à la place d'un `NumeroFichier`
+   illisible) ;
+4. succès : XML écrit sous `<XmlPath>/<nom>_<yyyyMMddHHmmss>.xml`, entrée sans
+   raison, puis Fichier déplacé en `<DonePath>/<nom>_<yyyyMMddHHmmss>` ;
+5. échec : aucun XML, entrée avec ses raisons, Fichier déplacé en
+   `<ErrorPath>/<nom>_<yyyyMMddHHmmss>` ;
+6. `Record` en échec (toute exception) : le XML déjà écrit est supprimé, le Fichier reste
+   dans le dossier source et sera retraité au tick suivant.
+
+Le suffixe horodaté évite qu'une rotation d'index 999 → 001 n'écrase une
+conversion antérieure ; aucun fichier n'est jamais écrasé.
+
+Configuration (`GpaoConvertP89.json`, copiée à côté du `Launcher`) : la section
+`P89` — `SourcePath`, `XmlPath`, `DonePath`, `ErrorPath` (obligatoires, sinon le
+worker refuse de démarrer), `PollingInterval` (défaut 30 s) — et, pour le
+journal, `ConnectionStrings:AscoLSI` et `AscoLsiJournal:InitiatingServer`
+(`L_D_LOG_COMMANDE.User`, nom de machine si vide).
+
+Après une modification de `Templates/P89.xml` : `pwsh scripts/gen.ps1 -Format P89`
+régénère `Templates/P89.xsd` (`-Check -Format P89` pour vérifier sans écrire).
 
 ## Build & tests
 
@@ -100,4 +138,6 @@ par la story qui en a besoin (Annexe A.4 du PRD).
 
 `.gitattributes` marque `P60/**` et `tests/TextToXml.Tests/fixtures/**` en
 `-text` : ces fichiers `Windows-1252` (octets hauts, `CR LF`) ne doivent jamais
-être normalisés.
+être normalisés. Idem pour `P89/**` et `tests/P89Converter.Tests/fixtures/**`
+(trois Fichiers P89 réels, UTF-8 ; les variantes fautives sont construites dans
+les tests).

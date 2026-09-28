@@ -58,3 +58,15 @@ dotnet_style_namespace_match_folder = false
 # Unused usings: surfaced, not enforced. The codebase deliberately keeps explicit
 # System directives despite ImplicitUsings; revisit this house-style point before raising it.
 dotnet_diagnostic.IDE0005.severity = suggestion
+
+[P89/**]
+charset = unset
+end_of_line = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+
+[tests/P89Converter.Tests/fixtures/**]
+charset = unset
+end_of_line = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset

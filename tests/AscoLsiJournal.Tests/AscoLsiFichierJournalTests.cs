@@ -93,6 +93,18 @@ public class AscoLsiFichierJournalTests
         Assert.Equal("013 — REJETÉ : XSD : r1 ; XSD : r2", Assert.Single(this.Rows()).Message);
     }
 
+    // AC-FR23-3 (F-1 of the Story 5.0 review): an unreadable NumeroFichier with a readable OF (a blank
+    // NumeroFichier is allowed by P89.xsd, then rejected) falls back to the FichierName, never a message
+    // starting with " — ".
+    [Fact]
+    [Trait("AC", "FR23-3")]
+    public void Record_UnreadableNumeroFichier_StartsTheMessageWithTheFichierName_AcFr23_3()
+    {
+        this.Journal(InitiatingServer).Record(Entry(numeroFichier: null, reasons: ["XSD : r1"]));
+
+        Assert.Equal("LP89_682_617_013 — REJETÉ : XSD : r1", Assert.Single(this.Rows()).Message);
+    }
+
     // AC-FR23-3 / D15: without a readable OF no row can be written.
     [Theory]
     [InlineData(null)]
@@ -142,13 +154,14 @@ public class AscoLsiFichierJournalTests
 
     private static FichierJournal.FichierJournalEntry Entry(
         DateTimeOffset? instant = null,
+        string? numeroFichier = "013",
         string? of = "2039841",
         string[]? reasons = null) => new()
     {
         Commande = "P89",
         FichierName = "LP89_682_617_013",
         Instant = instant ?? Instant,
-        NumeroFichier = "013",
+        NumeroFichier = numeroFichier,
         OF = of,
         Reasons = reasons ?? [],
     };

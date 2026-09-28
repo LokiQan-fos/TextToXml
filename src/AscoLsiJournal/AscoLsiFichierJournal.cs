@@ -31,7 +31,9 @@ public sealed class AscoLsiFichierJournal : IFichierJournal
             return;
         }
 
-        string numeroFichier = entry.NumeroFichier ?? string.Empty;
+        // A readable OF with an unreadable NumeroFichier (P89.xsd allows a blank one) still names the
+        // Fichier: the message starts with its FichierName instead (F-1 of the Story 5.0 review).
+        string numeroFichier = string.IsNullOrWhiteSpace(entry.NumeroFichier) ? entry.FichierName : entry.NumeroFichier;
         string message = entry.Reasons.Count == 0
             ? $"{numeroFichier} — OK"
             : $"{numeroFichier} — REJETÉ : {string.Join(" ; ", entry.Reasons)}";

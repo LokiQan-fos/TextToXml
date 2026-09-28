@@ -4,3 +4,5 @@
 # SAP samples and test fixtures are byte-sensitive (Windows-1252, CR LF, high bytes). Never normalize them.
 P60/** -text
 tests/TextToXml.Tests/fixtures/** -text
+P89/** -text
+tests/P89Converter.Tests/fixtures/** -text
