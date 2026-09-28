@@ -486,3 +486,8 @@ $RECYCLE.BIN/
 
 # Local SQL Server test connection strings (AR-12). Never commit the real file.
 /tests/Kape22Importer.Tests/appsettings.Test.json
+
+# P89 processing output (Story 5.1 review D-1/D-2): only P89/raw is versioned.
+/P89/done/
+/P89/error/
+/P89/xml/

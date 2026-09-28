@@ -1272,3 +1272,29 @@ s'y trouver et rester à confirmer.
 - source_spec: `Templates/P89.xml`
   summary: Cosmetic defects in the supplied P89 Descripteur Descriptions (typos "Rmetteur", "ElTransactionement", "Reroidissement"; copy-pasted "Element"/"Reserve" Descriptions; empty `SectionChargeRefroid` Description; trailing spaces; `libre`/`Libre` Id casing across Blocs).
   evidence: Raised by the blind-hunter lens. Descriptions are not emitted in the XML or the XSD types; Ids are per-Bloc. Fix with the template owner when P89 Step 2 (mapping) is planned.
+
+## Deferred from: code review of story-5.1, iteration 3 (2026-09-28)
+
+- source_spec: `reviews/story-5-1/aggregated-report.md` (F-1)
+  summary: `P89Options.PollingInterval` defaults to `TimeSpan.Zero` while `README.md:86` announces 30 s; the library never reads `PollingInterval` nor `SectionName`, which belong to the worker.
+  evidence: Raised by the review lenses, found by reading `src/P89Converter/P89Options.cs:19` against the README. Story 5.2 (worker `GpaoConvertP89`) sets the default, or moves both members into its own options.
+
+- source_spec: `reviews/story-5-1/aggregated-report.md` (F-2)
+  summary: `P89FolderConverter` validates none of its options: no null guard in the constructor, an empty path makes `Directory.CreateDirectory("")` throw `ArgumentException` in `RunTick`, and overlapping folders (Xml or Done under Source) would be rescanned in a loop.
+  evidence: Raised by the review lenses, found by reading `src/P89Converter/P89FolderConverter.cs:37-52`. The README assigns refusing to start on an incomplete configuration to Story 5.2; validate there, together with the deferred `RunTick` guard.
+
+- source_spec: `reviews/story-5-1/aggregated-report.md` (F-3)
+  summary: The `xs:date` / `xs:dateTime` heuristic is duplicated: `scripts/gen.ps1` (`HasTime`, `-cmatch '[Hhms]'`) and `P89TemplatesTests.cs:87` use a simplified rule that diverges from `NormalizedXmlBuilder.MaskHasTimeComponent` (`f`, `F`, `t`, `z`, `K`, quoted literals).
+  evidence: Raised by the review lenses, found by comparing the three rules. No effect today: the only datetime Champ is `DateEnvoi` (`ddMMyy`), validated against the XSD by the AC-FR22-1 fixtures. Fix when a mask with a time component appears.
+
+- source_spec: `reviews/story-5-1/aggregated-report.md` (F-4)
+  summary: Fichiers are processed in name order, so after an index rotation 999 -> 001 with a backlog, `..._001` is recorded before `..._999`.
+  evidence: Raised by the review lenses, found by reading `src/P89Converter/P89FolderConverter.cs:61`. The spec imposes no order, all entries of one tick share the same `Instant`, and no consumer depends on the order. Revisit if one does.
+
+- source_spec: `reviews/story-5-1/aggregated-report.md` (F-5)
+  summary: A UTF-8 Fichier with a BOM is rejected with an Encodage reason, because U+FEFF does not exist in Windows-1252.
+  evidence: Raised by the review lenses, found by reading `src/P89Converter/P89FichierConverter.cs:33`. Real Fichiers carry no BOM (checked on `P89/raw/LP89_682_617_001`, which starts with `P89`); the rejection goes to error, not silent. Handle if the producer changes.
+
+- source_spec: `reviews/story-5-1/aggregated-report.md` (closure, integration run)
+  summary: The iteration-1 worker `GpaoConvertP89` (MicroServices `GPAO/ConvertP89`, SVN-added, never committed) no longer compiles: `Client.cs` still uses `Kape22Importer.Persistence` and EF, which it used to reach through `P89Converter` before the 5.1 rescope. Building `MicroServices.sln` fails, so `GpaoImportP60WorkerEndToEndTests.WorkerEndToEnd_ImportsArchivesAndMatchesProduction` fails until Story 5.2.
+  evidence: Found by `dotnet test TextToXml.sln --filter Category=Integration -m:1` at the 5.1 closure (1 failed, 1091 passed, 18 skipped): CS0246 `Kape22Importer` and CS0234 `EntityFrameworkCore` in `Client.cs(2,7)` and `(6,17)`. Story 5.2 rewires the worker onto `AscoLsiFichierJournal` (user decision 2026-09-28: commit the 5.1 closure and track it).

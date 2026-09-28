@@ -78,6 +78,7 @@ context:
 
 - 2026-09-25, iteration 1 (intent_gap, resolved with the user): finding "P89Converter references Kape22Importer" (user). Amended: frozen block renegotiated (journal interface + LSI implementation, outside transaction; P60 migration split out), Code Map, Tasks, ACs. Known-bad state avoided: a P89 → P60 dependency and a per-format copy of the LSI journal. KEEP: transcode/XSD/timestamp/move behavior, review patches of iteration 0 (raw zero-padded OF/NumeroFichier, catch-all on journal write, single clock read, cached compiled schema, CC-2 comment, format-aware `gen.ps1` header), worker registration, the 7 added tests.
 - 2026-09-25, rescope after the Epic 5 re-plan: journal delivered by Story 5.0 (`ec4043b`), worker moved to Story 5.2 (AC-FR22-8 leaves this spec). Amended: frozen block (library only), Code Map, Tasks, ACs; F-1 of the 5.0 review settled here. Known-bad state avoided: re-implementing `AscoLsiJournal` inside 5.1, a database in `P89Converter.Tests`. KEEP: everything listed in the previous entry except worker registration (5.2).
+- 2026-09-28, Ask First gate (user, review D-1/D-2): committing the real P89 Fichiers under `P89/raw` is approved (reference data, commit `ede1abd`). `P89/xml` is removed from the repository (output of the processing, no intrinsic value). `P89/done/`, `P89/error/` and `P89/xml/` are git-ignored.
 
 ## Design Notes
 

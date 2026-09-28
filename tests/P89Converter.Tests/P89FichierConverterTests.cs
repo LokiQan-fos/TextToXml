@@ -42,7 +42,22 @@ public class P89FichierConverterTests
         Assert.Contains("é", conversion.Xml, StringComparison.Ordinal);
     }
 
-    // D8: the log row carries the raw, zero-padded values, not the normalized int (NumeroFichier "013").
+    // AC-FR22-5 (F-1 of the Story 5.0 review): a blank header NumeroFichier or message OF is allowed by
+    // P89.xsd, so the Fichier converts and the value is null, never "000" nor "".
+    [Theory]
+    [InlineData("NumeroFichier")]
+    [InlineData("OF")]
+    [Trait("AC", "FR22-5")]
+    public void Convert_BlankNumeroFichierOrOf_ConvertsWithANullValue_AcFr22_5(string champ)
+    {
+        P89Conversion conversion = P89FichierConverter.Convert(BlankChampFichier(champ));
+
+        Assert.True(conversion.Success, string.Join(Environment.NewLine, conversion.Reasons));
+        Assert.Null(champ == "OF" ? conversion.OF : conversion.NumeroFichier);
+    }
+
+    // D8: the IFichierJournal entry carries the raw, zero-padded values, not the normalized int
+    // (NumeroFichier "013").
     [Fact]
     [Trait("AC", "FR22-5")]
     public void Convert_AccentedFichier_KeepsTheRawNumeroFichierAndOf_AcFr22_5()
@@ -88,7 +103,7 @@ public class P89FichierConverterTests
         Assert.False(conversion.Success);
         Assert.Null(conversion.Xml);
         Assert.Null(conversion.OF);
-        Assert.NotEmpty(conversion.Reasons);
+        Assert.Contains(conversion.Reasons, reason => reason.Contains(" ligne 2 ", StringComparison.Ordinal));
     }
 
     // AC-FR22-6: a normalized XML the schema rejects fails with an XSD reason but keeps its OF readable,

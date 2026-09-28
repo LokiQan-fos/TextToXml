@@ -14,9 +14,10 @@ namespace P89Converter;
 // IFichierJournal entry is recorded (success or failure; whether a row is written is the journal's
 // concern, D15), and the Fichier is moved to the done folder, or to the error folder when it failed, under
 // the same suffix. The suffix comes from one clock reading per tick, so the index rotation 999 -> 001
-// never collides with an earlier conversion, and nothing is ever overwritten. A journal failure or a
-// file-system fault (including a done target that already exists) defers the Fichier: the XML this tick
-// wrote is deleted, the Fichier stays in the source folder and is retried at the next tick.
+// never collides with an earlier conversion, and nothing is ever overwritten. A done or error target that
+// already exists defers the Fichier before anything is written or recorded. A journal failure or a
+// file-system fault defers it too: the XML this tick wrote is deleted, the Fichier stays in the source
+// folder and is retried at the next tick.
 public sealed class P89FolderConverter
 {
     private const string Commande = "P89";
@@ -93,12 +94,35 @@ public sealed class P89FolderConverter
             TargetName = targetName,
         };
 
-    // Success: XML, then the entry, then the move to done. Once this tick has created the XML, any later
-    // failure (write, entry, move) deletes it so the retried Fichier does not leave a second one behind.
-    // CreateNew stays outside that cleanup: an XML that already existed is never deleted.
+    private static string TargetExists(string targetPath) => $"Fichier : {targetPath} existe déjà";
+
+    // Best-effort cleanup: a failed delete (locked XML) must not replace the reason the Fichier is deferred
+    // for. The XML is then left behind; the retry writes its own under a new suffix.
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
+
+    // Success: XML, then the entry, then the move to done. A done target that already exists defers the
+    // Fichier before anything is written, so a retry never records a second entry for it. Once this tick
+    // has created the XML, any later failure (write, entry, move) deletes it so the retried Fichier does
+    // not leave a second one behind. CreateNew stays outside that cleanup: an XML that already existed is
+    // never deleted.
     private P89FichierOutcome Accept(string path, string targetName, P89Conversion conversion, DateTimeOffset now)
     {
         string fichierName = Path.GetFileName(path);
+        string donePath = Path.Combine(this.options.DonePath, targetName);
+        if (File.Exists(donePath))
+        {
+            return Outcome(fichierName, P89FichierStatus.Deferred, targetName, [TargetExists(donePath)]);
+        }
+
         string xmlPath = Path.Combine(this.options.XmlPath, targetName + ".xml");
         FileStream stream = new(xmlPath, FileMode.CreateNew);
         try
@@ -111,18 +135,18 @@ public sealed class P89FolderConverter
             string? failure = this.TryRecord(Entry(fichierName, conversion, now));
             if (failure is not null)
             {
-                File.Delete(xmlPath);
+                TryDelete(xmlPath);
                 return Outcome(fichierName, P89FichierStatus.Deferred, targetName, [failure]);
             }
 
-            File.Move(path, Path.Combine(this.options.DonePath, targetName));
+            File.Move(path, donePath);
             return Outcome(fichierName, P89FichierStatus.Converted, targetName, []);
         }
         catch
         {
             // Process turns the rethrown file-system fault into a Deferred outcome.
             stream.Dispose();
-            File.Delete(xmlPath);
+            TryDelete(xmlPath);
             throw;
         }
     }
@@ -149,10 +173,16 @@ public sealed class P89FolderConverter
         }
     }
 
-    // Failure: no XML; the entry with its reasons, then the move to error.
+    // Failure: no XML; the entry with its reasons, then the move to error. An error target that already
+    // exists defers the Fichier before its entry, as on the success path.
     private P89FichierOutcome Reject(string path, string targetName, P89Conversion conversion, DateTimeOffset now)
     {
         string fichierName = Path.GetFileName(path);
+        string errorPath = Path.Combine(this.options.ErrorPath, targetName);
+        if (File.Exists(errorPath))
+        {
+            return Outcome(fichierName, P89FichierStatus.Deferred, targetName, [TargetExists(errorPath)]);
+        }
 
         string? failure = this.TryRecord(Entry(fichierName, conversion, now));
         if (failure is not null)
@@ -160,7 +190,7 @@ public sealed class P89FolderConverter
             return Outcome(fichierName, P89FichierStatus.Deferred, targetName, [.. conversion.Reasons, failure]);
         }
 
-        File.Move(path, Path.Combine(this.options.ErrorPath, targetName));
+        File.Move(path, errorPath);
         return Outcome(fichierName, P89FichierStatus.Rejected, targetName, conversion.Reasons);
     }
 

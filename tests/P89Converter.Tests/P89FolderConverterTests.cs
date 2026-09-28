@@ -50,6 +50,25 @@ public sealed class P89FolderConverterTests : IDisposable
         Assert.Equal("013", this.journal.Entries[1].NumeroFichier);
     }
 
+    // AC-FR22-5 (F-1 of the Story 5.0 review): a blank NumeroFichier or OF still converts; the Fichier goes
+    // to done and its entry carries null, leaving the fallback (or the D15 skip) to the journal.
+    [Theory]
+    [InlineData("NumeroFichier")]
+    [InlineData("OF")]
+    [Trait("AC", "FR22-5")]
+    public void RunTick_BlankNumeroFichierOrOf_MovesToDoneAndRecordsANullValue_AcFr22_5(string champ)
+    {
+        string name = ReferenceFichierNames[0];
+        this.folders.Drop(name, BlankChampFichier(champ));
+
+        P89FichierOutcome outcome = Assert.Single(this.Converter(Instant).RunTick());
+
+        Assert.Equal(P89FichierStatus.Converted, outcome.Status);
+        Assert.Equal([$"{name}_{InstantSuffix}"], this.folders.Names(this.folders.Done));
+        FichierJournalEntry entry = Assert.Single(this.journal.Entries);
+        Assert.Null(champ == "OF" ? entry.OF : entry.NumeroFichier);
+    }
+
     // AC-FR22-4: the same Fichier name converted at two instants (index rotation 999 -> 001) yields two
     // XML files and two done files; nothing is overwritten.
     [Fact]
@@ -87,12 +106,11 @@ public sealed class P89FolderConverterTests : IDisposable
         Assert.Empty(this.journal.Entries);
     }
 
-    // AC-FR22-4: a done target that already exists is never overwritten: the move fails after the entry,
-    // the XML just written is deleted and the Fichier stays in the source folder for the next tick (its
-    // second entry on retry is accepted).
+    // AC-FR22-4: a done target that already exists is never overwritten: it is checked before anything
+    // is written, so no XML, no entry, and the Fichier stays in the source folder for the next tick.
     [Fact]
     [Trait("AC", "FR22-4")]
-    public void RunTick_DoneTargetAlreadyExists_DeletesXmlAndLeavesFichierInSource_AcFr22_4()
+    public void RunTick_DoneTargetAlreadyExists_DefersWithoutXmlNorEntry_AcFr22_4()
     {
         string name = ReferenceFichierNames[0];
         this.folders.Drop(name, ReadFixture(name));
@@ -106,7 +124,27 @@ public sealed class P89FolderConverterTests : IDisposable
         Assert.Empty(this.folders.Names(this.folders.Xml));
         Assert.Equal([name], this.folders.Names(this.folders.Source));
         Assert.Equal("earlier", File.ReadAllText(existing));
-        Assert.Single(this.journal.Entries);
+        Assert.Empty(this.journal.Entries);
+    }
+
+    // AC-FR22-4: an error target that already exists is never overwritten either: the rejected Fichier is
+    // deferred before its entry, so a retry never records a second one.
+    [Fact]
+    [Trait("AC", "FR22-4")]
+    public void RunTick_ErrorTargetAlreadyExists_DefersWithoutEntryAndKeepsTheEarlierFile_AcFr22_4()
+    {
+        string name = "LP89_682_617_900";
+        this.folders.Drop(name, InvalidUtf8Fichier());
+        Directory.CreateDirectory(this.folders.Error);
+        string existing = Path.Combine(this.folders.Error, $"{name}_{InstantSuffix}");
+        File.WriteAllText(existing, "earlier");
+
+        P89FichierOutcome outcome = Assert.Single(this.Converter(Instant).RunTick());
+
+        Assert.Equal(P89FichierStatus.Deferred, outcome.Status);
+        Assert.Equal([name], this.folders.Names(this.folders.Source));
+        Assert.Equal("earlier", File.ReadAllText(existing));
+        Assert.Empty(this.journal.Entries);
     }
 
     // AC-FR22-4: the suffix is the host local wall time, while the entry Instant stays the UTC instant.

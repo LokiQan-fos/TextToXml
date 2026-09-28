@@ -1,9 +1,9 @@
 # Regenerates Templates/<Format>.xsd from Templates/<Format>.xml, plus src/Kape22Importer/Kape22File.cs
 # for P60 (the only format with a DTO).
 #
-# Templates/P60.xml is the single source of truth for the P60 format (AR-5). This script derives the
-# two dependent artifacts mechanically so an evolution of the descriptor never has to be transcribed
-# by hand (risk R-5): one xs:element / one DTO property per <value>, in descriptor order (R-4),
+# Templates/P60.xml is the single source of truth for the P60 format (AR-5). For P60, this script derives
+# the two dependent artifacts mechanically (for P89, the schema only) so an evolution of the descriptor
+# never has to be transcribed by hand (risk R-5): one xs:element / one DTO property per <value>, in descriptor order (R-4),
 # xs:int + minOccurs="0" + int? for datatype="int" (PRD D27), xs:string + string otherwise (D6).
 #
 # There is no build- or CI-time code generator: xsd.exe does not exist on .NET 10 and the output is
@@ -15,6 +15,7 @@
 #   pwsh scripts/gen.ps1            Rewrites the two P60 files.
 #   pwsh scripts/gen.ps1 -Check     Exits non-zero if either P60 file is out of date (no write).
 #   pwsh scripts/gen.ps1 -Format P89    Rewrites Templates/P89.xsd only.
+#   pwsh scripts/gen.ps1 -Check -Format P89    Exits non-zero if Templates/P89.xsd is out of date (no write).
 #
 # A datatype="datetime" Champ maps to xs:date (xs:dateTime when its convert pattern carries a time)
 # + minOccurs="0": Step 1 emits it as ISO-8601 and omits it when blank. P60 has no such Champ.

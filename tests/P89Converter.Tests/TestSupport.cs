@@ -23,6 +23,16 @@ internal static class TestSupport
     public static readonly string[] ReferenceFichierNames =
         ["LP89_682_617_001", AccentedFichierName, "LP89_682_617_248"];
 
+    // The first reference Fichier with its header NumeroFichier ("NumeroFichier") or its message OF ("OF")
+    // blanked: an int Champ P89.xsd allows to be absent (minOccurs="0"), F-1 of the Story 5.0 review.
+    public static byte[] BlankChampFichier(string champ)
+    {
+        (int ligne, int position, int size) = champ == "OF" ? (1, 26, 7) : (0, 6, 3);
+        string[] lines = Utf8("LP89_682_617_001").Split("\r\n");
+        lines[ligne] = lines[ligne][..position] + new string(' ', size) + lines[ligne][(position + size)..];
+        return Encoding.UTF8.GetBytes(string.Join("\r\n", lines));
+    }
+
     // The accented reference Fichier with one byte of its message Ligne replaced by 0xFF, never valid UTF-8.
     public static byte[] InvalidUtf8Fichier()
     {
