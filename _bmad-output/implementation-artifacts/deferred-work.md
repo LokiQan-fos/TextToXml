@@ -1302,9 +1302,29 @@ s'y trouver et rester à confirmer.
 ## Deferred from: code review of story-5.2 (2026-09-28)
 
 - source_spec: `spec-5-2-worker-gpaoconvertp89-launcher.md`
-  summary: `Client.Actions` calls `await Connect()` outside its `try`, so a broker connect that throws reaches the Publisher timer callback, which stops the worker; the "never throws" comment does not hold for that line.
-  evidence: Raised by the blind-hunter and edge-case-hunter lenses, found by reading `GPAO/ConvertP89/Client.cs` `Actions`. Same shape in `GPAO/ImportP60/Client.cs:137`, so not introduced by this story; fix both workers together (move the connect inside the guarded body).
+  summary: `GpaoImportP60.Client.Actions` calls `await Connect()` outside its `try`, so a broker connect that throws reaches the Publisher timer callback, which stops the worker; the "never throws" comment does not hold for that line.
+  evidence: `GPAO/ImportP60/Client.cs:137`. Fixed for `GpaoConvertP89` by the Story 5.2 review (P-1, connect moved inside the guarded body); apply the same move to P60.
 
 - source_spec: `spec-5-2-worker-gpaoconvertp89-launcher.md`
   summary: When a tick outlives the 4 s `ShutdownBudget`, `Stop()` returns and `WorkerAdapter.StopAsync` disconnects and disposes the `Client` (and its `CancellationTokenSource`) while the `Task.Run` tick may still be moving and journaling Fichiers.
   evidence: Raised by the edge-case-hunter and blind-hunter lenses, found by reading `Client.Stop`/`Dispose` against `Launcher/Adapters/WorkerAdapter.cs:48-56`. Same pattern in `GpaoImportP60.Client`; a Fichier in flight finishes its own move/journal steps, so no loss, but the orphaned tick logs through a disposed client. Revisit with the shared Publisher re-entrancy fix.
+
+- source_spec: `reviews/story-5-2/aggregated-report.md` (F-1, medium)
+  summary: No test builds a real `GpaoConvertP89.Client`, so its instance wiring is unverified: `Frequency = FrequencyFor(...)`, error containment in `Actions`, `Stop()` cancelling the tick token, and the `LogOutcome` forwarder (Deferred → Warning).
+  evidence: verification-gap lens, found by reading `GPAO/ConvertP89/Client.cs:33-41`, `:156-188`, `:244` against the tests (only the static `ReadConfig`/`RunTickCore`/`FrequencyFor` seams are exercised). Needs `AscoLSI_Test` because of the `AbstractService` SQL sink; same debt as the P60 `Client.Actions` test owed in `MicroServices.sln`. Cover both workers with one shared integration test.
+
+- source_spec: `reviews/story-5-2/aggregated-report.md` (F-2, low)
+  summary: Connection strings are only checked for being non-blank: a malformed `ConnectionStrings:AscoLSI` passes construction and then defers every Fichier forever, and `ConnectionStrings:MQTTnetServices` is not checked by `ReadConfig` at all.
+  evidence: blind-hunter + edge-case-hunter lenses, `GPAO/ConvertP89/Client.cs:58-63` and `GpaoConvertP89.json:6`. Outside the frozen matrix (only "Blank AscoLSI"); `MQTTnetServices` is read by `AbstractService`, shared with P60. Fix with P60.
+
+- source_spec: `reviews/story-5-2/aggregated-report.md` (F-3, low)
+  summary: The heartbeat publishes "alive" even after a failed tick.
+  evidence: blind-hunter + edge-case-hunter lenses, `GPAO/ConvertP89/Client.cs:172-173`; same pattern as `GPAO/ImportP60/Client.cs:170`. Surfacing "last tick failed" is a supervision decision shared by all Launcher workers, outside Epic 5.
+
+- source_spec: `reviews/story-5-2/aggregated-report.md` (F-4, low)
+  summary: The standalone `WorkerService` host retries a configuration error 10 times and does not dispose the `Client`.
+  evidence: blind-hunter + edge-case-hunter lenses, `GPAO/ConvertP89/WorkerService.cs:21-37`; identical to `GPAO/ImportP60/WorkerService.cs` except for names (checked with `diff`). Only used by a standalone `dotnet run`, not under the Launcher. Pre-existing; fix with P60.
+
+- source_spec: `reviews/story-5-2/aggregated-report.md` (F-5, low)
+  summary: A `ReadConfig` that throws after the base constructor can leak the `AbstractService` SQL sink.
+  evidence: edge-case-hunter lens, `GPAO/ConvertP89/Client.cs:33-35`; same constructor order in `GPAO/ImportP60/Client.cs`. Only happens on an invalid configuration, which already blocks startup. Fix with P60.

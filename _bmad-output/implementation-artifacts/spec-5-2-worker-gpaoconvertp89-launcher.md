@@ -68,6 +68,11 @@ MicroServices = `C:\Users\Administrateur\Documents\MicroServices` (SVN).
 - Given a Launcher tick, when the source folder is missing or a Fichier is Deferred, then `Actions` does not throw and the next tick runs.
 - Given the rewire, when `MicroServices.sln` builds, then 0 warnings and no reference to `Kape22Importer` from `GpaoConvertP89`.
 
+## Spec Change Log
+
+- 2026-09-28, code review P-3: the frozen matrix is extended with two config-error rows, "relative folder" (`P89:<Key>` not fully qualified) and "malformed folder" (invalid path characters); both mean no worker and a throw naming `P89:<Key>`, as AC-FR22-8 in `PRD.md` already states. Tests: `ReadConfig_RelativeFolder_ThrowsNamingTheKey_AcFr22_8`, `ReadConfig_MalformedFolder_ThrowsNamingTheKey_AcFr22_8`. KEEP: every other matrix row.
+- 2026-09-28, code review P-1: the Always rule "`Actions` never throws" now also covers the broker `Connect()`, moved inside the guarded body.
+
 ## Design Notes
 
 Validation stays in the worker, not in `P89FolderConverter` (library untouched): the keys and file name are worker concerns. Equal folders are rejected; nesting is not (`GetFiles` is top-level, pattern `LP89_*`).
