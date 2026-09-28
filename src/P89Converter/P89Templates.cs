@@ -10,17 +10,20 @@ namespace P89Converter;
 // from Templates/P89.xml by scripts/gen.ps1 -Format P89.
 public static class P89Templates
 {
+    private const string SchemaResourceName = "P89Converter.Templates.P89.xsd";
+
     public static string DescriptorXml { get; } = Read("P89Converter.Templates.P89.xml");
 
-    public static string SchemaXsd { get; } = Read("P89Converter.Templates.P89.xsd");
-
-    // SchemaXsd compiled once, not once per Fichier.
+    // The embedded schema compiled once, not once per Fichier. Static initializers run in textual order,
+    // so Compile reads the resource itself instead of depending on SchemaXsd, declared after it (CC-4).
     internal static XmlSchemaSet Schemas { get; } = Compile();
+
+    public static string SchemaXsd { get; } = Read(SchemaResourceName);
 
     private static XmlSchemaSet Compile()
     {
         XmlSchemaSet schemas = new();
-        using XmlReader reader = XmlReader.Create(new StringReader(SchemaXsd));
+        using XmlReader reader = XmlReader.Create(new StringReader(Read(SchemaResourceName)));
         schemas.Add(null, reader);
         schemas.Compile();
         return schemas;

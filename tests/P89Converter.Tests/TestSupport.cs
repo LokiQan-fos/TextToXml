@@ -50,12 +50,13 @@ internal static class TestSupport
     private static string Utf8(string fichierName) => Encoding.UTF8.GetString(ReadFixture(fichierName));
 }
 
-// A TimeProvider frozen on one instant, with UTC as its local zone.
-internal sealed class FixedClock(DateTimeOffset utcNow) : TimeProvider
+// A TimeProvider frozen on one instant, with the given local zone (UTC by default).
+internal sealed class FixedClock(DateTimeOffset utcNow, TimeZoneInfo? localTimeZone = null) : TimeProvider
 {
+    private readonly TimeZoneInfo localTimeZone = localTimeZone ?? TimeZoneInfo.Utc;
     private readonly DateTimeOffset utcNow = utcNow;
 
-    public override TimeZoneInfo LocalTimeZone => TimeZoneInfo.Utc;
+    public override TimeZoneInfo LocalTimeZone => this.localTimeZone;
 
     public override DateTimeOffset GetUtcNow() => this.utcNow;
 }

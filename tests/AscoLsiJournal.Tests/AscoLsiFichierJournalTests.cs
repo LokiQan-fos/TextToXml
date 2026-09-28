@@ -93,6 +93,17 @@ public class AscoLsiFichierJournalTests
         Assert.Equal("013 — REJETÉ : XSD : r1 ; XSD : r2", Assert.Single(this.Rows()).Message);
     }
 
+    // AC-FR23-2 (F-1 of the Story 5.0 review): a success entry with an unreadable NumeroFichier and a
+    // readable OF writes "<FichierName> — OK".
+    [Fact]
+    [Trait("AC", "FR23-2")]
+    public void Record_SuccessEntryWithUnreadableNumeroFichier_WritesTheFichierNameOkRow_AcFr23_2()
+    {
+        this.Journal(InitiatingServer).Record(Entry(numeroFichier: null));
+
+        Assert.Equal("LP89_682_617_013 — OK", Assert.Single(this.Rows()).Message);
+    }
+
     // AC-FR23-3 (F-1 of the Story 5.0 review): an unreadable NumeroFichier with a readable OF (a blank
     // NumeroFichier is allowed by P89.xsd, then rejected) falls back to the FichierName, never a message
     // starting with " — ".

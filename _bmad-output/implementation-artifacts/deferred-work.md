@@ -1258,3 +1258,17 @@ s'y trouver et rester à confirmer.
 - source_spec: `PRD.md` D31, FR-23; `epics.md` Épic 5 (séquencement)
   summary: Migrate P60 (`Kape22Importer`) onto `IFichierJournal` / `AscoLsiJournal`: write the `L_D_LOG_COMMANDE` row outside the AD-1 transaction for every outcome (success, business rejection, SQL failure), add a detailed SQL rejection reason (column, type, length) to the journal, move the D22 anti-duplicate guard from the "— OK" log row to `L_D_KAPE22` (NumeroFichier + OF), then delete the P60 copies of the entity, column lengths, `ParisTime` and row rules.
   evidence: User decision 2026-09-25 (the journal is the import result, independent of the business transaction). Today an SQL failure on `L_D_KAPE22` writes no `L_D_LOG_COMMANDE` row (`Kape22Persister.PersistenceFailure`, Logs only) and the "— OK" row shares the AD-1 `SaveChanges`. Touches AD-1, D22, AC-FR11-x / AC-FR21-x of a closed epic: plan it with `/bmad-correct-course`, not inside Épic 5.
+
+## Deferred from: code review of story-5.1, iteration 2 (2026-09-25)
+
+- source_spec: `spec-5-1-p89converter-dossier-p89-brut-xml-normalise-horodate.md`
+  summary: `P89FolderConverter.RunTick` can still throw: `Process` only catches `IOException` / `UnauthorizedAccessException`, so an unexpected exception (e.g. `XmlException`, `TypeInitializationException` from the embedded templates) aborts the rest of the tick, and a missing or unreachable `SourcePath` raises `DirectoryNotFoundException` from `Directory.GetFiles`.
+  evidence: Raised by the blind-hunter and edge-case-hunter lenses. `Converter.Convert` reports failures as Errors rather than exceptions, so no known Fichier triggers it; the project prefers pre-checks over widened catches (Epic 4, A-5). Story 5.2 owns the worker tick: guard `RunTick` there (log + next tick) and validate/await `SourcePath`.
+
+- source_spec: `spec-5-1-p89converter-dossier-p89-brut-xml-normalise-horodate.md`
+  summary: A Deferred Fichier (locked file, done-name collision, journal down) is retried every tick with no attempt counter, quarantine or escalation beyond the per-tick outcome.
+  evidence: Raised by the blind-hunter lens. Same regime as P60 deferrals; how the worker surfaces repeated Deferred outcomes (Logs level, alerting) belongs to Story 5.2 or a later ops story.
+
+- source_spec: `Templates/P89.xml`
+  summary: Cosmetic defects in the supplied P89 Descripteur Descriptions (typos "Rmetteur", "ElTransactionement", "Reroidissement"; copy-pasted "Element"/"Reserve" Descriptions; empty `SectionChargeRefroid` Description; trailing spaces; `libre`/`Libre` Id casing across Blocs).
+  evidence: Raised by the blind-hunter lens. Descriptions are not emitted in the XML or the XSD types; Ids are per-Bloc. Fix with the template owner when P89 Step 2 (mapping) is planned.

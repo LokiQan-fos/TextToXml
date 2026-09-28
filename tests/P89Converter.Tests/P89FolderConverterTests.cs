@@ -87,6 +87,44 @@ public sealed class P89FolderConverterTests : IDisposable
         Assert.Empty(this.journal.Entries);
     }
 
+    // AC-FR22-4: a done target that already exists is never overwritten: the move fails after the entry,
+    // the XML just written is deleted and the Fichier stays in the source folder for the next tick (its
+    // second entry on retry is accepted).
+    [Fact]
+    [Trait("AC", "FR22-4")]
+    public void RunTick_DoneTargetAlreadyExists_DeletesXmlAndLeavesFichierInSource_AcFr22_4()
+    {
+        string name = ReferenceFichierNames[0];
+        this.folders.Drop(name, ReadFixture(name));
+        Directory.CreateDirectory(this.folders.Done);
+        string existing = Path.Combine(this.folders.Done, $"{name}_{InstantSuffix}");
+        File.WriteAllText(existing, "earlier");
+
+        P89FichierOutcome outcome = Assert.Single(this.Converter(Instant).RunTick());
+
+        Assert.Equal(P89FichierStatus.Deferred, outcome.Status);
+        Assert.Empty(this.folders.Names(this.folders.Xml));
+        Assert.Equal([name], this.folders.Names(this.folders.Source));
+        Assert.Equal("earlier", File.ReadAllText(existing));
+        Assert.Single(this.journal.Entries);
+    }
+
+    // AC-FR22-4: the suffix is the host local wall time, while the entry Instant stays the UTC instant.
+    [Fact]
+    [Trait("AC", "FR22-4")]
+    public void RunTick_LocalZoneUtcPlusOne_SuffixesWithLocalWallTime_AcFr22_4()
+    {
+        string name = ReferenceFichierNames[0];
+        this.folders.Drop(name, ReadFixture(name));
+        TimeZoneInfo utcPlusOne = TimeZoneInfo.CreateCustomTimeZone("UTC+1", TimeSpan.FromHours(1), "UTC+1", "UTC+1");
+
+        new P89FolderConverter(this.Options(), this.journal, new FixedClock(Instant, utcPlusOne)).RunTick();
+
+        Assert.Equal([$"{name}_20260210090000"], this.folders.Names(this.folders.Done));
+        Assert.Equal([$"{name}_20260210090000.xml"], this.folders.Names(this.folders.Xml));
+        Assert.Equal(Instant, Assert.Single(this.journal.Entries).Instant);
+    }
+
     // AC-FR22-6 (with AC-FR22-3): an encoding or conversion failure writes no XML; the Fichier goes to
     // error under the timestamped name and one entry carries its reasons, with no OF (unreadable).
     [Theory]
@@ -179,6 +217,7 @@ public sealed class P89FolderConverterTests : IDisposable
         Assert.Equal([name], this.folders.Names(this.folders.Source));
         Assert.Empty(this.folders.Names(this.folders.Xml));
         Assert.Empty(this.folders.Names(this.folders.Done));
+        Assert.Empty(this.folders.Names(this.folders.Error));
     }
 
     // AC-FR22-6: any exception from Record (here a connection-pool timeout) is contained: the Fichier is
@@ -198,6 +237,7 @@ public sealed class P89FolderConverterTests : IDisposable
         Assert.All(outcomes, outcome => Assert.Equal(P89FichierStatus.Deferred, outcome.Status));
         Assert.Empty(this.folders.Names(this.folders.Xml));
         Assert.Equal(2, this.folders.Names(this.folders.Source).Length);
+        Assert.Empty(this.folders.Names(this.folders.Error));
     }
 
     // AC-FR22-6: a rejected Fichier whose entry cannot be recorded is deferred, not moved to error, so its
@@ -237,6 +277,7 @@ public sealed class P89FolderConverterTests : IDisposable
 
         Assert.Equal(P89FichierStatus.Deferred, outcome.Status);
         Assert.Equal([name], this.folders.Names(this.folders.Source));
+        Assert.Empty(this.folders.Names(this.folders.Xml));
         Assert.Empty(this.journal.Entries);
     }
 

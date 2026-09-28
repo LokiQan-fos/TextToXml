@@ -51,7 +51,7 @@ public static class P89FichierConverter
         xml.Validate(schemas, (_, args) => reasons.Add($"XSD : {args.Message}"));
 
         // The OF and NumeroFichier are readable as soon as a normalized XML exists, even a schema-invalid
-        // one, so a REJETÉ L_D_LOG_COMMANDE row can still be written (D15).
+        // one, so the IFichierJournal entry of a rejected Fichier still carries them.
         return new P89Conversion
         {
             NumeroFichier = Raw(xml.Root?.Element("header")?.Element("NumeroFichier")?.Value, NumeroFichierSize),
@@ -73,8 +73,8 @@ public static class P89FichierConverter
         return Encoding.GetEncoding(1252, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback);
     }
 
-    // The normalized XML drops the leading zeros of an int Champ; the L_D_LOG_COMMANDE row carries the raw,
-    // zero-padded Fichier value instead (D8), e.g. NumeroFichier "013", not "13".
+    // The normalized XML drops the leading zeros of an int Champ; the IFichierJournal entry carries the raw,
+    // zero-padded Fichier value instead, e.g. NumeroFichier "013", not "13".
     private static string? Raw(string? value, int size) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim().PadLeft(size, '0');
 }

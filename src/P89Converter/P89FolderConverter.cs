@@ -15,7 +15,8 @@ namespace P89Converter;
 // concern, D15), and the Fichier is moved to the done folder, or to the error folder when it failed, under
 // the same suffix. The suffix comes from one clock reading per tick, so the index rotation 999 -> 001
 // never collides with an earlier conversion, and nothing is ever overwritten. A journal failure or a
-// file-system fault defers the Fichier: it stays in the source folder and is retried at the next tick.
+// file-system fault (including a done target that already exists) defers the Fichier: the XML this tick
+// wrote is deleted, the Fichier stays in the source folder and is retried at the next tick.
 public sealed class P89FolderConverter
 {
     private const string Commande = "P89";
@@ -92,26 +93,38 @@ public sealed class P89FolderConverter
             TargetName = targetName,
         };
 
-    // Success: XML, then the entry, then the move to done. A failed entry deletes the XML so the retried
-    // Fichier does not leave a second one behind.
+    // Success: XML, then the entry, then the move to done. Once this tick has created the XML, any later
+    // failure (write, entry, move) deletes it so the retried Fichier does not leave a second one behind.
+    // CreateNew stays outside that cleanup: an XML that already existed is never deleted.
     private P89FichierOutcome Accept(string path, string targetName, P89Conversion conversion, DateTimeOffset now)
     {
         string fichierName = Path.GetFileName(path);
         string xmlPath = Path.Combine(this.options.XmlPath, targetName + ".xml");
-        using (StreamWriter writer = new(new FileStream(xmlPath, FileMode.CreateNew), Utf8))
+        FileStream stream = new(xmlPath, FileMode.CreateNew);
+        try
         {
-            writer.Write(conversion.Xml);
-        }
+            using (StreamWriter writer = new(stream, Utf8))
+            {
+                writer.Write(conversion.Xml);
+            }
 
-        string? failure = this.TryRecord(Entry(fichierName, conversion, now));
-        if (failure is not null)
+            string? failure = this.TryRecord(Entry(fichierName, conversion, now));
+            if (failure is not null)
+            {
+                File.Delete(xmlPath);
+                return Outcome(fichierName, P89FichierStatus.Deferred, targetName, [failure]);
+            }
+
+            File.Move(path, Path.Combine(this.options.DonePath, targetName));
+            return Outcome(fichierName, P89FichierStatus.Converted, targetName, []);
+        }
+        catch
         {
+            // Process turns the rethrown file-system fault into a Deferred outcome.
+            stream.Dispose();
             File.Delete(xmlPath);
-            return Outcome(fichierName, P89FichierStatus.Deferred, targetName, [failure]);
+            throw;
         }
-
-        File.Move(path, Path.Combine(this.options.DonePath, targetName));
-        return Outcome(fichierName, P89FichierStatus.Converted, targetName, []);
     }
 
     private P89FichierOutcome Process(string path, string suffix, DateTimeOffset now)

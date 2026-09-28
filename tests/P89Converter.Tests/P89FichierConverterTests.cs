@@ -92,8 +92,8 @@ public class P89FichierConverterTests
     }
 
     // AC-FR22-6: a normalized XML the schema rejects fails with an XSD reason but keeps its OF readable,
-    // so the REJETÉ L_D_LOG_COMMANDE row can be written. A stricter schema stands in for a schema error
-    // no raw Fichier can produce.
+    // so the IFichierJournal entry of the rejected Fichier carries it. A stricter schema stands in for a
+    // schema error no raw Fichier can produce.
     [Fact]
     [Trait("AC", "FR22-6")]
     public void Convert_SchemaInvalidXml_FailsWithAnXsdReasonAndKeepsTheOf_AcFr22_6()
