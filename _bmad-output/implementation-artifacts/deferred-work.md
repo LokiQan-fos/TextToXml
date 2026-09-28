@@ -1245,17 +1245,17 @@ s'y trouver et rester à confirmer.
 
 ## Deferred from: code review of story-5.1 (2026-09-25)
 
-- source_spec: `spec-5-1-p89converter-dossier-p89-brut-xml-normalise-horodate.md`
+- source_spec: **PLANNED 2026-09-28: Story 6.2** — `spec-5-1-p89converter-dossier-p89-brut-xml-normalise-horodate.md`
   summary: `P89FolderConverter.RunTick` reads every `LP89_*` file as soon as it is listed, with no stability gate; a Fichier still being copied into the source folder would be read truncated and moved to the error folder for good.
   evidence: Raised by the blind-hunter and edge-case-hunter lenses. Same weakness as P60, whose `InboxScanner.TryStableInboxFichiers` gate is already recorded above as a near no-op on a real share (two probes without delay). Fix both together: skip a Fichier whose `LastWriteTimeUtc` is younger than a quiet period, or compare two probes separated by a delay.
 
-- source_spec: `spec-5-1-p89converter-dossier-p89-brut-xml-normalise-horodate.md`
+- source_spec: **PLANNED 2026-09-28: Story 6.4** — `spec-5-1-p89converter-dossier-p89-brut-xml-normalise-horodate.md`
   summary: `GpaoConvertP89.Client.Actions` does not guard against a second Publisher timer tick starting while the previous one is still running; two ticks over the same source folder would race (duplicate XML and log rows, `IOException`s).
   evidence: Raised by the edge-case-hunter and blind-hunter lenses. Pre-existing pattern shared by every `Publisher` worker (`GpaoImportP60` included; Publisher timer re-entrancy was already left open after Story 3.4). Fix once in `MicroService.Publisher` rather than per worker.
 
 ## Deferred from: Story 5.1 spec checkpoint, D31 journal interface (2026-09-25)
 
-- source_spec: `PRD.md` D31, FR-23; `epics.md` Épic 5 (séquencement)
+- source_spec: **PLANNED 2026-09-28: Story 6.1** — `PRD.md` D31, FR-23; `epics.md` Épic 5 (séquencement)
   summary: Migrate P60 (`Kape22Importer`) onto `IFichierJournal` / `AscoLsiJournal`: write the `L_D_LOG_COMMANDE` row outside the AD-1 transaction for every outcome (success, business rejection, SQL failure), add a detailed SQL rejection reason (column, type, length) to the journal, move the D22 anti-duplicate guard from the "— OK" log row to `L_D_KAPE22` (NumeroFichier + OF), then delete the P60 copies of the entity, column lengths, `ParisTime` and row rules.
   evidence: User decision 2026-09-25 (the journal is the import result, independent of the business transaction). Today an SQL failure on `L_D_KAPE22` writes no `L_D_LOG_COMMANDE` row (`Kape22Persister.PersistenceFailure`, Logs only) and the "— OK" row shares the AD-1 `SaveChanges`. Touches AD-1, D22, AC-FR11-x / AC-FR21-x of a closed epic: plan it with `/bmad-correct-course`, not inside Épic 5.
 
@@ -1301,30 +1301,30 @@ s'y trouver et rester à confirmer.
 
 ## Deferred from: code review of story-5.2 (2026-09-28)
 
-- source_spec: `spec-5-2-worker-gpaoconvertp89-launcher.md`
+- source_spec: **PLANNED 2026-09-28: Story 6.4** — `spec-5-2-worker-gpaoconvertp89-launcher.md`
   summary: `GpaoImportP60.Client.Actions` calls `await Connect()` outside its `try`, so a broker connect that throws reaches the Publisher timer callback, which stops the worker; the "never throws" comment does not hold for that line.
   evidence: `GPAO/ImportP60/Client.cs:137`. Fixed for `GpaoConvertP89` by the Story 5.2 review (P-1, connect moved inside the guarded body); apply the same move to P60.
 
-- source_spec: `spec-5-2-worker-gpaoconvertp89-launcher.md`
+- source_spec: **PLANNED 2026-09-28: Story 6.4** — `spec-5-2-worker-gpaoconvertp89-launcher.md`
   summary: When a tick outlives the 4 s `ShutdownBudget`, `Stop()` returns and `WorkerAdapter.StopAsync` disconnects and disposes the `Client` (and its `CancellationTokenSource`) while the `Task.Run` tick may still be moving and journaling Fichiers.
   evidence: Raised by the edge-case-hunter and blind-hunter lenses, found by reading `Client.Stop`/`Dispose` against `Launcher/Adapters/WorkerAdapter.cs:48-56`. Same pattern in `GpaoImportP60.Client`; a Fichier in flight finishes its own move/journal steps, so no loss, but the orphaned tick logs through a disposed client. Revisit with the shared Publisher re-entrancy fix.
 
-- source_spec: `reviews/story-5-2/aggregated-report.md` (F-1, medium)
+- source_spec: **PLANNED 2026-09-28: Story 6.5** — `reviews/story-5-2/aggregated-report.md` (F-1, medium)
   summary: No test builds a real `GpaoConvertP89.Client`, so its instance wiring is unverified: `Frequency = FrequencyFor(...)`, error containment in `Actions`, `Stop()` cancelling the tick token, and the `LogOutcome` forwarder (Deferred → Warning).
   evidence: verification-gap lens, found by reading `GPAO/ConvertP89/Client.cs:33-41`, `:156-188`, `:244` against the tests (only the static `ReadConfig`/`RunTickCore`/`FrequencyFor` seams are exercised). Needs `AscoLSI_Test` because of the `AbstractService` SQL sink; same debt as the P60 `Client.Actions` test owed in `MicroServices.sln`. Cover both workers with one shared integration test.
 
-- source_spec: `reviews/story-5-2/aggregated-report.md` (F-2, low)
+- source_spec: **PLANNED 2026-09-28: Story 6.4** — `reviews/story-5-2/aggregated-report.md` (F-2, low)
   summary: Connection strings are only checked for being non-blank: a malformed `ConnectionStrings:AscoLSI` passes construction and then defers every Fichier forever, and `ConnectionStrings:MQTTnetServices` is not checked by `ReadConfig` at all.
   evidence: blind-hunter + edge-case-hunter lenses, `GPAO/ConvertP89/Client.cs:58-63` and `GpaoConvertP89.json:6`. Outside the frozen matrix (only "Blank AscoLSI"); `MQTTnetServices` is read by `AbstractService`, shared with P60. Fix with P60.
 
-- source_spec: `reviews/story-5-2/aggregated-report.md` (F-3, low)
+- source_spec: **PLANNED 2026-09-28: Story 6.4** — `reviews/story-5-2/aggregated-report.md` (F-3, low)
   summary: The heartbeat publishes "alive" even after a failed tick.
   evidence: blind-hunter + edge-case-hunter lenses, `GPAO/ConvertP89/Client.cs:172-173`; same pattern as `GPAO/ImportP60/Client.cs:170`. Surfacing "last tick failed" is a supervision decision shared by all Launcher workers, outside Epic 5.
 
-- source_spec: `reviews/story-5-2/aggregated-report.md` (F-4, low)
+- source_spec: **PLANNED 2026-09-28: Story 6.4** — `reviews/story-5-2/aggregated-report.md` (F-4, low)
   summary: The standalone `WorkerService` host retries a configuration error 10 times and does not dispose the `Client`.
   evidence: blind-hunter + edge-case-hunter lenses, `GPAO/ConvertP89/WorkerService.cs:21-37`; identical to `GPAO/ImportP60/WorkerService.cs` except for names (checked with `diff`). Only used by a standalone `dotnet run`, not under the Launcher. Pre-existing; fix with P60.
 
-- source_spec: `reviews/story-5-2/aggregated-report.md` (F-5, low)
+- source_spec: **PLANNED 2026-09-28: Story 6.4** — `reviews/story-5-2/aggregated-report.md` (F-5, low)
   summary: A `ReadConfig` that throws after the base constructor can leak the `AbstractService` SQL sink.
   evidence: edge-case-hunter lens, `GPAO/ConvertP89/Client.cs:33-35`; same constructor order in `GPAO/ImportP60/Client.cs`. Only happens on an invalid configuration, which already blocks startup. Fix with P60.

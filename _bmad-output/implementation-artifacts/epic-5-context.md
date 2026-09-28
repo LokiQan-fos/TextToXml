@@ -37,7 +37,7 @@ Deliver Step 1 (Étape 1) of the P89 format: raw P89 Fichiers (`LP89_682_617_<nn
 
 ## Cross-Story Dependencies
 
-- Strict order 5.0 → 5.1 → 5.2; 5.0 and 5.1 are done, 5.2 is in review.
+- Strict order 5.0 → 5.1 → 5.2; 5.0, 5.1 and 5.2 are done.
 - Story 5.2 rewired `GPAO/ConvertP89` onto `AscoLsiFichierJournal` (SVN r534): MicroServices.sln builds again and no longer references `Kape22Importer` from the P89 worker.
 - Epics 1–4 are done and untouched; the project is reopened for this epic and re-closes at the Story 5.2 closure.
 - Out of Epic 5: migrating P60 onto `IFichierJournal` (to be planned via correct-course); Publisher timer re-entrancy and the file-stability gate, both shared with P60 and to be fixed once.

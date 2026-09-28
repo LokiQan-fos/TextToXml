@@ -1,8 +1,8 @@
 ---
 status: 'reopened'
-reopened_date: '2026-09-25'
-reopened_reason: 'new requirement — Epic 5 P89 conversion (sprint-change-proposal-2026-09-25-p89.md)'
-previous_reopened_date: '2026-09-24'
+reopened_date: '2026-09-28'
+reopened_reason: 'Epic 6 — P60 journal migration, shared GPAO worker hardening, per-format XML export (sprint-change-proposal-2026-09-28.md)'
+previous_reopened_date: '2026-09-25'
 closed_date: '2026-09-25'
 previous_closed_date: '2026-09-22'
 last_commit: '1fcfbf2404176014e27cff77fb40d2c72779e5a4'
@@ -10,8 +10,9 @@ last_commit: '1fcfbf2404176014e27cff77fb40d2c72779e5a4'
 
 # TextToXml / Kape22Importer — Project Closure
 
-> **Reopened 2026-09-25 for Epic 5 (P89, Step 1 only)** — `sprint-change-proposal-2026-09-25-p89.md`.
-> Re-close at Story 5.1 closure.
+> **Reopened 2026-09-28 for Epic 6** (P60 journal migration, shared GPAO worker hardening, per-format
+> XML export) — `sprint-change-proposal-2026-09-28.md`. Epic 5 closed 2026-09-28 (retro
+> `epic-5-retro-2026-09-28.md`, `accepted-with-open-items`). Re-close at Epic 6 closure.
 
 > **Re-closed 2026-09-25**, after a reopening on 2026-09-24 (test/correction session 2). `last_commit`
 > is the last commit before this re-close; the re-close itself ships in the Story 4.14 commits
@@ -31,6 +32,7 @@ d'ordre. No story is in progress.
 | **Epic 2** | EF Database-First entities, SQL Server test harness, P60 XSD/DTO, deserialization/mapping, descriptor-vs-table compatibility check, derived fields, coherence warnings, transactional persistence + anti-duplicate guard (2.1–2.8) | 8/8 done | `accepted-with-open-items` (`epic-2-retro-2026-09-07.md`) — action items done, 2 reconciled at closure (see §3) |
 | **Epic 3** | Structural repositioning as a library, inbox scanning/file lifecycle, per-file orchestration, double journalization, worker loop + graceful shutdown, loop robustness, E2E coverage harness (3.0–3.6) | 7/7 done | `accepted-with-open-items` (`epic-3-retro-2026-09-11.md`) — action items done, 1 reconciled at closure (see §3) |
 | **Epic 4** | Downstream-table dispatch: 10 `L_D_*` entities, mapping annex, OF/Coulée + Consignes mappers, bundle orchestrator, single-transaction persister, 10-table E2E suite, plus 5 post-retro hardening stories (4.1–4.7, 4.2-bis, 4.3-bis, 4.9, 4.10, 4.11), then 4 production-parity stories (4.4-bis, 4.12, 4.13, 4.14) | 11/11 base + 5/5 hardening + 4/4 parity = done | `accepted-with-open-items`, 4 retro passes (`epic-4-retro-2026-09-17.md`, `-18.md`, `-21.md`, `-25.md`) — every routed action item done as of this closure (see §3) |
+| **Epic 5** | P89 Step 1: `IFichierJournal` + LSI implementation, `P89Converter` (raw P89 folder → timestamped normalized XML + XSD), worker `GpaoConvertP89` under the Launcher (5.0–5.2) | 3/3 done | `accepted-with-open-items` (`epic-5-retro-2026-09-28.md`) — A-1, A-3 done 2026-09-28; A-2, A-4 open |
 
 Every epic closed with the same verdict shape: **accepted-with-open-items**, never a hard rejection.
 Each round of open items was either fixed by a dedicated follow-up story or explicitly accepted as a

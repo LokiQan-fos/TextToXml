@@ -428,6 +428,16 @@ une entrée de journal `IFichierJournal` par Fichier (LSI : `L_D_LOG_COMMANDE`) 
 plus tard.
 **FRs couverts :** FR-22, FR-23.
 
+### Épic 6 : Journal P60, robustesse des workers GPAO, export XML par format
+Solder la dette partagée P60/P89 relevée par la rétro de l'Épic 5 (F-4) :
+`Kape22Importer` journalise via `IFichierJournal` hors de la transaction AD-1
+(garde D22 sur `L_D_KAPE22`), les deux formats attendent qu'un Fichier soit
+stable, `MicroService.Publisher` n'empile plus les ticks, et les `Client`
+`GpaoImportP60` / `GpaoConvertP89` sont durcis et testés sur une vraie
+instance ; chaque format exporte son XML dans son propre dossier (D33). `AC-FR24-1..6`, `AC-FR25-1..7`, `AC-FR26-1..6`, `AC-FR16-5`, `AC-FR12-5` (révisé) et
+`AC-FR22-9` sont verts.
+**FRs couverts :** FR-24, FR-25, FR-26 (+ FR-11, FR-12, FR-14, FR-16, FR-22 révisés).
+
 ---
 
 ## Épic 1 : Bibliothèque générique `TextToXml` — Fichier → XML normalisé
@@ -2880,6 +2890,141 @@ So that les P89 sont traités en continu sans intervention manuelle.
 
 **Tests xUnit :** `GPAO/ConvertP89.Tests` + `Launcher.Tests` ;
 `[Trait("AC", "FR22-8")]`.
+
+**Critères transverses :** CC-1, CC-2, CC-4, CC-7.
+
+Owner : Dev.
+
+## Épic 6 : Journal P60, robustesse des workers GPAO, export XML par format
+
+Solder les 10 entrées « fix with P60 / fix once » de `deferred-work.md`
+(rétro Épic 5, F-4) et ajouter un dossier d'export XML par format (D33)
+(sprint-change-proposal-2026-09-28.md). `TextToXml` n'est pas modifiée.
+
+**FRs couverts :** FR-24, FR-25, FR-26 (+ `AC-FR11-3`, `AC-FR11-6`, `AC-FR12-5`,
+`AC-FR14-7` révisés, `AC-FR16-5`, `AC-FR22-9`).
+
+**Séquencement :** 6.1 → 6.2 → 6.3 → 6.4 → 6.5.
+
+### Story 6.1 : Journal P60 via `IFichierJournal`
+
+As an exploitant,
+I want que le journal P60 s'écrive comme celui de P89, après la transaction
+métier et pour chaque issue, y compris un échec SQL,
+So that chaque Fichier P60 laisse une ligne `L_D_LOG_COMMANDE` lisible, avec la
+cause SQL précise en cas d'échec, sans deux copies des règles LSI.
+
+**Acceptance Criteria:** `AC-FR24-1` à `AC-FR24-6` ; `AC-FR11-3`, `AC-FR11-6`,
+`AC-FR14-7` révisés (PRD §4.2, §4.3, §4.8).
+
+**Notes dev :**
+- `Kape22Persister` reçoit un `IFichierJournal` ; plus aucun `LogCommandeRows`
+  dans son contexte ; supprimer les copies (`deferred-work.md:1259`).
+- `GpaoImportP60` (MicroServices) compose `AscoLsiFichierJournal`, comme
+  `GpaoConvertP89`. Commit SVN par l'utilisateur.
+- Au checkpoint spec : confirmer par `SELECT` en lecture seule sur la
+  production que la garde `L_D_KAPE22` (`NumeroFichier` + `OF`) n'archive pas
+  à tort un Fichier (lignes legacy).
+- Tests d'intégration existants lisant `L_D_LOG_COMMANDE` : adapter, pas
+  supprimer.
+
+**Tests xUnit (TDD, CC-1) :** `Kape22Importer.Tests` Unit + Integration (AR-12),
+`[Trait("AC", "FR24-…")]`.
+
+**Critères transverses :** CC-1, CC-2, CC-4, CC-5, CC-7 ; AD-1, AD-4, AD-5.
+
+Owner : Dev.
+
+### Story 6.2 : Garde de stabilité des Fichiers P60 + P89
+
+As an exploitant,
+I want qu'un Fichier encore en cours de copie ne soit pas lu,
+So that il ne part pas en `error/` tronqué.
+
+**Acceptance Criteria:** `AC-FR12-5` (révisé), `AC-FR22-9`.
+
+**Notes dev :**
+- Même règle dans `InboxScanner` et `P89FolderConverter` : dernière écriture
+  plus récente que la période de calme ⇒ Fichier ignoré ce tick. Horloge =
+  `TimeProvider` (`deferred-work.md:1249`).
+- Clés `Import:StabilityQuietPeriod` et `P89:StabilityQuietPeriod`, défaut
+  10 s ; README à jour.
+
+**Tests xUnit (TDD, CC-1) :** `Kape22Importer.Tests`, `P89Converter.Tests`,
+`Category=Unit`.
+
+**Critères transverses :** CC-1, CC-2, CC-4.
+
+Owner : Dev.
+
+### Story 6.3 : Export XML P60 dans un dossier dédié
+
+As an exploitant,
+I want que le XML normalisé de chaque Fichier P60 converti soit sauvegardé
+dans un dossier d'export dédié, jamais purgé,
+So that je peux l'envoyer à des tiers qui vérifient les données importées,
+comme je peux déjà le faire pour P89.
+
+**Origine :** ajout de l'utilisateur à l'approbation de
+sprint-change-proposal-2026-09-28.md (D33).
+
+**Acceptance Criteria:** `AC-FR26-1` à `AC-FR26-6`, `AC-FR16-5`.
+
+**Notes dev :**
+- `ImportOptions.XmlExportPath` (`Import:XmlExportPath`), chemin absolu ;
+  horloge `TimeProvider` pour le suffixe `yyyyMMddHHmmss`, comme
+  `P89FolderConverter`.
+- L'export s'ajoute aux XML existants de `archive/` et `error/`, qui ne
+  changent pas.
+- `GpaoImportP60` (MicroServices) : clé ajoutée à `GpaoImportP60.json` et
+  validée au démarrage (`AC-FR26-5`). Commit SVN par l'utilisateur.
+- `AC-FR16-5` : vérifier que P89 s'y conforme déjà (`P89:XmlPath`), sans le
+  modifier ; README : section « Export XML ».
+
+**Tests xUnit (TDD, CC-1) :** `Kape22Importer.Tests` (`Category=Unit`,
+dossiers temporaires), `GPAO/ImportP60.Tests` ; `[Trait("AC", "FR26-…")]`.
+
+**Critères transverses :** CC-1, CC-2, CC-4, CC-7.
+
+Owner : Dev.
+
+### Story 6.4 : Robustesse commune des workers GPAO
+
+As an exploitant,
+I want que les workers GPAO ne s'arrêtent pas, ne se chevauchent pas et ne
+signalent pas « alive » à tort,
+So that la supervision du Launcher reflète l'état réel.
+
+**Acceptance Criteria:** `AC-FR25-1` à `AC-FR25-6`.
+
+**Notes dev :**
+- `MicroService.Publisher` : garde anti‑ré‑entrance (`deferred-work.md:1253`),
+  testée dans `MicroService.Tests` ; vérifier que Laminoir, Video et Zumbach
+  compilent et que leurs tests passent.
+- `GpaoImportP60` et `GpaoConvertP89` : `deferred-work.md:1305`, `:1309`,
+  `:1317`, `:1321`, `:1325`, `:1329`, corrigés à l'identique.
+- Commit SVN par l'utilisateur.
+
+**Tests xUnit :** `MicroService.Tests`, `GPAO/ImportP60.Tests`,
+`GPAO/ConvertP89.Tests` ; `[Trait("AC", "FR25-…")]`.
+
+**Critères transverses :** CC-1, CC-2, CC-4, CC-7.
+
+Owner : Dev.
+
+### Story 6.5 : Test d'intégration d'un vrai `Client` GPAO
+
+As a développeur,
+I want un test qui construit un vrai `Client` de chaque worker GPAO,
+So that le câblage d'instance (fréquence, confinement d'erreur, arrêt,
+forwarder de log) ne régresse plus en silence.
+
+**Acceptance Criteria:** `AC-FR25-7`.
+
+**Notes dev :**
+- Un seul harnais partagé pour P60 et P89 (`deferred-work.md:1313`) ; base
+  `AscoLSI_Test` (sink SQL d'`AbstractService`), `[SkippableFact]` si absente.
+- Solde aussi le test `Client.Actions` P60 dû depuis l'Épic 3.
 
 **Critères transverses :** CC-1, CC-2, CC-4, CC-7.
 

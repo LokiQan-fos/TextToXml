@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 16:00
-last_updated: 09-28-2026 13:30
+last_updated: 09-28-2026 13:53
 project: TextToXml
 project_key: NOKEY
 tracking_system: file-system
@@ -91,6 +91,14 @@ development_status:
   5-1-p89converter-dossier-p89-brut-xml-normalise-horodate: done
   5-2-worker-gpaoconvertp89-launcher: done
   epic-5-retrospective: done
+
+  epic-6: backlog
+  6-1-journal-p60-via-ifichierjournal: backlog
+  6-2-garde-stabilite-fichiers-p60-p89: backlog
+  6-3-export-xml-p60-dossier-dedie: backlog
+  6-4-robustesse-commune-workers-gpao: backlog
+  6-5-test-integration-client-gpao: backlog
+  epic-6-retrospective: optional
 action_items:
   - id: "story-4-6-decimal-scale-defect-story-4-3-bis"
     epic: 4
@@ -588,7 +596,7 @@ action_items:
       row with 5.0-5.2 and this retro, current test counts) and fix epic-5-context.md:40
       (5.2 is in review -> done)."
     owner: "SM"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-5-retro-2026-09-28.md"
   - id: "epic-5-retro-item-2-ci-comment-fixture-sharers"
     epic: 5
@@ -603,7 +611,7 @@ action_items:
     action: "Run /bmad-correct-course to plan the P60/P89 shared debt: P60 migration
       onto IFichierJournal plus the 9 other fix-with-P60 / fix-once entries of deferred-work.md:1249-1329."
     owner: "PM"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-5-retro-2026-09-28.md"
   - id: "epic-5-retro-item-4-closure-check-project-closed"
     epic: 5

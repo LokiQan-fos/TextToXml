@@ -61,10 +61,12 @@ flowchart LR
 - **Prevents:** un `L_D_KAPE22` commité sans ses tables aval en cas d'échec du
   dispatch — ce qui rendrait la ligne invisible au garde-fou anti-doublon
   (`AC-FR11-6/7`) et empêcherait tout rejeu du Fichier corrigé (NFR-7).
-- **Rule:** `L_D_KAPE22`, `L_D_LOG_COMMANDE`, `L_D_ORDRE_FABRICATION`,
+- **Rule:** `L_D_KAPE22`, `L_D_ORDRE_FABRICATION`,
   `L_D_COULEE`, `L_D_CONSIGNES` et les `L_D_SECTIONCHARGE_*` concernées sont
   ajoutées au **même** `DbContext` et committées par **un seul**
   `SaveChanges()`. Aucune écriture partielle : soit tout commit, soit rien.
+- **Note (Épic 6, D31) :** `L_D_LOG_COMMANDE` est écrit par `IFichierJournal` après ce
+  `SaveChanges()` ; la garde anti-doublon lit `L_D_KAPE22` (D22 révisé).
 
 ### AD-2 — Mapping explicite, sans réflexion
 
@@ -202,7 +204,7 @@ scripts/schema/
 | Mapping L_D_KAPE22 → OF/Coulée/Consignes/SectionCharge_* | `src/Kape22Importer/*Mapper.cs`, `SectionCharge/` | AD-2, Consistency: nommage mappers |
 | Contrôles métier bloquants (coulée, répartition lingots) | `Kape22Persister` (lecture DB avant `Add`) | AD-1, AD-4 |
 | Persistance transactionnelle du bundle complet | `Kape22Persister.Persist(Kape22ImportBundle)` | AD-1, AD-5 |
-| Journalisation d'échec (cause précise, exploitant averti) | `Kape22Persister` + `L_D_LOG_COMMANDE` + `MQTTnetServices.Logs` | AD-4 (réutilise FR-14/Story 3.3) |
+| Journalisation d'échec (cause précise, exploitant averti) | `Kape22Persister` → `IFichierJournal` (`AscoLsiFichierJournal`, `L_D_LOG_COMMANDE`) + `MQTTnetServices.Logs` | AD-4 (réutilise FR-14/Story 3.3 ; FR-24) |
 | Étanchéité avec l'application legacy | tout le dispatch | AD-3 |
 
 ## Deferred

@@ -1,7 +1,7 @@
 ---
 title: TextToXml
 created: 2026-09-02
-updated: 2026-09-25
+updated: 2026-09-28
 status: validé — prêt pour epics & stories
 ---
 
@@ -99,7 +99,7 @@ part ailleurs.*
 | D5 | Message positions **526→636 : données inutilisées, ignorées**. Le **template fait foi** pour tout le reste. | utilisateur |
 | D6 | **Typage : le template est directeur.** Les `datatype` du descripteur `P60.xml` sont **dérivés du type de la colonne** `L_D_KAPE22` : colonne `int` → `datatype="int"`, sinon `"string"`. **P60 : 0 `datetime`** (Champs `DateEnfournementFourN` non utilisés, D14), 0 `decimal`, ~30 `int`, le reste `string`. Table figée Annexe A. | données `sys.columns` (Annexe C) |
 | D7 | **Pas de déduplication** de fichiers. Un fichier redéposé est **réimporté** (nouvelle ligne, `Id` identity). La sûreté de reprise vient du dossier **`processing/`** (FR‑12), pas d'une clé. | utilisateur |
-| D8 | **Journalisation double**, à chaque fichier : (a) `MQTTnetServices.dbo.Logs` — Serilog sink MSSqlServer, format `[Kape22Importer][<Event>] : <texte>`, comme les workers existants ; (b) `AscoLSI.dbo.L_D_LOG_COMMANDE` — 1 ligne : `Commande="P60"`, `Message` = `"<NumeroFichier> — OK"` ou `"<NumeroFichier> — REJETÉ : <résumé des erreurs de mapping>"`, `OF` = `OF` **brut** du bloc message, `User` = **`Import:InitiatingServer`** (serveur initiateur du traitement), `Date` = horodatage local, `NumLingot=0`, `Trace=1`. Écrite **seulement si l'`OF` est lisible** (D15). | utilisateur + schémas réels (Annexe C) |
+| D8 | **Journalisation double**, à chaque fichier : (a) `MQTTnetServices.dbo.Logs` — Serilog sink MSSqlServer, format `[Kape22Importer][<Event>] : <texte>`, comme les workers existants ; (b) `AscoLSI.dbo.L_D_LOG_COMMANDE` — 1 ligne : `Commande="P60"`, `Message` = `"<NumeroFichier> — OK"` ou `"<NumeroFichier> — REJETÉ : <résumé des erreurs de mapping>"`, `OF` = `OF` **brut** du bloc message, `User` = **`Import:InitiatingServer`** (serveur initiateur du traitement), `Date` = horodatage local, `NumLingot=0`, `Trace=1`. Écrite **seulement si l'`OF` est lisible** (D15). Depuis l'Épic 6 (FR-24), la ligne `L_D_LOG_COMMANDE` est écrite par `IFichierJournal` (D31) hors de la transaction AD-1. | utilisateur + schémas réels (Annexe C) |
 | D9 | Le worker s'intègre au **`Launcher` existant** (`MicroServices.sln`) comme classe in‑process `Client : Publisher` : **une ligne** dans `Launcher/WorkerRegistry.cs` (`Factories`, enveloppée dans `WorkerAdapter<Client>`) + une entrée `Launcher/workers.json` (`{Name, Type, ConfigPath}`). La table `MQTTnetServices.dbo.WorkerSettings` (`WorkerName`, `IsActive`) est **détenue par le Launcher** (il l'auto‑crée, lit `IsActive` au démarrage, l'écrit sur bascule) ; **le worker n'y touche jamais**. Le `WorkerStatus` vu du dashboard est fourni par `WorkerAdapter` (`IsRunning = Client.IsConnected`), pas par le worker. | schéma réel + modèle `Launcher` (correction‑de‑cap 2026‑09‑09) |
 | D10 | **1 XSD statique, écrit à la main, par format** (`P60.xsd`), versionné, décrivant le **XML normalisé**. Le **DTO C# (`Kape22File`) est généré** de ce XSD (`xsd.exe /classes`). Le XML normalisé est **validé contre le XSD avant désérialisation**. **Pas** de méta‑schéma des descripteurs (`commande.xsd`) : chaque format a son propre XSD, ça suffit. | utilisateur |
 | D11 | Le **XML normalisé est conservé** (`archive/<yyyy>/<MM>/<nom>.xml`, ou à côté du fichier en `error/`) pour consultation des données champ par champ. | utilisateur |
@@ -113,7 +113,7 @@ part ailleurs.*
 | D19 | Octet non décodable en `Windows-1252` → **rejet** (`UndecodableInput`). | utilisateur (Q16) |
 | D20 | **`TextToXml.sln`** (ce dépôt) = `TextToXml` (lib pure, Épic 1) + **`Kape22Importer` (bibliothèque** de format P60 : descripteur, `P60.xsd`, DTO `Kape22File`, entité + `AscoLsiDbContext`, `Kape22Mapper`, `Kape22Persister`, `InboxScanner`, `Kape22FichierProcessor`) + projets de tests. **Le worker exécutable** est une classe **`Client : Publisher, IPublisher, IService`** mince ajoutée à **`MicroServices.sln`** (à côté de `Laminoir/OrdresFabricationSync`), en `ProjectReference` cross‑dépôt vers la lib `Kape22Importer` + `MicroService.csproj`, enregistrée dans `Launcher`. `PortalSharedLibrary` référencé pour l'identité/log. **Prérequis bloquant** : `MicroServices.sln` (aujourd'hui `net9.0;net10.0` + EF Core 9.0.9) aligné sur **`net10.0` + EF Core 10.0.x**. | utilisateur (Q18a ; rév. correction‑de‑cap 2026‑09‑09) |
 | D21 | Chaîne(s) de connexion : compte **`sa`** existant (comme les autres workers), lu depuis la configuration, jamais en dur. | utilisateur (Q12) |
-| D22 | Avant l'`INSERT` `L_D_KAPE22`, le worker vérifie qu'aucune ligne `L_D_LOG_COMMANDE` `… — OK` n'existe déjà pour ce `NumeroFichier` + `OF` (garde‑fou anti‑doublon sur crash post‑commit). Si trouvée → fichier déplacé en `archive/`, log `Warning`, pas de ré‑insertion. | utilisateur (Q21) |
+| D22 | Avant l'`INSERT` `L_D_KAPE22`, le worker vérifie qu'aucune ligne `L_D_KAPE22` n'existe déjà pour ce `NumeroFichier` + `OF` (garde‑fou anti‑doublon sur crash post‑commit ; révisé 2026-09-28, Épic 6 — la garde portait sur la ligne `L_D_LOG_COMMANDE … — OK`, qui n'est plus dans la transaction). Si trouvée → pas de ré‑insertion ; si le journal n'a pas d'entrée de succès pour ce Fichier, elle est écrite ; fichier déplacé en `archive/`, log `Warning`. | utilisateur (Q21 ; 2026‑09‑28) |
 | D23 | Chevauchements de tranches entre Champs (ex. `Segment` et `NumeroFichier` du message, `Position=9`) : **acceptés** par `TextToXml` (Champs = tranches indépendantes, aucune erreur de layout). | données (`P60.xml` corrigé) |
 | D24 | Formats `P62` / `SerrageBil` / `SortieStock` : **hors périmètre**, fournis à titre d'exemple. v1 = **P60 uniquement** ; P89 ajouté en Étape 1 seule par l'Épic 5 (D30). `format="Semicolon"` → `LayoutInvalid`. | utilisateur (Q19) |
 | D25 | `L_D_LOG_COMMANDE` : `NumLingot = 0`, `Trace = 1` pour toutes les lignes P60. | utilisateur |
@@ -122,7 +122,9 @@ part ailleurs.*
 | D28 | **Types étendus `TextToXml` (généricité, hors P60).** `datatype="decimal"` : analyse pilotée par `decimalSeparator` seul (caractère unique, défaut `.`) ; `convert` ignoré pour `decimal` en v1 ; forme canonique `xs:decimal`, zéros de fin retirés. `datatype="datetime"` : `convert="{0:<masque>}"` **obligatoire** (`DescriptorValidator` rejette un `datetime` sans masque → `LayoutInvalid`), sert **uniquement** à l'analyse (`ParseExact`, `InvariantCulture`) ; le XML normalisé porte **toujours** de l'**ISO‑8601** (`yyyy-MM-dd` / `yyyy-MM-ddTHH:mm:ss`). Le format d'affichage français est une préoccupation d'Étape 2, jamais `TextToXml`. Contrats `CTR-1` / `CTR-2` / `CTR-3` (Story 1.8). | utilisateur (contrat Story 1.8, 2026‑09‑03) |
 | D29 | **Encodage P89 : UTF-8.** Les Fichiers P89 sont en UTF-8 (mesuré sur 248 Fichiers réels). `TextToXml` reste figée en Windows-1252 (§5, AC-FR16-4) : le format P89 transcode **strictement** UTF-8 → Windows-1252 **avant** `Converter.Convert` (octet UTF-8 invalide ou caractère hors Windows-1252 ⇒ Fichier en échec, jamais de caractère de remplacement). | utilisateur + données réelles (2026‑09‑25) |
 | D30 | **P89 : Étape 1 seule.** Le format P89 est livré jusqu'au XML normalisé validé par `P89.xsd` (Épic 5). Mapping et persistance P89 : **plus tard**, épic non planifié (le worker `GpaoConvertP89` est livré par l'Épic 5, Story 5.2 — correction 2026-09-25). Le layout réel décale de +5 toutes les Positions à partir de `AnomaliePitsFour1` par rapport au template fourni (`Reserve9` Size 6) ; Ligne Détail = 3442 caractères. | utilisateur (2026‑09‑25) |
-| D31 | **Journal de Fichier = interface, LSI = une implémentation.** Un format n'écrit pas lui-même son journal applicatif : il appelle `IFichierJournal` (`src/FichierJournal`, sans dépendance). `src/AscoLsiJournal` est l'implémentation LSI (`L_D_LOG_COMMANDE`, règles D8/D15). D'autres applications auront d'autres implémentations. Le journal est le **résultat** de l'import : il s'écrit **hors de toute transaction métier**, y compris en cas d'échec de l'insertion des données. P89 l'utilise dès l'Épic 5 ; la migration de P60 (ligne `— OK` aujourd'hui dans la transaction AD-1, garde D22 sur la ligne de log, cause SQL détaillée absente du journal) est une story à planifier par correct-course. | utilisateur (2026‑09‑25) |
+| D31 | **Journal de Fichier = interface, LSI = une implémentation.** Un format n'écrit pas lui-même son journal applicatif : il appelle `IFichierJournal` (`src/FichierJournal`, sans dépendance). `src/AscoLsiJournal` est l'implémentation LSI (`L_D_LOG_COMMANDE`, règles D8/D15). D'autres applications auront d'autres implémentations. Le journal est le **résultat** de l'import : il s'écrit **hors de toute transaction métier**, y compris en cas d'échec de l'insertion des données. P89 l'utilise dès l'Épic 5 ; P60 y migre par l'Épic 6 (FR-24, sprint-change-proposal-2026-09-28.md). | utilisateur (2026‑09‑25) |
+| D32 | **Robustesse commune des workers.** La ré‑entrance du timer se corrige une fois dans `MicroService.Publisher` (tous les workers `Publisher`) : un tick ne démarre pas tant que le précédent tourne. Les défauts propres aux `Client` GPAO (`GpaoImportP60`, `GpaoConvertP89`) se corrigent dans les deux à l'identique (FR-25). Après un tick en échec, un worker GPAO ne publie pas de heartbeat. | utilisateur (2026‑09‑28) |
+| D33 | **Export XML par format.** Chaque format (P60, P89, formats futurs, en import comme en export) écrit le XML normalisé de **chaque** Fichier converti dans son **propre** dossier d'export, pour transmission à des tiers qui vérifient les données importées ou exportées. Nom `<nom>_<yyyyMMddHHmmss>.xml` (jamais d'écrasement). Ce dossier n'est **jamais purgé** par le worker ; son nettoyage relève de l'exploitation. Un Fichier que `TextToXml` ne sait pas convertir n'a pas de XML. P89 s'y conforme déjà (`P89:XmlPath`) ; P60 par l'Épic 6 (FR-26). | utilisateur (2026‑09‑28) |
 
 ## 1. Vision
 
@@ -687,16 +689,17 @@ schéma miroir `L_D_KAPE22` + `L_D_LOG_COMMANDE`)* :
   `ImportResult.InsertedId` = l'`Id` identity généré.
 - `AC-FR11-2` : `MapResult.Success == false` → **0** ligne `L_D_KAPE22`,
   `InsertedId == null`.
-- `AC-FR11-3` : **succès** → insert `L_D_KAPE22` + insert `L_D_LOG_COMMANDE`
-  (` — OK`) dans **une même transaction** ; échec de l'un ⇒ rollback des deux.
+- `AC-FR11-3` : *(révisé Épic 6, remplacé par `AC-FR24-2`)* **succès** → insert
+  `L_D_KAPE22` (+ tables aval, AD-1) puis entrée de journal de succès, hors
+  transaction (D31).
 - `AC-FR11-4` : **rejet** avec `OF` lisible → 0 insert `L_D_KAPE22`, **1**
   `L_D_LOG_COMMANDE` (` — REJETÉ : <résumé>`) en transaction dédiée.
 - `AC-FR11-5` : échec SQL → `{Block:File, Code:PersistenceError}`, **pas**
   d'exception qui remonte ; rollback vérifié.
-- `AC-FR11-6` : garde‑fou — le retraitement d'un fichier dont un
-  `L_D_LOG_COMMANDE … — OK` existe déjà (même `NumeroFichier` + `OF`) →
+- `AC-FR11-6` : garde‑fou — le retraitement d'un fichier dont une ligne
+  `L_D_KAPE22` existe déjà (même `NumeroFichier` + `OF`, D22 révisé Épic 6) →
   **0 insert**, fichier déplacé en `archive/`, log `Warning`
-  « déjà importé, ignoré ».
+  « déjà importé, ignoré » (voir aussi `AC-FR24-4`).
 - `AC-FR11-7` : retraitement d'un fichier **jamais** importé avec succès (pas de
   ligne `OK`) → import normal.
 - `AC-FR11-8` : chaînes de connexion (`AscoLSI`, `MQTTnetServices`) lues de la
@@ -738,8 +741,9 @@ en test). Sous‑dossiers de travail : `processing/`, `archive/`, `error/`
   XML normalisé écrit à côté `<nom>.xml` (§0bis D11).
 - `AC-FR12-4` : rejet → Fichier déplacé dans `error/<nom>` + `<nom>.errors.json`
   (tableau `Errors`) écrit à côté.
-- `AC-FR12-5` : Fichier encore en cours d'écriture (taille instable entre deux
-  lectures) → laissé dans l'inbox, retenté au tick suivant, aucune erreur loggée.
+- `AC-FR12-5` : Fichier encore en cours d'écriture (dernière écriture plus
+  récente que `Import:StabilityQuietPeriod`, défaut 10 s ; révisé Épic 6) →
+  laissé dans l'inbox, retenté au tick suivant, aucune erreur loggée.
 - `AC-FR12-6` : worker tué pendant le traitement → au redémarrage, un Fichier
   resté dans `processing/` est **repris** ; le garde‑fou anti‑doublon (§0bis D22,
   FR‑11‑6) empêche une 2ᵉ insertion si le commit avait eu lieu.
@@ -809,8 +813,8 @@ Deux cibles (§0bis D8), à **chaque** fichier :
   Fichier en cours finit ou reste dans `processing/` (jamais à moitié inséré) ;
   arrêt propre < 5 s.
 - `AC-FR14-7` : `Logs` indisponible n'empêche pas l'insertion `L_D_KAPE22` (log
-  best‑effort) ; `L_D_LOG_COMMANDE` fait partie de la transaction de succès
-  (`AC-FR11-3`).
+  best‑effort) ; `L_D_LOG_COMMANDE` est écrit après la transaction de succès
+  (`AC-FR24-2`, révisé Épic 6).
 
 ---
 
@@ -852,6 +856,10 @@ jamais modifiée : **Étape 1 = 0 ligne de code** (le descripteur `<format>.xml`
   P60 (`"EOF"`, `"Segment"`, position `9`, longueurs de Champs…). Seul
   `Windows-1252` est figé. Revue + test : la lib passe ses tests en ne connaissant
   que `fixtures/generic/`.
+- `AC-FR16-5` : chaque format déclare son propre dossier d'export XML (D33),
+  distinct de ceux des autres formats et de ses dossiers de travail, jamais
+  purgé ; un Fichier converti y laisse `<nom>_<yyyyMMddHHmmss>.xml`
+  (P60 : `Import:XmlExportPath`, FR-26 ; P89 : `P89:XmlPath`, `AC-FR22-4`).
 
 **Feature‑specific NFRs :**
 - Performance : un Fichier (3 Lignes, ~700 octets) traité de bout en bout en
@@ -1057,6 +1065,9 @@ via `IFichierJournal` (D31) ; livraison découpée en Stories 5.0 / 5.1 / 5.2.
   `ConnectionStrings:AscoLSI` absent ou un `AscoLsiJournal:InitiatingServer`
   trop long empêchent le démarrage du worker avec un message nommant la ou les
   clés.
+- `AC-FR22-9` : un Fichier dont la dernière écriture est plus récente que
+  `P89:StabilityQuietPeriod` (défaut 10 s) est laissé dans le dossier source,
+  sans XML, sans entrée de journal, et retenté au tick suivant (Épic 6).
 
 #### FR-23 : Journal de Fichier — interface et implémentation LSI
 
@@ -1081,6 +1092,82 @@ une exception si l'écriture échoue ; l'appelant décide du sort du Fichier.
   `FichierName` à sa place en tête du `Message` (F-1 de la revue 5.0).
 - `AC-FR23-4` : chaque `Record` est une écriture autonome (aucune transaction
   ambiante requise) ; une base injoignable lève une exception, rien n'est écrit.
+
+### 4.8 Migration du journal P60, robustesse commune des workers GPAO et export XML (Épic 6)
+
+#### FR-24 : Journal P60 via `IFichierJournal`
+
+**Description :** `Kape22Importer` n'écrit plus lui-même `L_D_LOG_COMMANDE` :
+il appelle `IFichierJournal` (D31), dont `GpaoImportP60` injecte
+l'implémentation LSI `AscoLsiFichierJournal`. Le journal s'écrit après la
+transaction AD-1, pour chaque issue.
+
+**Consequences (testables) :**
+- `AC-FR24-1` : `Kape22Importer` ne contient plus d'entité, de longueurs de
+  colonnes, de `ParisTime` ni de règle de ligne `L_D_LOG_COMMANDE` ; il
+  référence `FichierJournal`, pas `AscoLsiJournal`.
+- `AC-FR24-2` : succès → un seul `SaveChanges()` (AD-1) sans
+  `L_D_LOG_COMMANDE`, puis une entrée de journal de succès (`NumeroFichier`,
+  `OF`) ; la ligne produite est celle de D8.
+- `AC-FR24-3` : rejet métier ou échec SQL → aucune ligne métier, une entrée
+  d'échec ; pour un échec SQL, la raison nomme la table, la colonne et la
+  cause (troncature, type, contrainte) quand SQL Server les fournit.
+- `AC-FR24-4` : garde D22 (ligne `L_D_KAPE22` même `NumeroFichier` + `OF`) →
+  aucune ré‑insertion ; si le journal n'a pas d'entrée de succès pour ce
+  Fichier, elle est écrite, puis le Fichier est archivé.
+- `AC-FR24-5` : journal en échec après le commit → Fichier laissé dans
+  `processing/`, log `Warning`, retraité au tick suivant (`AC-FR24-4` le
+  termine) ; aucune donnée métier en double.
+- `AC-FR24-6` : sur les Fichiers P60 de référence, les `Message` de
+  `L_D_LOG_COMMANDE` sont identiques à ceux d'avant la migration.
+
+#### FR-25 : Robustesse commune des workers GPAO
+
+**Description :** défauts partagés par `GpaoImportP60` et `GpaoConvertP89`,
+corrigés à l'identique dans les deux (D32) ; la ré‑entrance, une fois dans
+`MicroService.Publisher`.
+
+**Consequences (testables) :**
+- `AC-FR25-1` : `Publisher` ne démarre jamais un tick tant que le précédent
+  tourne ; le tick manqué est ignoré, pas empilé.
+- `AC-FR25-2` : `Client.Actions()` ne laisse échapper aucune exception, la
+  connexion au broker comprise.
+- `AC-FR25-3` : un tick qui dépasse le budget d'arrêt n'accède plus au
+  `Client` une fois celui-ci libéré (aucun log, aucun publish après
+  `Dispose`).
+- `AC-FR25-4` : `ConnectionStrings:AscoLSI` et `ConnectionStrings:MQTTnetServices`
+  absentes ou mal formées empêchent le démarrage avec un message nommant la
+  clé ; une configuration refusée ne laisse aucun sink SQL ouvert.
+- `AC-FR25-5` : un tick en échec ne publie pas de heartbeat.
+- `AC-FR25-6` : l'hôte autonome `WorkerService` ne retente pas une erreur de
+  configuration et libère le `Client` à l'arrêt.
+- `AC-FR25-7` : un test d'intégration construit un vrai `Client` de chaque
+  worker GPAO (`AscoLSI_Test`) et vérifie `Frequency`, le confinement des
+  erreurs dans `Actions`, l'annulation par `Stop()` et le log `Warning` d'un
+  Fichier `Deferred`.
+
+#### FR-26 : Export XML P60 dans un dossier dédié
+
+**Description :** `Kape22Importer` écrit le XML normalisé de chaque Fichier
+converti dans `Import:XmlExportPath` (D33), en plus des emplacements existants
+(`archive/`, `error/`, `AC-FR12-3`, `AC-FR13-3`, inchangés).
+
+**Consequences (testables) :**
+- `AC-FR26-1` : tout Fichier que `Converter.Convert` convertit sans Error
+  laisse `<nom>_<yyyyMMddHHmmss>.xml` dans `Import:XmlExportPath`, quelle que
+  soit la suite : importé, rejeté (mapping, contrôles métier, SQL) ou ignoré
+  par la garde D22.
+- `AC-FR26-2` : un Fichier en échec de conversion (Étape 1) n'y laisse rien.
+- `AC-FR26-3` : deux traitements d'un même `<nom>` à des instants différents
+  ne s'écrasent pas (horloge injectée).
+- `AC-FR26-4` : la purge `Import:RetentionDays` (`AC-FR12-9`) ne touche
+  jamais `Import:XmlExportPath`.
+- `AC-FR26-5` : `Import:XmlExportPath` absent, relatif, mal formé ou
+  identique à un autre dossier du worker empêche le démarrage de
+  `GpaoImportP60`, avec un message nommant la clé.
+- `AC-FR26-6` : une écriture impossible dans le dossier d'export laisse le
+  Fichier dans `processing/`, log `Warning`, retraité au tick suivant ; aucune
+  donnée métier en double (garde D22).
 
 ## 5. Non‑Goals (explicites)
 
