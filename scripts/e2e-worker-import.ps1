@@ -91,6 +91,8 @@ function Read-LiveLog([string] $Path) {
 
 # --- 1. Scratch inbox: drop the requested Fichiers where the worker will see them. ---
 if (Test-Path -LiteralPath $InboxPath) { Remove-Item -LiteralPath $InboxPath -Recurse -Force }
+# Exports left by an earlier -KeepArtifacts run would otherwise be listed as this run's.
+if (Test-Path -LiteralPath $exportPath) { Remove-Item -LiteralPath $exportPath -Recurse -Force }
 New-Item -ItemType Directory -Path $InboxPath | Out-Null
 foreach ($fichier in $Fichiers) {
     Copy-Item -LiteralPath (Join-Path $p60Dir $fichier) -Destination $InboxPath

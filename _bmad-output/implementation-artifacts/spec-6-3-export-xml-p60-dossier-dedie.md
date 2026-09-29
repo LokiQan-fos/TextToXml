@@ -71,6 +71,7 @@ context:
 ## Spec Change Log
 
 - 2026-09-29 — Renegotiation (human-approved, step-04 triage D-1): the frozen Always wording "`XmlExportPath` between `RetentionDays` and `StabilityQuietPeriod`" contradicts CC-4 (X sorts after S). Amended intent: `XmlExportPath` is declared after `StabilityQuietPeriod`. The frozen text is left verbatim; this note supersedes it. KEEP: the CC-4 placement in `ImportOptions.cs`.
+- 2026-09-29 — Code review D-1 (option 2, human-approved): the `catch { TryDelete(path); throw; }` cleanup in `InboxScanner.Export` (a write that fails after `CreateNew` created the file) is accepted as an unverified path. No test can fault the write without a new injection seam, and the same pattern in `P89FolderConverter.Accept` is untested too. KEEP: the cleanup catch.
 
 ## Design Notes
 

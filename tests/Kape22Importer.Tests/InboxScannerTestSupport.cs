@@ -23,6 +23,11 @@ internal sealed class InMemoryFileSource : IFileSource
     // (AC-FR15-2).
     public Exception? MoveFault { get; set; }
 
+    // When set, called with the source folder and name at the start of every Move call, before MoveFault is
+    // checked; a test uses it to act on one Fichier's filing (lock its export, then throw) and let the others
+    // through (AC-FR26-6).
+    public Action<string, string>? MoveHook { get; set; }
+
     // When set, every Read call throws it, standing in for a Fichier in processing/ that cannot be read
     // this tick - locked by another process, or removed between the listing and the read (AC-FR15-2).
     public Exception? ReadFault { get; set; }
@@ -84,6 +89,8 @@ internal sealed class InMemoryFileSource : IFileSource
 
     public void Move(string sourceFolder, string sourceName, string targetFolder, string targetName)
     {
+        this.MoveHook?.Invoke(sourceFolder, sourceName);
+
         if (this.MoveFault is not null)
         {
             throw this.MoveFault;

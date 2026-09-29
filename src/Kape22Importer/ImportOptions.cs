@@ -7,7 +7,8 @@ namespace Kape22Importer;
 // folder (FR-26) come from IConfiguration, never a literal in code. Defaults live in appsettings.json,
 // except InitiatingServer, which is a per-deployment value supplied by the host environment (Story 3.3),
 // StabilityQuietPeriod, whose 10-second default is the property initializer (Story 6.2), and
-// XmlExportPath, a per-deployment absolute folder with no default (Story 6.3).
+// XmlExportPath, a per-deployment absolute folder, empty by default (export off at library level,
+// Story 6.3).
 // Properties are declared in alphabetical order (CC-4).
 public sealed class ImportOptions
 {
@@ -43,9 +44,9 @@ public sealed class ImportOptions
     // disables the gate, future timestamps included.
     public TimeSpan StabilityQuietPeriod { get; set; } = TimeSpan.FromSeconds(10);
 
-    // Absolute folder, distinct from the reception working folders, that receives <name>_<yyyyMMddHHmmss>.xml for every
-    // Fichier whose outcome is final and that has a normalized XML (FR-26, D33). Never purged by the
-    // worker. Empty turns the export off at library level; GpaoImportP60 refuses to start without it
-    // (AC-FR26-5).
+    // Absolute folder, distinct from the reception working folders, that receives
+    // <name>_<yyyyMMddHHmmss>.xml for every Fichier whose outcome is final and that has a normalized XML
+    // (FR-26, D33). Never purged by the worker. Empty turns the export off at library level;
+    // GpaoImportP60 refuses to start without it (AC-FR26-5).
     public string XmlExportPath { get; set; } = string.Empty;
 }

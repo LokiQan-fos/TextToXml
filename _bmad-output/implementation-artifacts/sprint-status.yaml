@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 16:00
-last_updated: 09-29-2026 13:01
+last_updated: 09-29-2026 13:22
 project: TextToXml
 project_key: NOKEY
 tracking_system: file-system
@@ -95,7 +95,7 @@ development_status:
   epic-6: in-progress
   6-1-journal-p60-via-ifichierjournal: done
   6-2-garde-stabilite-fichiers-p60-p89: done
-  6-3-export-xml-p60-dossier-dedie: review
+  6-3-export-xml-p60-dossier-dedie: done
   6-4-robustesse-commune-workers-gpao: backlog
   6-5-test-integration-client-gpao: backlog
   epic-6-retrospective: optional

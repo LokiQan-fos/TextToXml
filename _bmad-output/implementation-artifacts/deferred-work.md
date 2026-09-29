@@ -1354,3 +1354,17 @@ s'y trouver et rester à confirmer.
 - source_spec: **PLANNED 2026-09-29: Story 6.4** — `reviews/story-6-2/aggregated-report.md` (F-2, medium, from D-1 option 2)
   summary: A Fichier held back by the stability gate leaves no trace at any log level; a misconfigured quiet period (bare `10` read as 10 days) or a share clock running ahead blocks the P60 inbox or the P89 source folder with no signal to the operator.
   evidence: blind-hunter + edge-case-hunter lenses, `src/Kape22Importer/InboxScanner.cs:137`, `src/P89Converter/P89FolderConverter.cs:77`. The silence is what the spec requires (no log >= Warning; any logged outcome for a skipped Fichier is Ask First), decided 2026-09-29 (option 2); fix in the worker hardening, e.g. a Debug trace or a worker-side signal when a Fichier stays held back.
+
+## Deferred from: code review of story-6.3, closure (2026-09-29)
+
+- source_spec: **PLANNED 2026-09-29: Story 6.4** — `reviews/story-6-3/aggregated-report.md` (F-1, medium)
+  summary: An unreachable P60 export folder keeps every Fichier in `processing/` with no retry cap; each tick reruns the processor against `AscoLSI`, rewriting an `AlreadyImported` Logs row (committed success) or the "REJETÉ" journal entry and an `ImportRejected` row (rejection).
+  evidence: blind-hunter + acceptance-auditor (out of mandate) lenses, `src/Kape22Importer/InboxScanner.cs:241-274` and `Kape22FichierProcessor.cs:147-186`. AC-FR26-6 requires the Fichier to stay in `processing/`; the per-Fichier retry cap is already planned in Story 6.4 (Story 6.1 F-1), and Story 6.3 only adds a new trigger.
+
+- source_spec: **PLANNED 2026-09-29: Story 6.4** — `reviews/story-6-3/aggregated-report.md` (F-2, medium)
+  summary: The export is written directly under its final name, so a third party polling the folder can read a partial XML; a process stop between `Export` and the filing move skips the cleanup `catch`, and the retry writes a second `<name>_<ts>.xml`.
+  evidence: edge-case-hunter + blind-hunter lenses, `src/Kape22Importer/InboxScanner.cs:241-248` and `:323-329`. The spec (Always) imposes the `P89FolderConverter.Accept` pattern, which behaves the same; the fix (write `.tmp`, rename after filing) spans both formats and `src/P89Converter/` is Ask First — handle jointly in the 6.4 hardening or a dedicated story.
+
+- source_spec: **PLANNED 2026-09-29: Story 6.4** — `reviews/story-6-3/aggregated-report.md` (F-3, low)
+  summary: `Directory.CreateDirectory(options.XmlExportPath)` runs on every export, so a mistyped but absolute export path passes the worker validation and silently creates a folder nobody reads.
+  evidence: blind-hunter lens, `src/Kape22Importer/InboxScanner.cs:320`. `P89FolderConverter` does the same (`CreateDirectory(XmlPath)`); checking the folder exists at startup belongs to the worker configuration validation planned in Story 6.4 (AC-FR25-4).

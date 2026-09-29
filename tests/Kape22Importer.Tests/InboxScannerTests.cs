@@ -573,6 +573,44 @@ public sealed class InboxScannerTests : IDisposable
         Assert.True(source.Exists(ArchiveDateFolder, "P60_847_682_001"));
     }
 
+    // AC-FR26-6: when the export cannot be deleted after a failed filing (a third party holds it open), the
+    // cleanup failure is logged at Warning naming the export and never unwinds the tick: the Fichier stays
+    // in processing/ and the next Fichier is still filed.
+    [Fact]
+    [Trait("AC", "FR26-6")]
+    public void Tick_ExportUndeletableAfterAFailedFiling_WarnsAndFilesTheNextFichier_AcFr26_6()
+    {
+        InMemoryFileSource source = new();
+        source.Add("processing", "P60_847_682_001", Bytes("payload"), Now.AddMinutes(-1));
+        source.Add("processing", "P60_847_682_002", Bytes("payload"), Now.AddMinutes(-1));
+        string lockedExport = Path.Combine(this.exportFolder, $"P60_847_682_001_{NowSuffix}.xml");
+        FileStream? exportLock = null;
+        source.MoveHook = (_, name) =>
+        {
+            if (name == "P60_847_682_001")
+            {
+                exportLock = File.Open(lockedExport, FileMode.Open, FileAccess.Read, FileShare.None);
+                throw new IOException("archive unreachable");
+            }
+        };
+        RecordingLogger<InboxScanner> logger = new();
+
+        try
+        {
+            Scanner(source, AlwaysSucceeds(), this.ExportOptions(), logger).RunTick();
+        }
+        finally
+        {
+            exportLock?.Dispose();
+        }
+
+        Assert.True(source.Exists("processing", "P60_847_682_001"), "the Fichier must stay in processing/.");
+        Assert.True(source.Exists(ArchiveDateFolder, "P60_847_682_002"));
+        Assert.Contains(
+            logger.AtLevel(LogLevel.Warning),
+            entry => entry.Message.Contains(lockedExport, StringComparison.Ordinal));
+    }
+
     // Library level: an empty Import:XmlExportPath turns the export off (GpaoImportP60 refuses to start
     // without it, AC-FR26-5); the Fichier is archived as before.
     [Fact]

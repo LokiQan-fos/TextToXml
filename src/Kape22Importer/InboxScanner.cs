@@ -349,7 +349,7 @@ public sealed class InboxScanner(
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
             logger.LogWarning(
-                "Export {Path} could not be deleted after a failed filing ({Reason}); a retry will export it again.",
+                "Export {Path} could not be deleted after a failed filing ({Reason}); it stays in the export folder and the retry will write a second one - remove it manually.",
                 path,
                 exception.Message);
         }
