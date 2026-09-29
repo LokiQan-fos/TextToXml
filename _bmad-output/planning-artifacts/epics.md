@@ -1169,8 +1169,9 @@ transaction) et `AC-FR11-6`/`AC-FR11-7` (garde‑fou anti‑doublon) tournent en
 
 **Given** la configuration
 **When** le worker lit ses chaînes de connexion
-**Then** `AscoLSI` et `MQTTnetServices` viennent de la configuration, **jamais en
-  dur**, compte `sa` existant (AC-FR11-8, D21, CC-7)
+**Then** `AscoLSI` vient de la configuration, **jamais en
+  dur**, compte `sa` existant (AC-FR11-8, D21, CC-7) *(2026-09-29, Story 6.4 :
+  `MQTTnetServices` retirée, clé morte — voir PRD AC-FR11-8)*
 
 **Tests xUnit (TDD — écrits en premier, CC-1) :** `AC-FR11-1` … `AC-FR11-8`
 (catégorie `Integration`, harnais SQL Server local Story 2.1).
@@ -2904,7 +2905,7 @@ Solder les 10 entrées « fix with P60 / fix once » de `deferred-work.md`
 **FRs couverts :** FR-24, FR-25, FR-26 (+ `AC-FR11-3`, `AC-FR11-6`, `AC-FR12-5`,
 `AC-FR14-7` révisés, `AC-FR16-5`, `AC-FR22-9`).
 
-**Séquencement :** 6.1 → 6.2 → 6.3 → 6.4 → 6.5.
+**Séquencement :** 6.1 → 6.2 → 6.3 → 6.4 → 6.4-bis → 6.5 (6.4-bis ajoutée le 2026-09-29, bloquante avant 6.5).
 
 ### Story 6.1 : Journal P60 via `IFichierJournal`
 
@@ -3007,6 +3008,47 @@ So that la supervision du Launcher reflète l'état réel.
 
 **Tests xUnit :** `MicroService.Tests`, `GPAO/ImportP60.Tests`,
 `GPAO/ConvertP89.Tests` ; `[Trait("AC", "FR25-…")]`.
+
+**Critères transverses :** CC-1, CC-2, CC-4, CC-7.
+
+Owner : Dev.
+
+### Story 6.4-bis : Réaligner le harnais E2E worker P60 sur la config 6.4
+
+As a développeur,
+I want que `scripts/e2e-worker-import.ps1` n'écrive plus la clé `MQTTnetServices`
+retirée des JSON workers par la Story 6.4 (AC-FR25-4),
+So that `GpaoImportP60WorkerEndToEndTests` repasse au vert et que la suite
+`Category=Integration` soit de nouveau une base fiable avant la Story 6.5.
+
+**Contexte (2026-09-29) :** la clôture de revue de 6.4 a révélé l'échec de
+`WorkerEndToEnd_ImportsArchivesAndMatchesProduction` (1 échec sur 1269) : le
+script échoue sur `Exception setting "MQTTnetServices"` (`e2e-worker-import.ps1`,
+lignes 65 et 106). Effet de bord non couvert par la revue 6.4 (l'Integration
+n'avait pas été relancée). **Prérequis bloquant de 6.5.**
+
+**Acceptance Criteria :**
+
+**Given** les JSON workers sans clé `ConnectionStrings:MQTTnetServices`
+**When** le script prépare la config patchée
+**Then** il ne lit ni n'assigne plus cette clé, et n'échoue plus (AC-FR25-4).
+
+**Given** le sink Logs d'`AbstractService` (`Logging:ConnectionString` /
+`SharedLogger`)
+**When** le worker tourne sous le script
+**Then** ses logs vont vers la base de test, jamais vers la base de production
+(à vérifier ; le patch de config du script porte cette clé si elle est requise).
+
+**Given** la solution complète
+**When** `dotnet test TextToXml.sln --filter Category=Integration -m:1` s'exécute
+**Then** 0 échec.
+
+**Notes dev :**
+- Périmètre : `scripts/e2e-worker-import.ps1` et, si nécessaire,
+  `tests/Kape22Importer.Tests/appsettings.Test.json(.example)` ; aucun code de
+  production, aucune modification de `MicroServices`.
+- Vérifier que le harnais P89 éventuel n'a pas le même défaut (grep
+  `MQTTnetServices` dans `scripts/`).
 
 **Critères transverses :** CC-1, CC-2, CC-4, CC-7.
 

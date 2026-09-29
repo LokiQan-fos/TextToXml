@@ -1309,7 +1309,7 @@ s'y trouver et rester à confirmer.
   summary: When a tick outlives the 4 s `ShutdownBudget`, `Stop()` returns and `WorkerAdapter.StopAsync` disconnects and disposes the `Client` (and its `CancellationTokenSource`) while the `Task.Run` tick may still be moving and journaling Fichiers.
   evidence: Raised by the edge-case-hunter and blind-hunter lenses, found by reading `Client.Stop`/`Dispose` against `Launcher/Adapters/WorkerAdapter.cs:48-56`. Same pattern in `GpaoImportP60.Client`; a Fichier in flight finishes its own move/journal steps, so no loss, but the orphaned tick logs through a disposed client. Revisit with the shared Publisher re-entrancy fix.
 
-- source_spec: **PARTIALLY COVERED 2026-09-29 by Story 6.4** (`ClientRobustnessTests` build a `Client` through its internal test constructor: error containment in `Actions`, the `LogOutcome` forwarder, `Stop`/`Dispose`; still no real instance) · **PLANNED 2026-09-28: Story 6.5** (real-instance test) — `reviews/story-5-2/aggregated-report.md` (F-1, medium)
+- source_spec: **PARTIALLY COVERED 2026-09-29 by Story 6.4** (`ClientRobustnessTests` build a `Client` through its internal test constructor: error containment in `Actions`, the `LogOutcome` forwarder, `Dispose`; still no real instance) · **PLANNED 2026-09-28: Story 6.5** (real-instance test) — `reviews/story-5-2/aggregated-report.md` (F-1, medium)
   summary: No test builds a real `GpaoConvertP89.Client`, so its instance wiring is unverified: `Frequency = FrequencyFor(...)`, error containment in `Actions`, `Stop()` cancelling the tick token, and the `LogOutcome` forwarder (Deferred → Warning).
   evidence: verification-gap lens, found by reading `GPAO/ConvertP89/Client.cs:33-41`, `:156-188`, `:244` against the tests (only the static `ReadConfig`/`RunTickCore`/`FrequencyFor` seams are exercised). Needs `AscoLSI_Test` because of the `AbstractService` SQL sink; same debt as the P60 `Client.Actions` test owed in `MicroServices.sln`. Cover both workers with one shared integration test.
 
@@ -1321,7 +1321,7 @@ s'y trouver et rester à confirmer.
   summary: The heartbeat publishes "alive" even after a failed tick.
   evidence: blind-hunter + edge-case-hunter lenses, `GPAO/ConvertP89/Client.cs:172-173`; same pattern as `GPAO/ImportP60/Client.cs:170`. Surfacing "last tick failed" is a supervision decision shared by all Launcher workers, outside Epic 5.
 
-- source_spec: **RESOLVED 2026-09-29 by Story 6.4** (AC-FR25-6: `WorkerService` stops the host on a factory `InvalidOperationException`, disposes a failed attempt's `Client`, and disposes the `Client` on stop, both workers) — `reviews/story-5-2/aggregated-report.md` (F-4, low)
+- source_spec: **RESOLVED 2026-09-29 by Story 6.4** (AC-FR25-6: `WorkerService` pre-checks `Client.ReadConfig` and stops the host on any refusal without retry; every factory exception is then retried, a failed attempt's `Client` is disposed, the host stops once every attempt failed, and the `Client` is disposed on stop, both workers; renegotiated in the spec Change Log, code review D-1/D-2) — `reviews/story-5-2/aggregated-report.md` (F-4, low)
   summary: The standalone `WorkerService` host retries a configuration error 10 times and does not dispose the `Client`.
   evidence: blind-hunter + edge-case-hunter lenses, `GPAO/ConvertP89/WorkerService.cs:21-37`; identical to `GPAO/ImportP60/WorkerService.cs` except for names (checked with `diff`). Only used by a standalone `dotnet run`, not under the Launcher. Pre-existing; fix with P60.
 
@@ -1333,11 +1333,11 @@ s'y trouver et rester à confirmer.
 
 - source_spec: **UNPLANNED 2026-09-29 (Story 6.4 scope decision)** — `spec-6-1-journal-p60-via-ifichierjournal.md`
   summary: `Import:Commande` longer than `L_D_LOG_COMMANDE.Commande` (50) is not rejected at `GpaoImportP60` startup; every journal write then fails, and committed Fichiers loop in `processing/` (guard hit + failed journal each tick) until the setting is fixed. Every business rejection with a readable OF loops too (its failure entry fails, so it never reaches `error/`) and logs `ImportRejected` at Error each tick.
-  evidence: Raised by the edge-case-hunter lens. No duplicate business data (D22 guard), and the `JournalPending` Warning names the cause every tick; startup validation of the worker's configuration keys belongs to Story 6.4 (AC-FR25-4).
+  evidence: Raised by the edge-case-hunter lens. No duplicate business data (D22 guard), and the `JournalPending` Warning names the cause every tick; startup validation of the worker's configuration keys was routed to Story 6.4 (AC-FR25-4), which excluded it on 2026-09-29.
 
 - source_spec: **UNPLANNED 2026-09-29 (Story 6.4 scope decision)** — `reviews/story-6-1/aggregated-report.md` (F-1, low)
   summary: Every journal exception becomes a retryable File-level `PersistenceError`, so a deterministic journal failure (truncation, invalid argument, NRE) leaves the Fichier in `processing/` indefinitely instead of quarantining it in `error/`.
-  evidence: edge-case-hunter + blind-hunter lenses, `src/Kape22Importer/Persistence/Kape22Persister.cs:279-306` (`Recorded`, `JournalFailure`) and `:244` (`CompleteAlreadyImported`). The broad catch is an explicit spec choice shared with `P89FolderConverter.TryRecord`; an exception-type filter cannot separate outage from defect, so the fix is a per-Fichier retry cap in the worker loop (Story 6.4 hardening).
+  evidence: edge-case-hunter + blind-hunter lenses, `src/Kape22Importer/Persistence/Kape22Persister.cs:279-306` (`Recorded`, `JournalFailure`) and `:244` (`CompleteAlreadyImported`). The broad catch is an explicit spec choice shared with `P89FolderConverter.TryRecord`; an exception-type filter cannot separate outage from defect, so the fix is a per-Fichier retry cap in the worker loop (once routed to Story 6.4 hardening, excluded on 2026-09-29).
 
 ## Deferred from: code review of story-6.2 (2026-09-28)
 
@@ -1359,7 +1359,7 @@ s'y trouver et rester à confirmer.
 
 - source_spec: **UNPLANNED 2026-09-29 (Story 6.4 scope decision)** — `reviews/story-6-3/aggregated-report.md` (F-1, medium)
   summary: An unreachable P60 export folder keeps every Fichier in `processing/` with no retry cap; each tick reruns the processor against `AscoLSI`, rewriting an `AlreadyImported` Logs row (committed success) or the "REJETÉ" journal entry and an `ImportRejected` row (rejection).
-  evidence: blind-hunter + acceptance-auditor (out of mandate) lenses, `src/Kape22Importer/InboxScanner.cs:241-274` and `Kape22FichierProcessor.cs:147-186`. AC-FR26-6 requires the Fichier to stay in `processing/`; the per-Fichier retry cap is already planned in Story 6.4 (Story 6.1 F-1), and Story 6.3 only adds a new trigger.
+  evidence: blind-hunter + acceptance-auditor (out of mandate) lenses, `src/Kape22Importer/InboxScanner.cs:241-274` and `Kape22FichierProcessor.cs:147-186`. AC-FR26-6 requires the Fichier to stay in `processing/`; the per-Fichier retry cap was routed to Story 6.4 (Story 6.1 F-1), which excluded it on 2026-09-29, and Story 6.3 only adds a new trigger.
 
 - source_spec: **UNPLANNED 2026-09-29 (Story 6.4 scope decision)** — `reviews/story-6-3/aggregated-report.md` (F-2, medium)
   summary: The export is written directly under its final name, so a third party polling the folder can read a partial XML; a process stop between `Export` and the filing move skips the cleanup `catch`, and the retry writes a second `<name>_<ts>.xml`.
@@ -1367,10 +1367,30 @@ s'y trouver et rester à confirmer.
 
 - source_spec: **UNPLANNED 2026-09-29 (Story 6.4 scope decision)** — `reviews/story-6-3/aggregated-report.md` (F-3, low)
   summary: `Directory.CreateDirectory(options.XmlExportPath)` runs on every export, so a mistyped but absolute export path passes the worker validation and silently creates a folder nobody reads.
-  evidence: blind-hunter lens, `src/Kape22Importer/InboxScanner.cs:320`. `P89FolderConverter` does the same (`CreateDirectory(XmlPath)`); checking the folder exists at startup belongs to the worker configuration validation planned in Story 6.4 (AC-FR25-4).
+  evidence: blind-hunter lens, `src/Kape22Importer/InboxScanner.cs:320`. `P89FolderConverter` does the same (`CreateDirectory(XmlPath)`); checking the folder exists at startup belongs to the worker configuration validation once routed to Story 6.4 (AC-FR25-4), which excluded it on 2026-09-29.
 
 ## Deferred from: code review of story-6.4 (2026-09-29)
 
 - source_spec: `spec-6-4-robustesse-commune-workers-gpao.md`
   summary: `Import:RetentionDays` is not range-checked at `GpaoImportP60` startup, so a huge value (e.g. `int.MaxValue`) makes every `PurgeRetention` throw (`DateTimeOffset.AddDays` out of range), and every tick then fails and publishes no heartbeat.
   evidence: Review finding of Story 6.4; a pre-existing `Client.ReadConfig` gap, not caused by 6.4 (the purge overflow was only used as a failing-tick trigger in a first version of the tests).
+
+- source_spec: `reviews/story-6-4/aggregated-report.md` (F-1, low)
+  summary: `StopAsync` during the `WorkerService` start-retry loop finds `_client` null and returns; the fire-and-forget `StartClientAsync` (no token) can then create and start a `Client` that is never disposed.
+  evidence: edge-case-hunter + blind-hunter lenses, `GPAO/*/WorkerService.cs:36-83`. Pre-existing fire-and-forget pattern, standalone host only (`dotnet run`), not the Launcher; fixing it needs a `CancellationTokenSource` and an awaited task, beyond FR-25.
+
+- source_spec: `reviews/story-6-4/aggregated-report.md` (F-2, low)
+  summary: An `AscoLSI` connection string without `Initial Catalog` (e.g. `Server=x;`) passes `Client.ReadConfig` and targets the login's default database.
+  evidence: edge-case-hunter + blind-hunter lenses, `GPAO/ImportP60/Client.cs` and `GPAO/ConvertP89/Client.cs` `ReadConfig`. The frozen matrix covers absent/blank/malformed only; requiring the catalog is a product choice (a login may legitimately have a default database).
+
+- source_spec: `reviews/story-6-4/aggregated-report.md` (F-3, medium)
+  summary: A blocked tick makes the `Publisher` silently drop every following tick, with no watchdog and no Warning on an overlong tick.
+  evidence: edge-case-hunter lens, `MicroService/Publish/Publisher.cs:98-126`. "A skipped tick is dropped" is intended (Always); a watchdog is a new feature that also touches Laminoir, Video and Zumbach.
+
+- source_spec: `reviews/story-6-4/aggregated-report.md` (F-4, medium)
+  summary: A share outage (`IOException`) is contained as a Warning by `InboxScanner` and the heartbeat keeps publishing, so AC-FR25-5 is only partly held for that case.
+  evidence: blind-hunter lens, `src/Kape22Importer/InboxScanner.cs` (test comment at diff:1193-1204). Library behaviour; any change under `src/` is Ask First. Route to a story deciding whether a share outage is a failed tick.
+
+- source_spec: `reviews/story-6-4/aggregated-report.md` (F-5, low)
+  summary: `Directory.Exists` on a hung SMB share runs on the timer thread outside `_tick`, so the 4 s `Stop()` budget does not cover the block.
+  evidence: edge-case-hunter lens, `GPAO/ImportP60/Client.cs:303`. Fix is to move the check into the `Task.Run` (low impact); rare, no data loss.

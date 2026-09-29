@@ -703,8 +703,12 @@ schéma miroir `L_D_KAPE22` + `L_D_LOG_COMMANDE`)* :
 - `AC-FR11-7` : retraitement d'un fichier **jamais** importé avec succès (pas de
   ligne `L_D_KAPE22` même `NumeroFichier` + `OF`, D22 révisé Épic 6 ; une entrée
   de journal `— OK` seule ne suffit pas) → import normal.
-- `AC-FR11-8` : chaînes de connexion (`AscoLSI`, `MQTTnetServices`) lues de la
-  configuration, jamais en dur ; compte `sa` existant (§0bis D21).
+- `AC-FR11-8` : chaîne de connexion `AscoLSI` lue de la configuration, jamais en
+  dur ; compte `sa` existant (§0bis D21). *(2026-09-29, Story 6.4, décision
+  utilisateur : `ConnectionStrings:MQTTnetServices` n'est lue par rien et est
+  retirée des JSON workers ; le sink `MQTTnetServices.Logs` prend sa chaîne dans
+  `Logging:ConnectionString` / `MICROSERVICE_LOG_CONNECTION_STRING` via
+  `SharedLogger`.)*
 
 ---
 

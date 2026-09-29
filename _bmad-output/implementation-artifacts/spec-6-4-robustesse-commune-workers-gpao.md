@@ -72,6 +72,11 @@ This repo:
 - Given `MicroServices.sln`, when built with `-warnaserror` and all its test projects run, then 0 warnings and all green (Laminoir, Zumbach included).
 - Given `TextToXml.sln` Unit suite, when run, then green (no source change there).
 
+## Spec Change Log
+
+- 2026-09-29 — Code review D-1 (option 1, human-approved): the frozen matrix row "Standalone config error — `Client` factory throws `InvalidOperationException` → one attempt, no retry" and the matching Code Map line are superseded. Amended intent: `WorkerService` validates the configuration once through `Client.ReadConfig` before the retry loop, and any exception there stops the host without retry. Inside the loop every factory exception is retried, `InvalidOperationException` included, because the `AbstractService` SQL log sink can raise it transiently at cold start. The frozen text is left verbatim; this note supersedes it. KEEP: the `ReadConfig` pre-check with its `catch (Exception)`.
+- 2026-09-29 — Code review D-2 (option 1, human-approved): the frozen matrix row "Standalone transient error … unchanged" is amended. Once every attempt has failed, `WorkerService` stops the host rather than leaving it idle with no worker. The frozen text is left verbatim; this note supersedes it. KEEP: the `StopApplication()` after the last failed attempt.
+
 ## Design Notes
 
 AC-FR25-3 scope: "access to the `Client`" = its own members (`Log*`, `Publish`, `PayLoad`, `Connect`). The library `ILogger` of an orphaned P60 tick writes to the shared `SharedLogger` instance, which `AbstractService.Dispose` deliberately never disposes; stopping those would need blocking `Dispose` (Never).
