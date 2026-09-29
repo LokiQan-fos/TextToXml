@@ -41,8 +41,9 @@ public class InboxScannerTests
         IFileSource fileSource,
         IFichierProcessor processor,
         ImportOptions? options = null,
-        RecordingLogger<InboxScanner>? logger = null) =>
-        new(fileSource, processor, options ?? Options(), new FixedClock(Now), logger ?? new RecordingLogger<InboxScanner>());
+        RecordingLogger<InboxScanner>? logger = null,
+        DateTimeOffset? now = null) =>
+        new(fileSource, processor, options ?? Options(), new FixedClock(now ?? Now), logger ?? new RecordingLogger<InboxScanner>());
 
     private static FakeFichierProcessor AlwaysSucceeds() =>
         new((name, _) => new FichierProcessingResult { NormalizedXml = $"<file name=\"{name}\" />" });
@@ -189,40 +190,98 @@ public class InboxScannerTests
         Assert.Contains(logger.Entries, entry => entry.Level == LogLevel.Error);
     }
 
-    // AC-FR12-5: a Fichier whose size is still changing between two probes is left in the inbox,
-    // not processed, and nothing is logged as a Warning or an Error.
+    // AC-FR12-5: a Fichier written more recently than Import:StabilityQuietPeriod may still be copied
+    // in; it is left in the inbox, not processed, and nothing is logged as a Warning or an Error.
     [Fact]
     [Trait("AC", "FR12-5")]
-    public void Tick_LeavesHalfWrittenFichierInInbox_WithoutLoggingAnError_AcFr12_5()
+    public void Tick_LeavesFichierWrittenWithinTheQuietPeriodInInbox_WithoutLoggingAWarning_AcFr12_5()
     {
         InMemoryFileSource source = new();
-        source.Add("", "P60_847_682_001", Bytes("still uploading"), Now.AddMinutes(-1));
-        source.MarkUnstableOnce("P60_847_682_001");
+        source.Add("", "P60_847_682_001", Bytes("still uploading"), Now.AddSeconds(-5));
         FakeFichierProcessor processor = AlwaysSucceeds();
         RecordingLogger<InboxScanner> logger = new();
 
         Scanner(source, processor, logger: logger).RunTick();
 
         Assert.Empty(processor.Calls);
-        Assert.True(source.Exists("", "P60_847_682_001"), "half-written Fichier must stay in the inbox.");
+        Assert.True(source.Exists("", "P60_847_682_001"), "a Fichier still within its quiet period must stay in the inbox.");
         Assert.DoesNotContain(logger.Entries, entry => entry.Level >= LogLevel.Warning);
     }
 
-    // AC-FR12-5 (second tick): once the size settles, the next tick processes the Fichier.
+    // AC-FR12-5 (next tick): once the quiet period has fully elapsed since the last write, the Fichier is
+    // processed.
     [Fact]
     [Trait("AC", "FR12-5")]
-    public void Tick_ProcessesFichierOnceItsSizeSettles_AcFr12_5()
+    public void Tick_ProcessesFichierOnceTheQuietPeriodHasElapsed_AcFr12_5()
     {
         InMemoryFileSource source = new();
-        source.Add("", "P60_847_682_001", Bytes("done"), Now.AddMinutes(-1));
-        source.MarkUnstableOnce("P60_847_682_001");
+        source.Add("", "P60_847_682_001", Bytes("done"), Now.AddSeconds(-5));
         FakeFichierProcessor processor = AlwaysSucceeds();
-        InboxScanner scanner = Scanner(source, processor);
 
-        scanner.RunTick();
-        scanner.RunTick();
+        Scanner(source, processor).RunTick();
+        Assert.Empty(processor.Calls);
+
+        Scanner(source, processor, now: Now.AddSeconds(5)).RunTick();
 
         Assert.Equal(["P60_847_682_001"], processor.Calls);
+    }
+
+    // AC-FR12-5: the gate is per Fichier - a settled Fichier is processed in the same tick that leaves a
+    // younger one in the inbox.
+    [Fact]
+    [Trait("AC", "FR12-5")]
+    public void Tick_MixedInbox_ProcessesOnlyTheSettledFichier_AcFr12_5()
+    {
+        InMemoryFileSource source = new();
+        source.Add("", "P60_847_682_001", Bytes("settled"), Now.AddMinutes(-1));
+        source.Add("", "P60_847_682_002", Bytes("young"), Now.AddSeconds(-1));
+        FakeFichierProcessor processor = AlwaysSucceeds();
+
+        Scanner(source, processor).RunTick();
+
+        Assert.Equal(["P60_847_682_001"], processor.Calls);
+        Assert.True(source.Exists("", "P60_847_682_002"), "the younger Fichier must stay in the inbox.");
+    }
+
+    // AC-FR12-5: a last write after the clock's now (clock skew with the share) is not settled either.
+    [Fact]
+    [Trait("AC", "FR12-5")]
+    public void Tick_FichierWithALastWriteInTheFuture_IsLeftInInbox_AcFr12_5()
+    {
+        InMemoryFileSource source = new();
+        source.Add("", "P60_847_682_001", Bytes("skewed"), Now.AddMinutes(1));
+        FakeFichierProcessor processor = AlwaysSucceeds();
+
+        Scanner(source, processor).RunTick();
+
+        Assert.Empty(processor.Calls);
+        Assert.True(source.Exists("", "P60_847_682_001"));
+    }
+
+    // AC-FR12-5: a configured Import:StabilityQuietPeriod replaces the default - a Fichier older than
+    // 10 seconds but younger than the configured minute is still left in the inbox.
+    [Fact]
+    [Trait("AC", "FR12-5")]
+    public void Tick_ConfiguredQuietPeriod_LeavesAFichierYoungerThanItInInbox_AcFr12_5()
+    {
+        InMemoryFileSource source = new();
+        source.Add("", "P60_847_682_001", Bytes("slow share"), Now.AddSeconds(-30));
+        FakeFichierProcessor processor = AlwaysSucceeds();
+        ImportOptions options = Options();
+        options.StabilityQuietPeriod = TimeSpan.FromMinutes(1);
+
+        Scanner(source, processor, options).RunTick();
+
+        Assert.Empty(processor.Calls);
+        Assert.True(source.Exists("", "P60_847_682_001"));
+    }
+
+    // AC-FR12-5: Import:StabilityQuietPeriod defaults to 10 seconds when it is not configured.
+    [Fact]
+    [Trait("AC", "FR12-5")]
+    public void ImportOptions_StabilityQuietPeriod_DefaultsToTenSeconds_AcFr12_5()
+    {
+        Assert.Equal(TimeSpan.FromSeconds(10), new ImportOptions().StabilityQuietPeriod);
     }
 
     // AC-FR12-6: a Fichier stranded in processing/ by a killed worker is picked up again on the next

@@ -1338,3 +1338,9 @@ s'y trouver et rester à confirmer.
 - source_spec: **PLANNED 2026-09-28: Story 6.4** — `reviews/story-6-1/aggregated-report.md` (F-1, low)
   summary: Every journal exception becomes a retryable File-level `PersistenceError`, so a deterministic journal failure (truncation, invalid argument, NRE) leaves the Fichier in `processing/` indefinitely instead of quarantining it in `error/`.
   evidence: edge-case-hunter + blind-hunter lenses, `src/Kape22Importer/Persistence/Kape22Persister.cs:279-306` (`Recorded`, `JournalFailure`) and `:244` (`CompleteAlreadyImported`). The broad catch is an explicit spec choice shared with `P89FolderConverter.TryRecord`; an exception-type filter cannot separate outage from defect, so the fix is a per-Fichier retry cap in the worker loop (Story 6.4 hardening).
+
+## Deferred from: code review of story-6.2 (2026-09-28)
+
+- source_spec: `spec-6-2-garde-stabilite-fichiers-p60-p89.md`
+  summary: The stability gate (AC-FR12-5, AC-FR22-9) only compares the last-write time with the quiet period; a copy tool that preserves the source modification time (Explorer, `copy`, `robocopy`) or a copy stalled longer than the quiet period can still let a half-copied Fichier through.
+  evidence: Raised by the blind-hunter and edge-case-hunter lenses. The rule is the one the PRD fixes (revised AC-FR12-5, AC-FR22-9); the removed two-probe size check did not catch this case on a real share either. Confirm how SAP drops the P60/P89 Fichiers (direct write or rename-into-place) before choosing a stronger check (exclusive open, size over two ticks).

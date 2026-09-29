@@ -115,7 +115,7 @@ public class EndToEndPerformanceTests
         InMemoryFileSource source = new();
         for (int i = 0; i < 500; i++)
         {
-            source.Add(InboxRoot, $"P60_847_682_{i:D5}", pool[i % pool.Length], Now.AddSeconds(-i));
+            source.Add(InboxRoot, $"P60_847_682_{i:D5}", pool[i % pool.Length], Now.AddMinutes(-1).AddSeconds(-i));
         }
 
         Stopwatch stopwatch = Stopwatch.StartNew();
@@ -131,7 +131,7 @@ public class EndToEndPerformanceTests
     private static void RunSingleFichierTick(byte[] content)
     {
         InMemoryFileSource source = new();
-        source.Add(InboxRoot, ReferenceFichierName, content, Now);
+        source.Add(InboxRoot, ReferenceFichierName, content, Now.AddMinutes(-1));
         Scanner(source).RunTick();
     }
 }

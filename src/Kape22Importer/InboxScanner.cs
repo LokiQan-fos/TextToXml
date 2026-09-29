@@ -121,21 +121,20 @@ public sealed class InboxScanner(
         }
     }
 
-    // AC-FR12-5: a Fichier whose reported size changes between two consecutive probes is still being
-    // written; it is left in the inbox for a later tick, with nothing logged. AC-FR15-2: an inbox that
-    // cannot be listed is one Warning and a false return, so the tick is abandoned cleanly.
+    // AC-FR12-5: a Fichier whose last write is more recent than Import:StabilityQuietPeriod may still be
+    // copied in; it is left in the inbox for a later tick, with nothing logged. A last write after now
+    // (clock skew with the share) counts as recent too. AC-FR15-2: an inbox that cannot be listed is one
+    // Warning and a false return, so the tick is abandoned cleanly.
     private bool TryStableInboxFichiers(out IReadOnlyList<FichierEntry> stable)
     {
         stable = [];
-        if (!TryList(InboxFolder, out IReadOnlyList<FichierEntry> firstProbe)
-            || !TryList(InboxFolder, out IReadOnlyList<FichierEntry> secondProbe))
+        if (!TryList(InboxFolder, out IReadOnlyList<FichierEntry> entries))
         {
             return false;
         }
 
-        Dictionary<string, long> secondByName = secondProbe.ToDictionary(entry => entry.Name, entry => entry.Length);
-        stable = [.. firstProbe.Where(entry =>
-            secondByName.TryGetValue(entry.Name, out long length) && length == entry.Length)];
+        DateTimeOffset now = timeProvider.GetUtcNow();
+        stable = [.. entries.Where(entry => now - entry.LastWriteTimeUtc >= options.StabilityQuietPeriod)];
         return true;
     }
 

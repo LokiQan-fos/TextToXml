@@ -12,10 +12,6 @@ internal sealed class InMemoryFileSource : IFileSource
 {
     private readonly Dictionary<(string Folder, string Name), Entry> entries = new();
 
-    // Names whose next List("") call reports an inflated Length once, so the scanner's two size
-    // probes disagree and the Fichier is treated as still being written (AC-FR12-5).
-    private readonly HashSet<string> unstableOnce = new(StringComparer.Ordinal);
-
     // When set, every List / ListRecursive call throws it, standing in for a reception folder that is
     // unreachable for a tick - an IOException for a dead network share, an UnauthorizedAccessException
     // for a locked-down ACL. Cleared by the test to model the next tick finding it reachable again
@@ -45,9 +41,6 @@ internal sealed class InMemoryFileSource : IFileSource
     public IReadOnlyList<string> Names(string folder) =>
         this.entries.Keys.Where(key => key.Folder == folder).Select(key => key.Name).OrderBy(n => n, StringComparer.Ordinal).ToList();
 
-    // Marks a Fichier as still being written: the next List("") call inflates its reported Length once.
-    public void MarkUnstableOnce(string name) => this.unstableOnce.Add(name);
-
     public void Delete(string folder, string name) => this.entries.Remove((folder, name));
 
     public IReadOnlyList<FichierEntry> List(string folder)
@@ -57,25 +50,16 @@ internal sealed class InMemoryFileSource : IFileSource
             throw this.ListingFault;
         }
 
-        List<FichierEntry> result = [];
-        foreach (((string Folder, string Name) key, Entry entry) in this.entries.Where(pair => pair.Key.Folder == folder))
-        {
-            long length = entry.Content.LongLength;
-            if (folder.Length == 0 && this.unstableOnce.Remove(key.Name))
-            {
-                length += 1;
-            }
-
-            result.Add(new FichierEntry
+        return this.entries
+            .Where(pair => pair.Key.Folder == folder)
+            .Select(pair => new FichierEntry
             {
                 Folder = folder,
-                LastWriteTimeUtc = entry.LastWriteUtc,
-                Length = length,
-                Name = key.Name,
-            });
-        }
-
-        return result;
+                LastWriteTimeUtc = pair.Value.LastWriteUtc,
+                Length = pair.Value.Content.LongLength,
+                Name = pair.Key.Name,
+            })
+            .ToList();
     }
 
     public IReadOnlyList<FichierEntry> ListRecursive(string folder)

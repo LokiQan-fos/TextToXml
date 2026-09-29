@@ -21,6 +21,10 @@ public sealed class P89Options
     // Folder scanned for LP89_* Fichiers each tick.
     public string SourcePath { get; set; } = string.Empty;
 
+    // A source Fichier whose last write is more recent than this may still be copied in; it is left in the
+    // source folder and retried next tick (AC-FR22-9). Defaults to 10 seconds when not configured.
+    public TimeSpan StabilityQuietPeriod { get; set; } = TimeSpan.FromSeconds(10);
+
     // Folder the normalized XML <name>_<yyyyMMddHHmmss>.xml is written to.
     public string XmlPath { get; set; } = string.Empty;
 }

@@ -5,7 +5,7 @@ Chaîne d'ingestion des fichiers SAP → LSI. Livrables :
 | Projet | Rôle |
 |---|---|
 | `src/TextToXml` | Bibliothèque .NET **pure et générique** : fichier plat largeur fixe → XML normalisé, piloté par un Descripteur XML. Zéro dépendance NuGet runtime. |
-| `src/Kape22Importer` | **Bibliothèque** de format P60 : descripteur, XSD, DTO, entités EF, mapping (`Kape22Mapper`), contrôles de cohérence, scrutation du dossier de réception (`InboxScanner`), orchestration par Fichier (`Kape22FichierProcessor` : archive XML → EF → `AscoLSI`, avec double journalisation) et persistance transactionnelle (`Kape22Persister`). Depuis l'Épic 6 (FR-24), le journal `L_D_LOG_COMMANDE` passe par `IFichierJournal`, après la transaction métier et pour chaque issue ; le worker `GpaoImportP60` injecte `AscoLsiFichierJournal` (clé `Import:InitiatingServer` inchangée), et la garde anti-doublon D22 lit `L_D_KAPE22`. Destinée à être consommée par le worker exécutable (différé — voir ci-dessous). |
+| `src/Kape22Importer` | **Bibliothèque** de format P60 : descripteur, XSD, DTO, entités EF, mapping (`Kape22Mapper`), contrôles de cohérence, scrutation du dossier de réception (`InboxScanner`), orchestration par Fichier (`Kape22FichierProcessor` : archive XML → EF → `AscoLSI`, avec double journalisation) et persistance transactionnelle (`Kape22Persister`). Depuis l'Épic 6 (FR-24), le journal `L_D_LOG_COMMANDE` passe par `IFichierJournal`, après la transaction métier et pour chaque issue ; le worker `GpaoImportP60` injecte `AscoLsiFichierJournal` (clé `Import:InitiatingServer` inchangée), et la garde anti-doublon D22 lit `L_D_KAPE22`. Un Fichier de l'inbox dont la dernière écriture date de moins de `Import:StabilityQuietPeriod` (format `hh:mm:ss`, défaut `00:00:10`, Épic 6) est laissé en place et retenté au tick suivant, sans erreur. Destinée à être consommée par le worker exécutable (différé — voir ci-dessous). |
 | `src/FichierJournal` | Contrat du journal de Fichier (D31, FR-23) : `IFichierJournal.Record(FichierJournalEntry)`. Aucune dépendance — un format journalise le résultat de ses imports sans connaître l'application cible. |
 | `src/AscoLsiJournal` | Implémentation LSI de `IFichierJournal` : une ligne `L_D_LOG_COMMANDE` par Fichier (D8, D15), écrite hors de toute transaction métier. |
 | `src/P89Converter` | **Bibliothèque** de format P89, Étape 1 seule (Épic 5, FR-22) : descripteur + XSD embarqués, transcodage UTF-8 → Windows-1252, XML normalisé horodaté, journal via `IFichierJournal` (référence `TextToXml` + `FichierJournal` seulement). Consommée par le worker `GpaoConvertP89` de `MicroServices.sln` — voir « P89 » ci-dessous. |
@@ -84,7 +84,9 @@ conversion antérieure ; aucun fichier n'est jamais écrasé.
 Configuration (`GpaoConvertP89.json`, copiée à côté du `Launcher`) : la section
 `P89` — `SourcePath`, `XmlPath`, `DonePath`, `ErrorPath` (obligatoires, chemins
 absolus et distincts deux à deux, sinon le worker refuse de démarrer ;
-l'imbrication reste permise), `PollingInterval` (défaut 30 s) — et, pour le
+l'imbrication reste permise), `PollingInterval` (défaut 30 s),
+`StabilityQuietPeriod` (format `hh:mm:ss`, défaut `00:00:10` ; une valeur nue `10` vaut 10 jours ; un Fichier écrit plus récemment reste dans
+`SourcePath`, sans XML ni entrée de journal, et est retenté au tick suivant) — et, pour le
 journal, `ConnectionStrings:AscoLSI` (obligatoire) et
 `AscoLsiJournal:InitiatingServer` (`L_D_LOG_COMMANDE.User`, nom de machine si
 vide, trop long ⇒ refus de démarrer). Le worker valide ces clés à la

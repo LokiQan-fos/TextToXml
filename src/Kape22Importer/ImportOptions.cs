@@ -5,7 +5,8 @@ namespace Kape22Importer;
 // FR-12 configuration, bound from the "Import" section (AC-FR12-8, CC-7): every path, the polling
 // interval, the initiating server and the retention window come from IConfiguration, never a literal
 // in code. Defaults live in appsettings.json, except InitiatingServer, which is a per-deployment
-// value supplied by the host environment (Story 3.3).
+// value supplied by the host environment (Story 3.3), and StabilityQuietPeriod, whose 10-second
+// default is the property initializer (Story 6.2).
 // Properties are declared in alphabetical order (CC-4).
 public sealed class ImportOptions
 {
@@ -35,4 +36,8 @@ public sealed class ImportOptions
     // Files in ArchiveFolder / ErrorFolder older than this many days are purged; zero or less disables
     // the purge (AC-FR12-9, D13).
     public int RetentionDays { get; set; }
+
+    // An inbox Fichier whose last write is more recent than this may still be copied in; it is left in
+    // the inbox and retried next tick (AC-FR12-5). Defaults to 10 seconds when not configured.
+    public TimeSpan StabilityQuietPeriod { get; set; } = TimeSpan.FromSeconds(10);
 }

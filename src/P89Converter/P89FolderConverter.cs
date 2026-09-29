@@ -69,6 +69,14 @@ public sealed class P89FolderConverter
                 break;
             }
 
+            // AC-FR22-9: a Fichier written more recently than the quiet period (or, through clock skew,
+            // after now) may still be copied in; it is left in the source folder, with no outcome, and
+            // retried at the next tick.
+            if (now - File.GetLastWriteTimeUtc(path) < this.options.StabilityQuietPeriod)
+            {
+                continue;
+            }
+
             outcomes.Add(this.Process(path, suffix, now));
         }
 

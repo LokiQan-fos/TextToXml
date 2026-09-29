@@ -300,6 +300,77 @@ public sealed class P89FolderConverterTests : IDisposable
         Assert.Empty(this.folders.Names(this.folders.Error));
     }
 
+    // AC-FR22-9: a Fichier written more recently than P89:StabilityQuietPeriod may still be copied in; it
+    // is left in the source folder with no XML, no entry and no outcome.
+    [Fact]
+    [Trait("AC", "FR22-9")]
+    public void RunTick_FichierWrittenWithinTheQuietPeriod_IsLeftInSourceWithoutXmlNorEntry_AcFr22_9()
+    {
+        string name = ReferenceFichierNames[0];
+        this.folders.Drop(name, ReadFixture(name), Instant.AddSeconds(-5));
+
+        Assert.Empty(this.Converter(Instant).RunTick());
+
+        Assert.Equal([name], this.folders.Names(this.folders.Source));
+        Assert.Empty(this.folders.Names(this.folders.Xml));
+        Assert.Empty(this.folders.Names(this.folders.Done));
+        Assert.Empty(this.journal.Entries);
+    }
+
+    // AC-FR22-9 (next tick): once the quiet period has fully elapsed since the last write, the Fichier is
+    // converted; a settled Fichier of the same tick is not held back by a younger one.
+    [Fact]
+    [Trait("AC", "FR22-9")]
+    public void RunTick_FichierOnceTheQuietPeriodHasElapsed_IsConverted_AcFr22_9()
+    {
+        string young = ReferenceFichierNames[0];
+        string settled = ReferenceFichierNames[2];
+        this.folders.Drop(young, ReadFixture(young), Instant.AddSeconds(-5));
+        this.folders.Drop(settled, ReadFixture(settled));
+
+        P89FichierOutcome first = Assert.Single(this.Converter(Instant).RunTick());
+        P89FichierOutcome next = Assert.Single(this.Converter(Instant.AddSeconds(5)).RunTick());
+
+        Assert.Equal((settled, P89FichierStatus.Converted), (first.FichierName, first.Status));
+        Assert.Equal((young, P89FichierStatus.Converted), (next.FichierName, next.Status));
+        Assert.Empty(this.folders.Names(this.folders.Source));
+    }
+
+    // AC-FR22-9: a last write after the clock's now (clock skew with the share) is not settled either.
+    [Fact]
+    [Trait("AC", "FR22-9")]
+    public void RunTick_FichierWithALastWriteInTheFuture_IsLeftInSource_AcFr22_9()
+    {
+        string name = ReferenceFichierNames[0];
+        this.folders.Drop(name, ReadFixture(name), Instant.AddMinutes(1));
+
+        Assert.Empty(this.Converter(Instant).RunTick());
+        Assert.Equal([name], this.folders.Names(this.folders.Source));
+    }
+
+    // AC-FR22-9: a configured P89:StabilityQuietPeriod replaces the default - a Fichier older than
+    // 10 seconds but younger than the configured minute is still left in the source folder.
+    [Fact]
+    [Trait("AC", "FR22-9")]
+    public void RunTick_ConfiguredQuietPeriod_LeavesAFichierYoungerThanItInSource_AcFr22_9()
+    {
+        string name = ReferenceFichierNames[0];
+        this.folders.Drop(name, ReadFixture(name), Instant.AddSeconds(-30));
+        P89Options options = this.Options();
+        options.StabilityQuietPeriod = TimeSpan.FromMinutes(1);
+
+        Assert.Empty(new P89FolderConverter(options, this.journal, new FixedClock(Instant)).RunTick());
+        Assert.Equal([name], this.folders.Names(this.folders.Source));
+    }
+
+    // AC-FR22-9: P89:StabilityQuietPeriod defaults to 10 seconds when it is not configured.
+    [Fact]
+    [Trait("AC", "FR22-9")]
+    public void P89Options_StabilityQuietPeriod_DefaultsToTenSeconds_AcFr22_9()
+    {
+        Assert.Equal(TimeSpan.FromSeconds(10), new P89Options().StabilityQuietPeriod);
+    }
+
     // A file-system fault (source locked, unreadable) defers the Fichier without any entry.
     [Fact]
     public void RunTick_SourceUnreadable_DefersWithoutEntry()

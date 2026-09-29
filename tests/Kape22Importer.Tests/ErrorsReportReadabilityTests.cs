@@ -88,7 +88,7 @@ public class ErrorsReportReadabilityTests
     {
         const string fichierName = "non_numeric_diametre";
         InMemoryFileSource source = new();
-        source.Add(InboxRoot, fichierName, WithDetailChamp(DiametreProduitPosition, DiametreProduitSize, "11A0"), Now);
+        source.Add(InboxRoot, fichierName, WithDetailChamp(DiametreProduitPosition, DiametreProduitSize, "11A0"), Now.AddMinutes(-1));
 
         Scanner(source).RunTick();
 
@@ -111,7 +111,7 @@ public class ErrorsReportReadabilityTests
     {
         const string fichierName = "empty_required";
         InMemoryFileSource source = new();
-        source.Add(InboxRoot, fichierName, WithDetailChamp(CouleePosition, CouleeSize, string.Empty), Now);
+        source.Add(InboxRoot, fichierName, WithDetailChamp(CouleePosition, CouleeSize, string.Empty), Now.AddMinutes(-1));
 
         Scanner(source).RunTick();
 
@@ -136,7 +136,7 @@ public class ErrorsReportReadabilityTests
         byte[] content = WithDetailChamp(CouleePosition, CouleeSize, string.Empty);
         content = WithDetailChamp(content, NuancePosition, NuanceSize, string.Empty);
         InMemoryFileSource source = new();
-        source.Add(InboxRoot, fichierName, content, Now);
+        source.Add(InboxRoot, fichierName, content, Now.AddMinutes(-1));
 
         Scanner(source).RunTick();
 

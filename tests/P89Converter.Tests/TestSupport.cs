@@ -92,8 +92,14 @@ internal sealed class TempFolders : IDisposable
 
     public void Dispose() => Directory.Delete(this.Root, recursive: true);
 
-    public void Drop(string fichierName, byte[] content) =>
-        File.WriteAllBytes(Path.Combine(this.Source, fichierName), content);
+    // The last write defaults to a minute before Instant, so the Fichier is past its stability quiet period
+    // for a converter clocked at Instant (AC-FR22-9); the real write time would be after Instant.
+    public void Drop(string fichierName, byte[] content, DateTimeOffset? lastWriteUtc = null)
+    {
+        string path = Path.Combine(this.Source, fichierName);
+        File.WriteAllBytes(path, content);
+        File.SetLastWriteTimeUtc(path, (lastWriteUtc ?? TestSupport.Instant.AddMinutes(-1)).UtcDateTime);
+    }
 
     public string[] Names(string folder) =>
         Directory.Exists(folder)
