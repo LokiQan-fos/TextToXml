@@ -45,6 +45,8 @@ $launcherProject = Join-Path $MicroServicesRoot 'Launcher\Launcher.csproj'
 $launcherBinDir = Join-Path $MicroServicesRoot 'Launcher\bin\Debug\net10.0'
 $logFile = Join-Path (Split-Path -Parent $InboxPath) 'GpaoImportP60_E2E_launcher.log'
 $errLogFile = Join-Path (Split-Path -Parent $InboxPath) 'GpaoImportP60_E2E_launcher.err.log'
+# Story 6.3 (AC-FR26-5): the worker refuses to start without an absolute export folder distinct from the inbox.
+$exportPath = Join-Path (Split-Path -Parent $InboxPath) 'GpaoImportP60_E2E_Export'
 
 foreach ($required in @($configPath, $launcherProject, $testSettingsPath, $p60Dir)) {
     if (-not (Test-Path -LiteralPath $required)) {
@@ -101,6 +103,7 @@ $patchedConfig = $originalConfig | ConvertFrom-Json
 $patchedConfig.ConnectionStrings.AscoLSI = $ascoLsiTest
 $patchedConfig.ConnectionStrings.MQTTnetServices = $mqttLogTest
 $patchedConfig.Import.InboxPath = $InboxPath
+$patchedConfig.Import | Add-Member -NotePropertyName XmlExportPath -NotePropertyValue $exportPath -Force
 [System.IO.File]::WriteAllText($configPath, ($patchedConfig | ConvertTo-Json -Depth 5))
 
 $launcherProcess = $null
@@ -142,6 +145,9 @@ try {
     # Write-Host per line, not a piped Format-Table: the latter buffers and can print after the dotnet
     # test output that follows, out of order, since dotnet.exe writes to the console directly.
     Get-ChildItem -LiteralPath (Join-Path $InboxPath 'archive') -Recurse -File | ForEach-Object { Write-Host $_.FullName }
+
+    Write-Host "`n--- Exported XML files (FR-26) ---"
+    Get-ChildItem -LiteralPath $exportPath -File -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.FullName }
 
     Write-Host "`n--- L_D_KAPE22 rows inserted this run ---"
     $numeros = $Fichiers | ForEach-Object { ($_ -split '_')[-1] }
@@ -191,6 +197,7 @@ finally {
         $numeros = $Fichiers | ForEach-Object { ($_ -split '_')[-1] }
         Invoke-Sql "DELETE FROM L_D_LOG_COMMANDE WHERE [OF] IN (SELECT RTRIM([OF]) FROM L_D_KAPE22 WHERE NumeroFichier IN ('$($numeros -join "','")')); DELETE FROM L_D_KAPE22 WHERE NumeroFichier IN ('$($numeros -join "','")');" | Out-Null
         Remove-Item -LiteralPath $InboxPath -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $exportPath -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item -LiteralPath $logFile, $errLogFile -Force -ErrorAction SilentlyContinue
         Write-Host 'Cleaned up scratch inbox, logs and inserted test rows (-KeepArtifacts to skip this).'
     }

@@ -39,6 +39,8 @@ public class AcCoverageCompletenessTests
         // FR21-1/2/3 (pre-existing) + FR21-4 (this story, EndToEndImportIntegrationTests.cs)
         // + FR21-5 (this story, RejectionAtomicityIntegrationTests.cs) = 5.
         [21] = 5,
+        // FR26-1..6 (Story 6.3, InboxScannerTests.cs); FR26-5 is a KnownException below.
+        [26] = 6,
     };
 
     // ACs this assembly cannot cover by design, not by omission - each is out of Kape22Importer's own
@@ -54,8 +56,11 @@ public class AcCoverageCompletenessTests
     // applicability rule, annex as single reference) are the annex's business content - epics.md states
     // this stays a human review, non-automatable. Only AC-FR17-5 (the mechanical completeness gate) has
     // a trait-carrying test.
+    // FR26-5 (GpaoImportP60 refuses to start on a bad Import:XmlExportPath) is validated by the worker's
+    // Client.ReadConfig and covered in MicroServices.sln (GpaoImportP60.Tests.ClientConfigurationTests),
+    // an assembly this gate cannot see.
     private static readonly HashSet<string> KnownExceptions =
-        ["FR9-6", "FR14-5", "FR17-1", "FR17-2", "FR17-3", "FR17-4"];
+        ["FR9-6", "FR14-5", "FR17-1", "FR17-2", "FR17-3", "FR17-4", "FR26-5"];
 
     [Fact]
     [Trait("AC", "SM-1")]

@@ -5,7 +5,7 @@ Chaîne d'ingestion des fichiers SAP → LSI. Livrables :
 | Projet | Rôle |
 |---|---|
 | `src/TextToXml` | Bibliothèque .NET **pure et générique** : fichier plat largeur fixe → XML normalisé, piloté par un Descripteur XML. Zéro dépendance NuGet runtime. |
-| `src/Kape22Importer` | **Bibliothèque** de format P60 : descripteur, XSD, DTO, entités EF, mapping (`Kape22Mapper`), contrôles de cohérence, scrutation du dossier de réception (`InboxScanner`), orchestration par Fichier (`Kape22FichierProcessor` : archive XML → EF → `AscoLSI`, avec double journalisation) et persistance transactionnelle (`Kape22Persister`). Depuis l'Épic 6 (FR-24), le journal `L_D_LOG_COMMANDE` passe par `IFichierJournal`, après la transaction métier et pour chaque issue ; le worker `GpaoImportP60` injecte `AscoLsiFichierJournal` (clé `Import:InitiatingServer` inchangée), et la garde anti-doublon D22 lit `L_D_KAPE22`. Un Fichier de l'inbox dont la dernière écriture date de moins de `Import:StabilityQuietPeriod` (format `hh:mm:ss`, défaut `00:00:10` ; une valeur nue `10` vaut 10 jours ; Épic 6) est laissé en place et retenté au tick suivant, sans erreur. Destinée à être consommée par le worker exécutable (différé — voir ci-dessous). |
+| `src/Kape22Importer` | **Bibliothèque** de format P60 : descripteur, XSD, DTO, entités EF, mapping (`Kape22Mapper`), contrôles de cohérence, scrutation du dossier de réception (`InboxScanner`), orchestration par Fichier (`Kape22FichierProcessor` : archive XML → EF → `AscoLSI`, avec double journalisation) et persistance transactionnelle (`Kape22Persister`). Depuis l'Épic 6 (FR-24), le journal `L_D_LOG_COMMANDE` passe par `IFichierJournal`, après la transaction métier et pour chaque issue ; le worker `GpaoImportP60` injecte `AscoLsiFichierJournal` (clé `Import:InitiatingServer` inchangée), et la garde anti-doublon D22 lit `L_D_KAPE22`. Un Fichier de l'inbox dont la dernière écriture date de moins de `Import:StabilityQuietPeriod` (format `hh:mm:ss`, défaut `00:00:10` ; une valeur nue `10` vaut 10 jours ; Épic 6) est laissé en place et retenté au tick suivant, sans erreur. Le XML normalisé de chaque Fichier converti est aussi exporté dans `Import:XmlExportPath` (FR-26, voir « Export XML » ci-dessous). Destinée à être consommée par le worker exécutable (différé — voir ci-dessous). |
 | `src/FichierJournal` | Contrat du journal de Fichier (D31, FR-23) : `IFichierJournal.Record(FichierJournalEntry)`. Aucune dépendance — un format journalise le résultat de ses imports sans connaître l'application cible. |
 | `src/AscoLsiJournal` | Implémentation LSI de `IFichierJournal` : une ligne `L_D_LOG_COMMANDE` par Fichier (D8, D15), écrite hors de toute transaction métier. |
 | `src/P89Converter` | **Bibliothèque** de format P89, Étape 1 seule (Épic 5, FR-22) : descripteur + XSD embarqués, transcodage UTF-8 → Windows-1252, XML normalisé horodaté, journal via `IFichierJournal` (référence `TextToXml` + `FichierJournal` seulement). Consommée par le worker `GpaoConvertP89` de `MicroServices.sln` — voir « P89 » ci-dessous. |
@@ -94,6 +94,27 @@ construction et nomme la ou les clés fautives.
 
 Après une modification de `Templates/P89.xml` : `pwsh scripts/gen.ps1 -Format P89`
 régénère `Templates/P89.xsd` (`-Check -Format P89` pour vérifier sans écrire).
+
+## Export XML (D33)
+
+Chaque format écrit le XML normalisé de chaque Fichier converti dans son propre
+dossier d'export, pour transmission à des tiers, sous `<nom>_<yyyyMMddHHmmss>.xml`
+(jamais d'écrasement). Ce dossier n'est **jamais purgé** par le worker ; son
+nettoyage relève de l'exploitation. Un Fichier que `TextToXml` ne sait pas
+convertir n'y laisse rien.
+
+- **P60** : `Import:XmlExportPath` (`GpaoImportP60.json`, Story 6.3, FR-26) —
+  chemin absolu, obligatoire, distinct de l'inbox, de `processing/`, et hors de
+  `archive/` et `error/` (purgés par `Import:RetentionDays`), sinon le worker
+  refuse de démarrer en nommant la clé. Horodatage en heure de Paris. Le XML est
+  exporté dès que l'issue du Fichier est définitive : importé, rejeté après
+  conversion (mapping, contrôles métier, SQL) ou ignoré par la garde D22 ; rien
+  tant qu'une panne `AscoLSI` / journal laisse le Fichier en `processing/`. Une
+  écriture impossible (dossier injoignable, nom déjà pris) laisse le Fichier en
+  `processing/` (`Warning`, retraité au tick suivant). Les XML voisins du Fichier
+  dans `archive/` et `error/` sont inchangés.
+- **P89** : `P89:XmlPath` (`GpaoConvertP89.json`, Épic 5) — voir « P89 »
+  ci-dessus ; seuls les Fichiers convertis y laissent un XML.
 
 ## Build & tests
 

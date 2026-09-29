@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -14,6 +15,8 @@ namespace Kape22Importer;
 // FR-12: scans Import:InboxPath through IFileSource, moves each Fichier to processing/ before it is
 // read, files successes under archive/<yyyy>/<MM>/ with their normalized XML alongside and rejects
 // under error/ with a <name>.errors.json, and purges archive/ and error/ past Import:RetentionDays.
+// Story 6.3 (FR-26): every Fichier with a final outcome and a normalized XML is also exported to
+// Import:XmlExportPath, a folder the purge never touches.
 // The per-Fichier pipeline itself is IFichierProcessor (Story 3.2); the worker that calls RunTick on a
 // timer is GpaoImportP60.Client in MicroServices.sln (Story 3.4).
 public sealed class InboxScanner(
@@ -228,11 +231,21 @@ public sealed class InboxScanner(
             return;
         }
 
+        // One clock reading dates both the export file name and the archive/<yyyy>/<MM> folder.
+        DateTimeOffset parisNow = TimeZoneInfo.ConvertTime(timeProvider.GetUtcNow(), ParisTime.Zone);
+        string? exportPath = null;
         try
         {
+            // AC-FR26-1: the outcome is final here (a persistence failure returned above), so every
+            // Fichier that converted is exported before it is filed.
+            if (result.NormalizedXml is not null && !string.IsNullOrWhiteSpace(options.XmlExportPath))
+            {
+                exportPath = Export(fichierName, result.NormalizedXml, parisNow);
+            }
+
             if (result.Success)
             {
-                Archive(fichierName, result.NormalizedXml);
+                Archive(fichierName, result.NormalizedXml, parisNow);
             }
             else
             {
@@ -241,12 +254,18 @@ public sealed class InboxScanner(
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            // The outcome could not be filed - a sidecar write failed, or the Fichier could not be moved
-            // out of processing/ because archive/ or error/ is unreachable or the Fichier is locked.
-            // Both sidecars are written before the Fichier is moved, so the Fichier is still in
-            // processing/ here with nothing half-done: the next tick re-runs the whole outcome, a
-            // committed success is recognised by the D22 guard so no second row is inserted, and a
-            // rejection is re-evaluated. Any sidecar already written is overwritten on the retry.
+            // The outcome could not be filed - the export or a sidecar write failed, or the Fichier could
+            // not be moved out of processing/ because archive/ or error/ is unreachable or the Fichier is
+            // locked. The export and both sidecars are written before the Fichier is moved, so the Fichier
+            // is still in processing/ here with nothing half-done: the next tick re-runs the whole
+            // outcome, a committed success is recognised by the D22 guard so no second row is inserted,
+            // and a rejection is re-evaluated. Any sidecar already written is overwritten on the retry;
+            // the export this attempt created is deleted, so the retry leaves a single one (AC-FR26-6).
+            if (exportPath is not null)
+            {
+                TryDelete(exportPath);
+            }
+
             logger.LogWarning(
                 "Fichier {Fichier} outcome could not be filed ({Reason}); left in processing/ for retry.",
                 fichierName,
@@ -278,9 +297,8 @@ public sealed class InboxScanner(
     // to it as <name>.xml. The sidecar is written first: if that write fails the Fichier is still in
     // processing/, so the caller's catch leaves it there for a clean retry rather than archiving it
     // without its XML.
-    private void Archive(string fichierName, string? normalizedXml)
+    private void Archive(string fichierName, string? normalizedXml, DateTimeOffset parisNow)
     {
-        DateTimeOffset parisNow = TimeZoneInfo.ConvertTime(timeProvider.GetUtcNow(), ParisTime.Zone);
         string dateFolder = $"{options.ArchiveFolder}/{parisNow.Year:D4}/{parisNow.Month:D2}";
 
         if (normalizedXml is not null)
@@ -289,6 +307,52 @@ public sealed class InboxScanner(
         }
 
         fileSource.Move(options.ProcessingFolder, fichierName, dateFolder, fichierName);
+    }
+
+    // FR-26 (D33): writes <name>_<yyyyMMddHHmmss>.xml (Paris time) into Import:XmlExportPath, an absolute
+    // folder distinct from the reception working folders, so it goes straight to disk rather than through
+    // IFileSource, which is rooted at the inbox.
+    // CreateNew never overwrites: a name already taken throws an IOException, which the caller treats as
+    // any other filing failure, and that existing file is never deleted. A write that fails after the
+    // file was created deletes it before rethrowing. Returns the path created.
+    private string Export(string fichierName, string normalizedXml, DateTimeOffset parisNow)
+    {
+        Directory.CreateDirectory(options.XmlExportPath);
+        string suffix = parisNow.ToString("yyyyMMddHHmmss", CultureInfo.InvariantCulture);
+        string path = Path.Combine(options.XmlExportPath, $"{fichierName}_{suffix}{NormalizedXmlExtension}");
+        FileStream stream = new(path, FileMode.CreateNew);
+        try
+        {
+            using (stream)
+            {
+                stream.Write(Utf8NoBom.GetBytes(normalizedXml));
+            }
+        }
+        catch
+        {
+            TryDelete(path);
+            throw;
+        }
+
+        return path;
+    }
+
+    // Best-effort cleanup of an export this attempt created: a failed delete (a locked file) must not hide
+    // the reason the outcome could not be filed. The export is then left behind next to the retry's own,
+    // so it is logged: the folder goes to third parties.
+    private void TryDelete(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            logger.LogWarning(
+                "Export {Path} could not be deleted after a failed filing ({Reason}); a retry will export it again.",
+                path,
+                exception.Message);
+        }
     }
 
     // AC-FR12-4: the Fichier lands in error/ with a <name>.errors.json holding the Errors array. The

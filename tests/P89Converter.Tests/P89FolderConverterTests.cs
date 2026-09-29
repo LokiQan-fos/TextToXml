@@ -50,6 +50,25 @@ public sealed class P89FolderConverterTests : IDisposable
         Assert.Equal("013", this.journal.Entries[1].NumeroFichier);
     }
 
+    // AC-FR16-5 (D33, Story 6.3): P89 already has its own XML export folder, P89:XmlPath (kept distinct
+    // from the working folders by GpaoConvertP89, AC-FR22-8); a converted Fichier leaves
+    // <name>_<yyyyMMddHHmmss>.xml there and nowhere else, and P89FolderConverter has no purge.
+    // Conformance check, green on arrival: no production change.
+    [Fact]
+    [Trait("AC", "FR16-5")]
+    public void RunTick_ConvertedFichier_LeavesItsXmlInTheDedicatedExportFolder_AcFr16_5()
+    {
+        string name = ReferenceFichierNames[0];
+        this.folders.Drop(name, ReadFixture(name));
+
+        this.Converter(Instant).RunTick();
+
+        Assert.Equal([$"{name}_{InstantSuffix}.xml"], this.folders.Names(this.folders.Xml));
+        Assert.DoesNotContain(
+            new[] { this.folders.Source, this.folders.Done, this.folders.Error }.SelectMany(this.folders.Names),
+            file => file.EndsWith(".xml", StringComparison.OrdinalIgnoreCase));
+    }
+
     // AC-FR22-5 (F-1 of the Story 5.0 review): a blank NumeroFichier or OF still converts; the Fichier goes
     // to done and its entry carries null, leaving the fallback (or the D15 skip) to the journal.
     [Theory]
