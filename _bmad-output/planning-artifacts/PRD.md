@@ -1138,9 +1138,13 @@ corrigés à l'identique dans les deux (D32) ; la ré‑entrance, une fois dans
 - `AC-FR25-3` : un tick qui dépasse le budget d'arrêt n'accède plus au
   `Client` une fois celui-ci libéré (aucun log, aucun publish après
   `Dispose`).
-- `AC-FR25-4` : `ConnectionStrings:AscoLSI` et `ConnectionStrings:MQTTnetServices`
-  absentes ou mal formées empêchent le démarrage avec un message nommant la
-  clé ; une configuration refusée ne laisse aucun sink SQL ouvert.
+- `AC-FR25-4` : `ConnectionStrings:AscoLSI` absente ou mal formée empêche le
+  démarrage avec un message nommant la clé ; une configuration refusée ne
+  laisse aucun sink SQL ouvert. *(Réconcilié 2026-09-29, Story 6.4, décision
+  utilisateur : `ConnectionStrings:MQTTnetServices` n'est lue par aucun code
+  — le sink Logs passe par `Logging:ConnectionString` /
+  `MICROSERVICE_LOG_CONNECTION_STRING` via `SharedLogger` — et est retirée
+  des JSON des deux workers ; la chaîne du sink Logs n'est pas validée.)*
 - `AC-FR25-5` : un tick en échec ne publie pas de heartbeat.
 - `AC-FR25-6` : l'hôte autonome `WorkerService` ne retente pas une erreur de
   configuration et libère le `Client` à l'arrêt.
