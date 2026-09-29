@@ -58,11 +58,13 @@ public sealed class P89FolderConverter
         string suffix = TimeZoneInfo.ConvertTime(now, this.timeProvider.LocalTimeZone)
             .ToString("yyyyMMddHHmmss", CultureInfo.InvariantCulture);
 
-        string[] paths = Directory.GetFiles(this.options.SourcePath, "LP89_*");
-        Array.Sort(paths, StringComparer.OrdinalIgnoreCase);
+        // The last write times come with the listing itself, so the gate below makes no per-Fichier
+        // file-system call that could fault outside Process's per-Fichier deferral.
+        FileInfo[] files = new DirectoryInfo(this.options.SourcePath).GetFiles("LP89_*");
+        Array.Sort(files, (left, right) => StringComparer.OrdinalIgnoreCase.Compare(left.Name, right.Name));
 
         List<P89FichierOutcome> outcomes = [];
-        foreach (string path in paths)
+        foreach (FileInfo file in files)
         {
             if (cancellationToken.IsCancellationRequested)
             {
@@ -72,12 +74,12 @@ public sealed class P89FolderConverter
             // AC-FR22-9: a Fichier written more recently than the quiet period (or, through clock skew,
             // after now) may still be copied in; it is left in the source folder, with no outcome, and
             // retried at the next tick.
-            if (now - File.GetLastWriteTimeUtc(path) < this.options.StabilityQuietPeriod)
+            if (now - file.LastWriteTimeUtc < this.options.StabilityQuietPeriod)
             {
                 continue;
             }
 
-            outcomes.Add(this.Process(path, suffix, now));
+            outcomes.Add(this.Process(file.FullName, suffix, now));
         }
 
         return outcomes;

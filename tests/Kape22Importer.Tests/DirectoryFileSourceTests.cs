@@ -39,6 +39,21 @@ public sealed class DirectoryFileSourceTests : IDisposable
         Assert.Equal(content.Length, entry.Length);
     }
 
+    // AC-FR12-5: the inbox stability gate reads LastWriteTimeUtc from this adapter in production, so it
+    // must report the file's real last write instant.
+    [Fact]
+    [Trait("AC", "FR12-5")]
+    public void List_ReportsTheFileLastWriteTimeUtc_AcFr12_5()
+    {
+        DateTime lastWrite = new(2026, 9, 8, 9, 59, 55, DateTimeKind.Utc);
+        this.Source.Write("", "P60_847_682_001", [1]);
+        File.SetLastWriteTimeUtc(Path.Combine(this.root, "P60_847_682_001"), lastWrite);
+
+        FichierEntry entry = Assert.Single(this.Source.List(""));
+
+        Assert.Equal(new DateTimeOffset(lastWrite), entry.LastWriteTimeUtc);
+    }
+
     [Fact]
     public void List_OnMissingFolder_IsEmpty() => Assert.Empty(this.Source.List("processing"));
 

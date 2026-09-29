@@ -335,7 +335,7 @@
   summary: `InboxScanner.PurgeRetention()` a gagné un `try/catch (IOException/UnauthorizedAccessException)` par racine (Story 3.5, B4) mais toujours pas de `CancellationToken`. Un balayage récursif long sur un gros `archive/` ne peut pas être interrompu dans le budget d'arrêt que la Story 3.4 a établi pour `RunTick`.
   evidence: Jumeau du `CancellationToken` de `RunTick` (résolu 2026-09-09). `PurgeRetention` est appelé après `RunTick` dans `Client.Actions` ; un `Stop()` du Launcher pendant la purge attend la fin du balayage.
 
-- source_spec: `epics.md` § Story 3.5
+- source_spec: **RESOLVED 2026-09-29: Story 6.2 (9cad688)** — `epics.md` § Story 3.5
   summary: `InboxScanner.TryStableInboxFichiers` sonde `List(inbox)` deux fois de suite sans délai ni comparaison de `LastWriteTimeUtc`. Sur le `DirectoryFileSource` réel, deux `stat` consécutifs rapportent la même taille même pour un Fichier en cours d'écriture — la porte de stabilité `AC-FR12-5` est quasi un no-op hors du cas de test in-memory (`MarkUnstableOnce`).
   evidence: Pré-existant Story 3.1 (`StableInboxFichiers`), renommé mais sémantiquement inchangé par la Story 3.5. Correctif = un court délai inter-sondes, ou comparer aussi `LastWriteTimeUtc`.
 
@@ -1245,7 +1245,7 @@ s'y trouver et rester à confirmer.
 
 ## Deferred from: code review of story-5.1 (2026-09-25)
 
-- source_spec: **PLANNED 2026-09-28: Story 6.2** — `spec-5-1-p89converter-dossier-p89-brut-xml-normalise-horodate.md`
+- source_spec: **RESOLVED 2026-09-29: Story 6.2 (9cad688)** — `spec-5-1-p89converter-dossier-p89-brut-xml-normalise-horodate.md`
   summary: `P89FolderConverter.RunTick` reads every `LP89_*` file as soon as it is listed, with no stability gate; a Fichier still being copied into the source folder would be read truncated and moved to the error folder for good.
   evidence: Raised by the blind-hunter and edge-case-hunter lenses. Same weakness as P60, whose `InboxScanner.TryStableInboxFichiers` gate is already recorded above as a near no-op on a real share (two probes without delay). Fix both together: skip a Fichier whose `LastWriteTimeUtc` is younger than a quiet period, or compare two probes separated by a delay.
 
@@ -1344,3 +1344,13 @@ s'y trouver et rester à confirmer.
 - source_spec: `spec-6-2-garde-stabilite-fichiers-p60-p89.md`
   summary: The stability gate (AC-FR12-5, AC-FR22-9) only compares the last-write time with the quiet period; a copy tool that preserves the source modification time (Explorer, `copy`, `robocopy`) or a copy stalled longer than the quiet period can still let a half-copied Fichier through.
   evidence: Raised by the blind-hunter and edge-case-hunter lenses. The rule is the one the PRD fixes (revised AC-FR12-5, AC-FR22-9); the removed two-probe size check did not catch this case on a real share either. Confirm how SAP drops the P60/P89 Fichiers (direct write or rename-into-place) before choosing a stronger check (exclusive open, size over two ticks).
+
+## Deferred from: code review of story-6.2, closure (2026-09-29)
+
+- source_spec: `reviews/story-6-2/aggregated-report.md` (F-1, low)
+  summary: The back-dating of the seeds in `MicroServices/GPAO/ConvertP89.Tests/RunTickCoreTests.cs:104`, required by the Story 6.2 spec, lives in SVN outside this git repository; its SVN commit is not yet confirmed.
+  evidence: blind-hunter lens; the spec task is checked, but no git range can show the SVN change. The review report records the 34 `ConvertP89.Tests` tests green in the working copy.
+
+- source_spec: **PLANNED 2026-09-29: Story 6.4** — `reviews/story-6-2/aggregated-report.md` (F-2, medium, from D-1 option 2)
+  summary: A Fichier held back by the stability gate leaves no trace at any log level; a misconfigured quiet period (bare `10` read as 10 days) or a share clock running ahead blocks the P60 inbox or the P89 source folder with no signal to the operator.
+  evidence: blind-hunter + edge-case-hunter lenses, `src/Kape22Importer/InboxScanner.cs:137`, `src/P89Converter/P89FolderConverter.cs:77`. The silence is what the spec requires (no log >= Warning; any logged outcome for a skipped Fichier is Ask First), decided 2026-09-29 (option 2); fix in the worker hardening, e.g. a Debug trace or a worker-side signal when a Fichier stays held back.
