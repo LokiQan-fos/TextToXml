@@ -83,6 +83,19 @@ Passe la story <N>-<M> de review à done dans _bmad-output/implementation-
 artifacts/sprint-status.yaml. Vérifie la cohérence de l'épic parent (reste
 in-progress tant que toutes les stories ne sont pas done).
 
+ÉTAPE 4bis — Mise à jour du rapport de revue.
+Le rapport vit sous _bmad-output/implementation-artifacts/reviews/ et est
+versionné. Si RÉSOLUTION 2 l'a trouvé ailleurs ou dans la conversation,
+écris-le dans reviews/story-<N>-<M>/aggregated-report.md.
+Ajoute à la fin du rapport une section :
+  ## Clôture (<date du jour>)
+  - une ligne par finding : <FindingId> → appliqué / tranché (option) / tracé
+    dans deferred-work.md (story cible si planifiée) ;
+  - vérification finale : build, Unit, Integration (comptes de tests) ;
+  - statut : story <N>-<M> → done ; commit de clôture = celui qui ajoute
+    cette section.
+Ne réécris pas les sections existantes du rapport.
+
 ÉTAPE 5 — Vérification finale.
 Exécute successivement :
   dotnet build TextToXml.sln -warnaserror
@@ -105,7 +118,7 @@ Message si des Patchs ou Décisions ont été traités :
      L3-F01 Defer → tracé dans deferred-work.md (cause : pré-existant)
      L4-F03 Decision → option A retenue par le demandeur, patch appliqué>
 
-  Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+  Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 
 Message si aucun Patch ni Decision (cas heureux) :
 
@@ -117,9 +130,11 @@ Message si aucun Patch ni Decision (cas heureux) :
 Stage uniquement :
 - les fichiers touchés par les Patchs,
 - _bmad-output/implementation-artifacts/deferred-work.md (si modifié),
-- _bmad-output/implementation-artifacts/sprint-status.yaml.
-Ne touche pas aux fichiers non trackés (.claude/commands/, _bmad/custom/*.toml)
-et ne les stage pas.
+- _bmad-output/implementation-artifacts/sprint-status.yaml,
+- le rapport de revue sous _bmad-output/implementation-artifacts/reviews/
+  (ÉTAPE 4bis), même s'il n'est pas encore tracké.
+Ne touche pas aux autres fichiers non trackés (.claude/commands/,
+_bmad/custom/*.toml) et ne les stage pas.
 
 Après le commit, rends :
 - le hash du commit,
@@ -132,6 +147,7 @@ RÈGLES :
 - Ne jamais appliquer un Patch mal compris — arrête et demande.
 - Ne jamais ignorer un finding — soit appliqué, soit tracé, jamais silencieux.
 - Ne pas mélanger corrections de revue et améliorations opportunistes.
-- Ne pas modifier les fichiers hors scope sauf le ledger et le sprint-status.
+- Ne pas modifier les fichiers hors scope sauf le ledger, le sprint-status et
+  le rapport de revue.
 - Si un des paramètres (RÉSOLUTION 1/2/3) échoue, arrête immédiatement —
   n'invente pas de valeur, ne tombe pas dans une cascade par défaut.
