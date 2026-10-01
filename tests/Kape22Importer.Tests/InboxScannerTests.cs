@@ -774,6 +774,42 @@ public sealed class InboxScannerTests : IDisposable
         Assert.True(source.Exists("processing", Stuck));
     }
 
+    // AC-FR25-8: a tick cancelled before reaching the Fichier keeps its count, so the cap is reached on the
+    // MaxAttempts-th attempt actually made.
+    [Fact]
+    [Trait("AC", "FR25-8")]
+    public void RunTick_CancelledTick_KeepsTheCount_AcFr25_8()
+    {
+        InMemoryFileSource source = new();
+        source.Add("processing", Stuck, Bytes("payload"), Now.AddMinutes(-1));
+        FakeFichierProcessor processor = new((_, _) => PersistenceFailure());
+        Dictionary<string, int> attempts = new(StringComparer.OrdinalIgnoreCase);
+        Tick(source, processor, CappedOptions(), attempts);
+        Tick(source, processor, CappedOptions(), attempts);
+
+        Scanner(source, processor, CappedOptions(), new RecordingLogger<InboxScanner>(), attempts: attempts)
+            .RunTick(new CancellationToken(canceled: true));
+        RecordingLogger<InboxScanner> last = Tick(source, processor, CappedOptions(), attempts);
+
+        Assert.Equal(3, processor.Calls.Count);
+        Assert.Single(last.AtLevel(LogLevel.Error));
+    }
+
+    // AC-FR25-8: Fichier names match ignoring case, so a counter built with another comparer is refused.
+    [Fact]
+    [Trait("AC", "FR25-8")]
+    public void RunTick_CounterNotOrdinalIgnoreCase_Throws_AcFr25_8()
+    {
+        InMemoryFileSource source = new();
+        Dictionary<string, int> attempts = new(StringComparer.Ordinal);
+
+        ArgumentException exception = Assert.Throws<ArgumentException>(
+            () => Scanner(source, AlwaysSucceeds(), CappedOptions(), new RecordingLogger<InboxScanner>(), attempts: attempts)
+                .RunTick());
+
+        Assert.Equal("attempts", exception.ParamName);
+    }
+
     // AC-FR25-8: a Fichier that fails N-1 times then succeeds logs no Error and its count is dropped.
     [Fact]
     [Trait("AC", "FR25-8")]

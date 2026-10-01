@@ -1436,6 +1436,15 @@ s'y trouver et rester à confirmer.
   evidence: blind-hunter + acceptance-auditor (out of mandate) lenses, `GPAO/ImportP60.Tests/ClientRobustnessTests.cs`. The observable property (Stop() within budget while `Directory.Exists` blocks on a dead share) has no seam to test without production changes; the test is kept, the fragility recorded.
 
 ## Deferred from: code review of story-6.7 (2026-10-01)
-- source_spec: `spec-6-7-plafond-reessai-par-fichier.md`
+
+- source_spec: `spec-6-7-plafond-reessai-par-fichier.md` (implementation review, low)
   summary: A non-I/O exception escaping a Fichier's read or filing (P60 `InboxScanner.ProcessFromProcessing` around `fileSource.Read` / `Export` / `Archive` / `Reject`) or its conversion (P89 `P89FolderConverter.Process`, which only catches `IOException` / `UnauthorizedAccessException`) aborts the whole tick before the Fichier is counted, so the AC-FR25-8 retry cap never freezes it: `onError` fires and later Fichiers are starved every tick.
   evidence: edge-case-hunter lens, Story 6.7 review. Pre-existing escape path (the cap only adds a new place where it goes uncounted); no known trigger in production code, since `processor.Process` throws are already contained as `UnexpectedFailure`.
+
+- source_spec: `reviews/story-6-7/aggregated-report.md` (F-1, low)
+  summary: A frozen Fichier replaced in place under the same name (directly in P60 `processing/` or the P89 source folder) stays frozen until the worker restarts, because the AC-FR25-8 counter is keyed by name only.
+  evidence: edge-case-hunter lens, `src/P89Converter/P89FolderConverter.cs:72-101` and `src/Kape22Importer/InboxScanner.cs:73-97`. The normal P60 operator path (drop into the inbox) does reset the count (`RunTick_InboxFichierReplacingAFrozenOne_StartsAfresh_AcFr25_8`); covering the in-place case needs `LastWriteTimeUtc` in the key, a renegotiation of the frozen spec ("until restart").
+
+- source_spec: `reviews/story-6-7/aggregated-report.md` (F-2, low)
+  summary: The P60 Client's `_attempts` field wiring is not tested at instance level: a mutation recreating the counter every tick would pass every test, since `RunTickCoreTests` supplies its own dictionary.
+  evidence: verification-gap lens, `MicroServices/GPAO/ImportP60/Client.cs:54` and `:378-386`. An instance-level test needs the Story 6.5 Client harness (`Gpao.IntegrationTests`, MicroServices), outside the story's unit scope.

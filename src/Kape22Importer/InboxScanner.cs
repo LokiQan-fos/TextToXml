@@ -21,8 +21,8 @@ namespace Kape22Importer;
 // timer is GpaoImportP60.Client in MicroServices.sln (Story 3.4).
 // AC-FR25-8 (Story 6.7): attempts is a caller-owned per-Fichier counter of consecutive attempts that left
 // the Fichier in processing/. The scanner is rebuilt every tick, so the worker keeps the counter across
-// ticks; null keeps the uncapped behavior. The counter must be built with StringComparer.OrdinalIgnoreCase:
-// the prune of names absent from processing/ ignores case, while lookups follow the dictionary's comparer.
+// ticks; null keeps the uncapped behavior. Fichier names match case-insensitively, so RunTick refuses a
+// counter not built with StringComparer.OrdinalIgnoreCase.
 public sealed class InboxScanner(
     IFileSource fileSource,
     IFichierProcessor processor,
@@ -65,6 +65,12 @@ public sealed class InboxScanner(
     // failed move into processing/ included (one locked Fichier is not an unreachable folder).
     public bool RunTick(CancellationToken cancellationToken = default)
     {
+        if (attempts is not null && !ReferenceEquals(attempts.Comparer, StringComparer.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException(
+                "The attempts counter must be built with StringComparer.OrdinalIgnoreCase.", nameof(attempts));
+        }
+
         if (!TryList(options.ProcessingFolder, out IReadOnlyList<FichierEntry> stranded))
         {
             return false;
@@ -450,10 +456,12 @@ public sealed class InboxScanner(
     // PersistenceError (a P60Deserializer schema failure is SchemaInvalid, an unexpected throw is
     // UnexpectedFailure), so it is a precise signal for "leave the Fichier in processing/ and retry",
     // distinct from a Converter, schema or Mapper rejection (which belongs in error/).
+    private static bool IsPersistenceFailure(FichierProcessingResult result) => result.Errors.Any(IsPersistenceError);
+
+    // One File-level PersistenceError, the signal IsPersistenceFailure looks for; its messages are the
+    // retained cause (AC-FR25-8).
     private static bool IsPersistenceError(ConversionError error) =>
         error is { Block: Block.File, Code: ErrorCode.PersistenceError };
-
-    private static bool IsPersistenceFailure(FichierProcessingResult result) => result.Errors.Any(IsPersistenceError);
 
     // AC-FR12-1: oldest to newest, a deterministic order (the Name breaks ties between equal timestamps).
     private static IEnumerable<FichierEntry> Ordered(IEnumerable<FichierEntry> entries) =>

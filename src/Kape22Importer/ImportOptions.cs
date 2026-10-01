@@ -3,12 +3,12 @@ using System;
 namespace Kape22Importer;
 
 // FR-12 configuration, bound from the "Import" section (AC-FR12-8, CC-7): every path, the polling
-// interval, the initiating server, the retention window, the stability quiet period and the XML export
-// folder (FR-26) come from IConfiguration, never a literal in code. Defaults live in appsettings.json,
-// except InitiatingServer, which is a per-deployment value supplied by the host environment (Story 3.3),
-// StabilityQuietPeriod, whose 10-second default is the property initializer (Story 6.2), and
-// XmlExportPath, a per-deployment absolute folder, empty by default (export off at library level,
-// Story 6.3), and MaxAttempts, whose default of 10 is the property initializer (Story 6.7).
+// interval, the initiating server, the retention window, the stability quiet period, the XML export
+// folder (FR-26) and the retry cap come from IConfiguration, never a literal in code. Defaults live in
+// appsettings.json, with three exceptions. InitiatingServer is a per-deployment value supplied by the host
+// environment (Story 3.3). StabilityQuietPeriod (10 seconds, Story 6.2) and MaxAttempts (10, Story 6.7)
+// default through their property initializers. XmlExportPath is a per-deployment absolute folder, empty
+// by default (export off at library level, Story 6.3).
 // Properties are declared in alphabetical order (CC-4).
 public sealed class ImportOptions
 {
