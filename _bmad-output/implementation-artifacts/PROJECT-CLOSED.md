@@ -38,7 +38,7 @@ story is in progress.
 | **Epic 2** | EF Database-First entities, SQL Server test harness, P60 XSD/DTO, deserialization/mapping, descriptor-vs-table compatibility check, derived fields, coherence warnings, transactional persistence + anti-duplicate guard (2.1–2.8) | 8/8 done | `accepted-with-open-items` (`epic-2-retro-2026-09-07.md`) — action items done, 2 reconciled at closure (see §3) |
 | **Epic 3** | Structural repositioning as a library, inbox scanning/file lifecycle, per-file orchestration, double journalization, worker loop + graceful shutdown, loop robustness, E2E coverage harness (3.0–3.6) | 7/7 done | `accepted-with-open-items` (`epic-3-retro-2026-09-11.md`) — action items done, 1 reconciled at closure (see §3) |
 | **Epic 4** | Downstream-table dispatch: 10 `L_D_*` entities, mapping annex, OF/Coulée + Consignes mappers, bundle orchestrator, single-transaction persister, 10-table E2E suite, plus 5 post-retro hardening stories (4.1–4.7, 4.2-bis, 4.3-bis, 4.9, 4.10, 4.11), then 4 production-parity stories (4.4-bis, 4.12, 4.13, 4.14) | 11/11 base + 5/5 hardening + 4/4 parity = done | `accepted-with-open-items`, 4 retro passes (`epic-4-retro-2026-09-17.md`, `-18.md`, `-21.md`, `-25.md`) — every routed action item done as of this closure (see §3) |
-| **Epic 5** | P89 Step 1: `IFichierJournal` + LSI implementation, `P89Converter` (raw P89 folder → timestamped normalized XML + XSD), worker `GpaoConvertP89` under the Launcher (5.0–5.2) | 3/3 done | `accepted-with-open-items` (`epic-5-retro-2026-09-28.md`) — A-1, A-3 done 2026-09-28; A-2, A-4 open |
+| **Epic 5** | P89 Step 1: `IFichierJournal` + LSI implementation, `P89Converter` (raw P89 folder → timestamped normalized XML + XSD), worker `GpaoConvertP89` under the Launcher (5.0–5.2) | 3/3 done | `accepted-with-open-items` (`epic-5-retro-2026-09-28.md`) — A-1, A-3 done 2026-09-28; A-2, A-4 done 2026-10-01 |
 | **Epic 6** | P60 journal via `IFichierJournal` (D22 guard on `L_D_KAPE22`), stability gate for P60 + P89, P60 XML export to a dedicated never-purged folder, shared hardening of the two GPAO workers + `MicroService.Publisher`, E2E harness realignment, real-`Client` integration test (6.1–6.5, 6.4-bis) | 6/6 done | `accepted-with-open-items` (`epic-6-retro-2026-10-01.md`) — A-1 done at this re-close; A-3 done 2026-10-01; A-2 open (correct-course) |
 
 Every epic closed with the same verdict shape: **accepted-with-open-items**, never a hard rejection.
@@ -132,10 +132,12 @@ manual-session fix commits, and all four are `done` at this re-close:
   `manual-session-fix-review`: such a fix goes through `/run-review` or a story before commit, and a
   changed declared AC is reconciled in the same commit. It binds agent sessions only.
 
-At the 2026-10-01 re-close, four `sprint-status.yaml` action items are not `done`:
-`epic-5-retro-item-2` (CI comment), `epic-5-retro-item-4` (closure check in `/commit-review`, the
-prevention for this document going stale three times), and `epic-6-retro-item-2` (correct-course, see
-§4). `epic-6-retro-item-1` (this re-close) and `epic-6-retro-item-3` (project-profile rule) are done.
+At the 2026-10-01 re-close, one `sprint-status.yaml` action item is not `done`:
+`epic-6-retro-item-2` (correct-course, see §4). Done the same day: `epic-6-retro-item-1` (this
+re-close), `epic-6-retro-item-3` (project-profile rule), `epic-5-retro-item-2` (CI comment in
+`ci.yml`) and `epic-5-retro-item-4` (`/commit-review` step 4ter: an epic-closing story updates this
+document and `epic-<N>-context.md` in its closure commit — the prevention for this document going
+stale at three epic closures).
 
 ## 4. Deferred work — not resolved at closure
 

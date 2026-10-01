@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 16:00
-last_updated: 10-01-2026 13:25
+last_updated: 10-01-2026 13:28
 project: TextToXml
 project_key: NOKEY
 tracking_system: file-system
@@ -605,7 +605,7 @@ action_items:
       not share SqlServerIntegrationFixture (only AscoLsiJournal.Tests and Kape22Importer.Tests
       do)."
     owner: "Dev"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-5-retro-2026-09-28.md"
   - id: "epic-5-retro-item-3-correct-course-shared-worker-debt"
     epic: 5
@@ -619,7 +619,7 @@ action_items:
     action: "Add a check to the /commit-review closure step: when a story closes an
       epic, PROJECT-CLOSED.md and epic-<N>-context.md are updated in the same commit."
     owner: "SM"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-5-retro-2026-09-28.md"
   - id: "epic-6-retro-item-1-reclose-project-closed-svn-ledger"
     epic: 6

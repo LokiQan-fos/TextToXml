@@ -83,6 +83,22 @@ Passe la story <N>-<M> de review à done dans _bmad-output/implementation-
 artifacts/sprint-status.yaml. Vérifie la cohérence de l'épic parent (reste
 in-progress tant que toutes les stories ne sont pas done).
 
+ÉTAPE 4ter — Clôture d'épic (seulement si cette story est la dernière).
+Si, après l'Étape 4, toutes les stories <N>-* sont done (l'épic <N> passe
+à done), mets à jour dans le même commit :
+- _bmad-output/implementation-artifacts/PROJECT-CLOSED.md : bandeau en
+  tête (« Epic <N> done <date>, story <N>.<M> ; rétrospective en attente »),
+  ligne Épic <N> du tableau §1 (périmètre, stories x/x done, verdict
+  « retro pending »), chiffres de test de l'Étape 5 en §5. Ne touche pas
+  au statut de clôture du frontmatter : c'est la rétro qui re-clôture ;
+- _bmad-output/implementation-artifacts/epic-<N>-context.md : toute phrase
+  d'état périmée (story « in review », « in progress ») passe à done.
+Si l'un de ces fichiers n'existe pas, signale-le et continue.
+Contrôle avant l'Étape 6 : si l'épic passe à done et que git status
+--short ne montre pas PROJECT-CLOSED.md modifié, ARRÊTE et signale.
+(Motif : PROJECT-CLOSED.md resté périmé à trois clôtures d'épic — rétro #4
+F-3, rétro Épic 5 F-1, rétro Épic 6 F-2.)
+
 ÉTAPE 4bis — Mise à jour du rapport de revue.
 Le rapport vit sous _bmad-output/implementation-artifacts/reviews/ et est
 versionné. Si RÉSOLUTION 2 l'a trouvé ailleurs ou dans la conversation,
@@ -132,7 +148,8 @@ Stage uniquement :
 - _bmad-output/implementation-artifacts/deferred-work.md (si modifié),
 - _bmad-output/implementation-artifacts/sprint-status.yaml,
 - le rapport de revue sous _bmad-output/implementation-artifacts/reviews/
-  (ÉTAPE 4bis), même s'il n'est pas encore tracké.
+  (ÉTAPE 4bis), même s'il n'est pas encore tracké,
+- PROJECT-CLOSED.md et epic-<N>-context.md si l'ÉTAPE 4ter s'applique.
 Ne touche pas aux autres fichiers non trackés (.claude/commands/,
 _bmad/custom/*.toml) et ne les stage pas.
 
@@ -147,7 +164,8 @@ RÈGLES :
 - Ne jamais appliquer un Patch mal compris — arrête et demande.
 - Ne jamais ignorer un finding — soit appliqué, soit tracé, jamais silencieux.
 - Ne pas mélanger corrections de revue et améliorations opportunistes.
-- Ne pas modifier les fichiers hors scope sauf le ledger, le sprint-status et
-  le rapport de revue.
+- Ne pas modifier les fichiers hors scope sauf le ledger, le sprint-status,
+  le rapport de revue et, à la clôture d'un épic, PROJECT-CLOSED.md et
+  epic-<N>-context.md (ÉTAPE 4ter).
 - Si un des paramètres (RÉSOLUTION 1/2/3) échoue, arrête immédiatement —
   n'invente pas de valeur, ne tombe pas dans une cascade par défaut.
