@@ -19,12 +19,17 @@ namespace Kape22Importer;
 // Import:XmlExportPath, a folder the purge never touches.
 // The per-Fichier pipeline itself is IFichierProcessor (Story 3.2); the worker that calls RunTick on a
 // timer is GpaoImportP60.Client in MicroServices.sln (Story 3.4).
+// AC-FR25-8 (Story 6.7): attempts is a caller-owned per-Fichier counter of consecutive attempts that left
+// the Fichier in processing/. The scanner is rebuilt every tick, so the worker keeps the counter across
+// ticks; null keeps the uncapped behavior. The counter must be built with StringComparer.OrdinalIgnoreCase:
+// the prune of names absent from processing/ ignores case, while lookups follow the dictionary's comparer.
 public sealed class InboxScanner(
     IFileSource fileSource,
     IFichierProcessor processor,
     ImportOptions options,
     TimeProvider timeProvider,
-    ILogger<InboxScanner> logger)
+    ILogger<InboxScanner> logger,
+    Dictionary<string, int>? attempts = null)
 {
     // The inbox root folder, relative to the reception root.
     private const string InboxFolder = "";
@@ -65,6 +70,17 @@ public sealed class InboxScanner(
             return false;
         }
 
+        // AC-FR25-8: a Fichier no longer in processing/ (filed, or removed by an operator) has its count
+        // dropped, so the same name dropped in the inbox later starts afresh.
+        if (attempts is not null)
+        {
+            HashSet<string> present = new(stranded.Select(entry => entry.Name), StringComparer.OrdinalIgnoreCase);
+            foreach (string name in attempts.Keys.Where(name => !present.Contains(name)).ToList())
+            {
+                attempts.Remove(name);
+            }
+        }
+
         foreach (FichierEntry entry in Ordered(stranded))
         {
             if (cancellationToken.IsCancellationRequested)
@@ -72,7 +88,13 @@ public sealed class InboxScanner(
                 return true;
             }
 
-            ProcessFromProcessing(entry.Name);
+            // AC-FR25-8: a frozen Fichier gets no processing, no journal call and no log until restart.
+            if (IsFrozen(entry.Name))
+            {
+                continue;
+            }
+
+            Attempt(entry.Name);
         }
 
         if (!TryStableInboxFichiers(out IReadOnlyList<FichierEntry> ready))
@@ -103,10 +125,49 @@ public sealed class InboxScanner(
                 return true;
             }
 
-            ProcessFromProcessing(entry.Name);
+            // AC-FR25-8: a newly arrived Fichier starts afresh, even when the move replaced a frozen one of
+            // the same name in processing/.
+            attempts?.Remove(entry.Name);
+            Attempt(entry.Name);
         }
 
         return true;
+    }
+
+    // AC-FR25-8: true when the Fichier reached Import:MaxAttempts consecutive retained attempts (cap on).
+    private bool IsFrozen(string fichierName) =>
+        attempts is not null
+        && options.MaxAttempts > 0
+        && attempts.TryGetValue(fichierName, out int count)
+        && count >= options.MaxAttempts;
+
+    // Processes one Fichier from processing/ and keeps its attempts count (AC-FR25-8): an attempt that
+    // leaves it in processing/ counts one more, and the MaxAttempts-th logs one Error with the last cause;
+    // an attempt that files it drops the count. Without a counter, nothing is counted.
+    private void Attempt(string fichierName)
+    {
+        string? cause = ProcessFromProcessing(fichierName);
+        if (attempts is null)
+        {
+            return;
+        }
+
+        if (cause is null)
+        {
+            attempts.Remove(fichierName);
+            return;
+        }
+
+        int count = attempts.GetValueOrDefault(fichierName) + 1;
+        attempts[fichierName] = count;
+        if (count == options.MaxAttempts)
+        {
+            logger.LogError(
+                "Fichier {Fichier} left in processing/ after {Attempts} attempts ({Reason}); no longer processed until the worker restarts.",
+                fichierName,
+                count,
+                cause);
+        }
     }
 
     // Lists a reception folder, translating an unreachable folder (AC-FR15-2) into a single Warning and
@@ -185,7 +246,9 @@ public sealed class InboxScanner(
         }
     }
 
-    private void ProcessFromProcessing(string fichierName)
+    // Returns the cause when the Fichier is left in processing/ for a retry (AC-FR25-8): the read fault, the
+    // persistence failure message(s) or the filing failure; null when the Fichier was filed.
+    private string? ProcessFromProcessing(string fichierName)
     {
         // The read is guarded on its own: a transient I/O fault reading this one Fichier (a file lock, a
         // Fichier removed between the listing and the read, a full disk) leaves it in processing/ for the
@@ -203,7 +266,7 @@ public sealed class InboxScanner(
                 "Fichier {Fichier} could not be read ({Reason}); left in processing/, will retry.",
                 fichierName,
                 exception.Message);
-            return;
+            return exception.Message;
         }
 
         FichierProcessingResult result;
@@ -233,7 +296,7 @@ public sealed class InboxScanner(
         {
             logger.LogWarning(
                 "Fichier {Fichier} left in processing/ after a persistence failure; will retry.", fichierName);
-            return;
+            return string.Join("; ", result.Errors.Where(IsPersistenceError).Select(error => error.Message));
         }
 
         // One clock reading dates both the export file name and the archive/<yyyy>/<MM> folder.
@@ -275,11 +338,12 @@ public sealed class InboxScanner(
                 "Fichier {Fichier} outcome could not be filed ({Reason}); left in processing/ for retry.",
                 fichierName,
                 exception.Message);
-            return;
+            return exception.Message;
         }
 
         logger.LogInformation(
             "Fichier {Fichier} processed: {Outcome}.", fichierName, result.Success ? "archived" : "rejected");
+        return null;
     }
 
     // The result stand-in for a Fichier whose processing threw: a single File-level UnexpectedFailure
@@ -386,8 +450,10 @@ public sealed class InboxScanner(
     // PersistenceError (a P60Deserializer schema failure is SchemaInvalid, an unexpected throw is
     // UnexpectedFailure), so it is a precise signal for "leave the Fichier in processing/ and retry",
     // distinct from a Converter, schema or Mapper rejection (which belongs in error/).
-    private static bool IsPersistenceFailure(FichierProcessingResult result) =>
-        result.Errors.Any(error => error is { Block: Block.File, Code: ErrorCode.PersistenceError });
+    private static bool IsPersistenceError(ConversionError error) =>
+        error is { Block: Block.File, Code: ErrorCode.PersistenceError };
+
+    private static bool IsPersistenceFailure(FichierProcessingResult result) => result.Errors.Any(IsPersistenceError);
 
     // AC-FR12-1: oldest to newest, a deterministic order (the Name breaks ties between equal timestamps).
     private static IEnumerable<FichierEntry> Ordered(IEnumerable<FichierEntry> entries) =>

@@ -1331,11 +1331,11 @@ s'y trouver et rester à confirmer.
 
 ## Deferred from: code review of story-6.1 (2026-09-28)
 
-- source_spec: **RESOLVED 2026-10-01 by Story 6.6** (AC-FR25-9: `GpaoImportP60` `ReadConfig` refuses an `Import:Commande` over 50 chars, naming the key) · remainder **PLANNED: Story 6.7** (AC-FR25-8, retry cap) — sprint-change-proposal-2026-10-01.md · **UNPLANNED 2026-09-29 (Story 6.4 scope decision)** — `spec-6-1-journal-p60-via-ifichierjournal.md`
+- source_spec: **RESOLVED 2026-10-01 by Story 6.6** (AC-FR25-9: `GpaoImportP60` `ReadConfig` refuses an `Import:Commande` over 50 chars, naming the key) · remainder **RESOLVED 2026-10-01 by Story 6.7** (AC-FR25-8: a Fichier left in `processing/` for `Import:MaxAttempts` ticks gets one Error and is frozen until restart, so the loop stops) — sprint-change-proposal-2026-10-01.md · **UNPLANNED 2026-09-29 (Story 6.4 scope decision)** — `spec-6-1-journal-p60-via-ifichierjournal.md`
   summary: `Import:Commande` longer than `L_D_LOG_COMMANDE.Commande` (50) is not rejected at `GpaoImportP60` startup; every journal write then fails, and committed Fichiers loop in `processing/` (guard hit + failed journal each tick) until the setting is fixed. Every business rejection with a readable OF loops too (its failure entry fails, so it never reaches `error/`) and logs `ImportRejected` at Error each tick.
   evidence: Raised by the edge-case-hunter lens. No duplicate business data (D22 guard), and the `JournalPending` Warning names the cause every tick; startup validation of the worker's configuration keys was routed to Story 6.4 (AC-FR25-4), which excluded it on 2026-09-29.
 
-- source_spec: **PLANNED 2026-10-01: Story 6.7** (AC-FR25-8: one Error after `Import:MaxAttempts` ticks, Fichier frozen in `processing/` until restart, never quarantined) — sprint-change-proposal-2026-10-01.md · **UNPLANNED 2026-09-29 (Story 6.4 scope decision)** — `reviews/story-6-1/aggregated-report.md` (F-1, low)
+- source_spec: **RESOLVED 2026-10-01 by Story 6.7** (AC-FR25-8: one Error after `Import:MaxAttempts` ticks, Fichier frozen in `processing/` until restart, never quarantined; `P89:MaxAttempts` does the same for `Deferred` P89 Fichiers) — sprint-change-proposal-2026-10-01.md · **UNPLANNED 2026-09-29 (Story 6.4 scope decision)** — `reviews/story-6-1/aggregated-report.md` (F-1, low)
   summary: Every journal exception becomes a retryable File-level `PersistenceError`, so a deterministic journal failure (truncation, invalid argument, NRE) leaves the Fichier in `processing/` indefinitely instead of quarantining it in `error/`.
   evidence: edge-case-hunter + blind-hunter lenses, `src/Kape22Importer/Persistence/Kape22Persister.cs:279-306` (`Recorded`, `JournalFailure`) and `:244` (`CompleteAlreadyImported`). The broad catch is an explicit spec choice shared with `P89FolderConverter.TryRecord`; an exception-type filter cannot separate outage from defect, so the fix is a per-Fichier retry cap in the worker loop (once routed to Story 6.4 hardening, excluded on 2026-09-29).
 
@@ -1357,7 +1357,7 @@ s'y trouver et rester à confirmer.
 
 ## Deferred from: code review of story-6.3, closure (2026-09-29)
 
-- source_spec: **PLANNED 2026-10-01: Story 6.7** (AC-FR25-8, retry cap) — sprint-change-proposal-2026-10-01.md · **UNPLANNED 2026-09-29 (Story 6.4 scope decision)** — `reviews/story-6-3/aggregated-report.md` (F-1, medium)
+- source_spec: **RESOLVED 2026-10-01 by Story 6.7** (AC-FR25-8: an unreachable export folder now freezes the Fichier in `processing/` after `Import:MaxAttempts` ticks, one Error, no further `Logs` / journal rows) — sprint-change-proposal-2026-10-01.md · **UNPLANNED 2026-09-29 (Story 6.4 scope decision)** — `reviews/story-6-3/aggregated-report.md` (F-1, medium)
   summary: An unreachable P60 export folder keeps every Fichier in `processing/` with no retry cap; each tick reruns the processor against `AscoLSI`, rewriting an `AlreadyImported` Logs row (committed success) or the "REJETÉ" journal entry and an `ImportRejected` row (rejection).
   evidence: blind-hunter + acceptance-auditor (out of mandate) lenses, `src/Kape22Importer/InboxScanner.cs:241-274` and `Kape22FichierProcessor.cs:147-186`. AC-FR26-6 requires the Fichier to stay in `processing/`; the per-Fichier retry cap was routed to Story 6.4 (Story 6.1 F-1), which excluded it on 2026-09-29, and Story 6.3 only adds a new trigger.
 
@@ -1434,3 +1434,8 @@ s'y trouver et rester à confirmer.
 - source_spec: `spec-6-6-validation-config-panne-partage-workers-gpao.md` (D-2, low)
   summary: `Actions_MissingInbox_IsCheckedInsideTheTickTask_AcFr25_10` proves the inbox check runs inside the tick task by matching `TargetSite.Name` against the compiler-generated `<Actions>b__` lambda name, which a compiler or lowering change can break.
   evidence: blind-hunter + acceptance-auditor (out of mandate) lenses, `GPAO/ImportP60.Tests/ClientRobustnessTests.cs`. The observable property (Stop() within budget while `Directory.Exists` blocks on a dead share) has no seam to test without production changes; the test is kept, the fragility recorded.
+
+## Deferred from: code review of story-6.7 (2026-10-01)
+- source_spec: `spec-6-7-plafond-reessai-par-fichier.md`
+  summary: A non-I/O exception escaping a Fichier's read or filing (P60 `InboxScanner.ProcessFromProcessing` around `fileSource.Read` / `Export` / `Archive` / `Reject`) or its conversion (P89 `P89FolderConverter.Process`, which only catches `IOException` / `UnauthorizedAccessException`) aborts the whole tick before the Fichier is counted, so the AC-FR25-8 retry cap never freezes it: `onError` fires and later Fichiers are starved every tick.
+  evidence: edge-case-hunter lens, Story 6.7 review. Pre-existing escape path (the cap only adds a new place where it goes uncounted); no known trigger in production code, since `processor.Process` throws are already contained as `UnexpectedFailure`.

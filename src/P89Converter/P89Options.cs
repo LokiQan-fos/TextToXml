@@ -15,6 +15,11 @@ public sealed class P89Options
     // Folder a rejected Fichier is moved to, under <name>_<yyyyMMddHHmmss>.
     public string ErrorPath { get; set; } = string.Empty;
 
+    // AC-FR25-8 (Story 6.7): a Fichier deferred this many consecutive ticks is reported once as Frozen and
+    // no longer processed until the worker restarts. Defaults to 10; zero or less turns the cap off at
+    // library level (GpaoConvertP89 refuses a value below 1).
+    public int MaxAttempts { get; set; } = 10;
+
     // Delay between two scans of the source folder.
     public TimeSpan PollingInterval { get; set; }
 

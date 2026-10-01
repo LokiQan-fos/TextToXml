@@ -431,6 +431,142 @@ public sealed class P89FolderConverterTests : IDisposable
         Assert.Single(this.folders.Names(this.folders.Source));
     }
 
+    // AC-FR25-8: N consecutive Deferred ticks (here a failing journal, N = 3): ticks 1..N-1 are Deferred and
+    // tick N is one Frozen outcome carrying the same reasons; the Fichier stays in the source folder and is
+    // never moved to error.
+    [Fact]
+    [Trait("AC", "FR25-8")]
+    public void RunTick_DeferredForMaxAttemptsTicks_ReportsOneFrozenOutcome_AcFr25_8()
+    {
+        string name = ReferenceFichierNames[0];
+        this.folders.Drop(name, ReadFixture(name));
+        P89FolderConverter converter = this.CappedConverter(new RecordingJournal(new IOException("unreachable")));
+
+        P89FichierOutcome first = Assert.Single(converter.RunTick());
+        P89FichierOutcome second = Assert.Single(converter.RunTick());
+        P89FichierOutcome third = Assert.Single(converter.RunTick());
+
+        Assert.Equal(P89FichierStatus.Deferred, first.Status);
+        Assert.Equal(P89FichierStatus.Deferred, second.Status);
+        Assert.Equal(P89FichierStatus.Frozen, third.Status);
+        Assert.Equal(name, third.FichierName);
+        Assert.Contains(third.Reasons, reason => reason.Contains("unreachable", StringComparison.Ordinal));
+        Assert.Equal([name], this.folders.Names(this.folders.Source));
+        Assert.Empty(this.folders.Names(this.folders.Error));
+        Assert.Empty(this.folders.Names(this.folders.Xml));
+    }
+
+    // AC-FR25-8: from tick N+1 a frozen Fichier still in the source folder gets no outcome and no journal call.
+    [Fact]
+    [Trait("AC", "FR25-8")]
+    public void RunTick_FrozenFichier_GetsNoOutcomeNorJournalCall_AcFr25_8()
+    {
+        this.folders.Drop(ReferenceFichierNames[0], ReadFixture(ReferenceFichierNames[0]));
+        RecordingJournal failing = new(new IOException("unreachable"));
+        P89FolderConverter converter = this.CappedConverter(failing);
+        for (int tick = 0; tick < 3; tick++)
+        {
+            converter.RunTick();
+        }
+
+        Assert.Empty(converter.RunTick());
+        Assert.Empty(converter.RunTick());
+        Assert.Equal(3, failing.Calls);
+        Assert.Single(this.folders.Names(this.folders.Source));
+    }
+
+    // AC-FR25-8: a frozen Fichier that leaves the source folder has its count dropped when its name is absent
+    // from a listing, so the same name brought back by the index rotation is processed again.
+    [Fact]
+    [Trait("AC", "FR25-8")]
+    public void RunTick_FrozenNameReused_IsProcessedAgain_AcFr25_8()
+    {
+        string name = ReferenceFichierNames[0];
+        this.folders.Drop(name, ReadFixture(name));
+        RecordingJournal journal = new(new IOException("unreachable"));
+        P89FolderConverter converter = this.CappedConverter(journal);
+        for (int tick = 0; tick < 3; tick++)
+        {
+            converter.RunTick();
+        }
+
+        File.Delete(Path.Combine(this.folders.Source, name));
+        Assert.Empty(converter.RunTick());
+
+        journal.Failure = null;
+        this.folders.Drop(name, ReadFixture(name));
+        P89FichierOutcome outcome = Assert.Single(converter.RunTick());
+
+        Assert.Equal(P89FichierStatus.Converted, outcome.Status);
+        Assert.Empty(this.folders.Names(this.folders.Source));
+    }
+
+    // AC-FR25-8: a Fichier converted before the cap has its count dropped at once: the same name dropped
+    // again before the next listing and deferred (its done target now exists) starts from one, not Frozen.
+    [Fact]
+    [Trait("AC", "FR25-8")]
+    public void RunTick_ConvertedBeforeTheCap_DropsTheCount_AcFr25_8()
+    {
+        string name = ReferenceFichierNames[0];
+        this.folders.Drop(name, ReadFixture(name));
+        RecordingJournal journal = new(new IOException("unreachable"));
+        P89FolderConverter converter = this.CappedConverter(journal);
+        converter.RunTick();
+        converter.RunTick();
+        journal.Failure = null;
+        Assert.Equal(P89FichierStatus.Converted, Assert.Single(converter.RunTick()).Status);
+
+        this.folders.Drop(name, ReadFixture(name));
+
+        Assert.Equal(P89FichierStatus.Deferred, Assert.Single(converter.RunTick()).Status);
+    }
+
+    // AC-FR25-8: with MaxAttempts = 1 the first deferral is already the Frozen outcome, and the next tick
+    // skips the Fichier.
+    [Fact]
+    [Trait("AC", "FR25-8")]
+    public void RunTick_MaxAttemptsOne_FreezesAtTheFirstDeferral_AcFr25_8()
+    {
+        this.folders.Drop(ReferenceFichierNames[0], ReadFixture(ReferenceFichierNames[0]));
+        RecordingJournal failing = new(new IOException("unreachable"));
+        P89FolderConverter converter = this.CappedConverter(failing, 1);
+
+        Assert.Equal(P89FichierStatus.Frozen, Assert.Single(converter.RunTick()).Status);
+        Assert.Empty(converter.RunTick());
+        Assert.Equal(1, failing.Calls);
+    }
+
+    // AC-FR25-8: a library MaxAttempts of zero or less keeps today's behavior: Deferred every tick.
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [Trait("AC", "FR25-8")]
+    public void RunTick_NoCap_DefersEveryTick_AcFr25_8(int maxAttempts)
+    {
+        this.folders.Drop(ReferenceFichierNames[0], ReadFixture(ReferenceFichierNames[0]));
+        RecordingJournal failing = new(new IOException("unreachable"));
+        P89FolderConverter converter = this.CappedConverter(failing, maxAttempts);
+
+        for (int tick = 0; tick < 5; tick++)
+        {
+            Assert.Equal(P89FichierStatus.Deferred, Assert.Single(converter.RunTick()).Status);
+        }
+
+        Assert.Equal(5, failing.Calls);
+    }
+
+    // AC-FR25-8: P89:MaxAttempts defaults to 10.
+    [Fact]
+    [Trait("AC", "FR25-8")]
+    public void P89Options_MaxAttempts_DefaultsToTen_AcFr25_8() => Assert.Equal(10, new P89Options().MaxAttempts);
+
+    private P89FolderConverter CappedConverter(IFichierJournal journal, int maxAttempts = 3)
+    {
+        P89Options options = this.Options();
+        options.MaxAttempts = maxAttempts;
+        return new(options, journal, new FixedClock(Instant));
+    }
+
     private P89FolderConverter Converter(DateTimeOffset instant, IFichierJournal? journal = null) =>
         new(this.Options(), journal ?? this.journal, new FixedClock(instant));
 

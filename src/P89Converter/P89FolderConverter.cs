@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Xml.Schema;
@@ -17,12 +18,17 @@ namespace P89Converter;
 // never collides with an earlier conversion, and nothing is ever overwritten. A done or error target that
 // already exists defers the Fichier before anything is written or recorded. A journal failure or a
 // file-system fault defers it too: the XML this tick wrote is deleted, the Fichier stays in the source
-// folder and is retried at the next tick.
+// folder and is retried at the next tick. Story 6.7 (AC-FR25-8): the P89:MaxAttempts-th consecutive deferral
+// is reported once as Frozen, and the Fichier is then skipped until the worker restarts.
 public sealed class P89FolderConverter
 {
     private const string Commande = "P89";
 
     private static readonly Encoding Utf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+
+    // AC-FR25-8 (Story 6.7): consecutive Deferred ticks per source Fichier name. In memory: this converter
+    // lives as long as the worker, so a restart starts every count afresh.
+    private readonly Dictionary<string, int> attempts = new(StringComparer.OrdinalIgnoreCase);
 
     private readonly IFichierJournal journal;
     private readonly P89Options options;
@@ -63,6 +69,14 @@ public sealed class P89FolderConverter
         FileInfo[] files = new DirectoryInfo(this.options.SourcePath).GetFiles("LP89_*");
         Array.Sort(files, (left, right) => StringComparer.OrdinalIgnoreCase.Compare(left.Name, right.Name));
 
+        // AC-FR25-8: a Fichier no longer in the source folder has its count dropped, so a name brought back
+        // by the index rotation starts afresh.
+        HashSet<string> present = new(files.Select(file => file.Name), StringComparer.OrdinalIgnoreCase);
+        foreach (string name in this.attempts.Keys.Where(name => !present.Contains(name)).ToList())
+        {
+            this.attempts.Remove(name);
+        }
+
         List<P89FichierOutcome> outcomes = [];
         foreach (FileInfo file in files)
         {
@@ -79,10 +93,36 @@ public sealed class P89FolderConverter
                 continue;
             }
 
-            outcomes.Add(this.Process(file.FullName, suffix, now));
+            // AC-FR25-8: a frozen Fichier gets no outcome and no journal call until the worker restarts.
+            if (this.options.MaxAttempts > 0
+                && this.attempts.TryGetValue(file.Name, out int count)
+                && count >= this.options.MaxAttempts)
+            {
+                continue;
+            }
+
+            outcomes.Add(this.Counted(file.Name, this.Process(file.FullName, suffix, now)));
         }
 
         return outcomes;
+    }
+
+    // AC-FR25-8: a Deferred outcome counts one more consecutive attempt, and the MaxAttempts-th one becomes
+    // Frozen with the same reasons; any other outcome means the Fichier left the source folder, so its count
+    // is dropped. The key is the listed name, the one the frozen check and the prune use.
+    private P89FichierOutcome Counted(string fichierName, P89FichierOutcome outcome)
+    {
+        if (outcome.Status != P89FichierStatus.Deferred)
+        {
+            this.attempts.Remove(fichierName);
+            return outcome;
+        }
+
+        int count = this.attempts.GetValueOrDefault(fichierName) + 1;
+        this.attempts[fichierName] = count;
+        return count == this.options.MaxAttempts
+            ? Outcome(outcome.FichierName, P89FichierStatus.Frozen, outcome.TargetName, outcome.Reasons)
+            : outcome;
     }
 
     private static FichierJournalEntry Entry(string fichierName, P89Conversion conversion, DateTimeOffset now) => new()
@@ -243,6 +283,10 @@ public enum P89FichierStatus
 
     // Left in the source folder, retried at the next tick (journal failure, file-system fault).
     Deferred,
+
+    // Deferred for the P89:MaxAttempts-th consecutive tick (AC-FR25-8): left in the source folder, with the
+    // reasons of that last attempt, and no longer processed until the worker restarts.
+    Frozen,
 
     // Recorded in the journal with its reasons and moved to the error folder.
     Rejected,

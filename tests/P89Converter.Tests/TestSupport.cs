@@ -107,22 +107,26 @@ internal sealed class TempFolders : IDisposable
             : [];
 }
 
-// An IFichierJournal that keeps every entry it is handed, or throws the given exception instead, the way a
-// journal whose write fails does.
+// An IFichierJournal that keeps every entry it is handed, or throws Failure instead, the way a journal whose
+// write fails does. Calls counts every Record call, failed or not; a test clears Failure to model a journal
+// that recovers (AC-FR25-8).
 internal sealed class RecordingJournal(Exception? failure = null) : IFichierJournal
 {
-    private readonly Exception? failure = failure;
+    public int Calls { get; private set; }
 
     public List<FichierJournalEntry> Entries { get; } = [];
+
+    public Exception? Failure { get; set; } = failure;
 
     // P89 never asks: it has no anti-duplicate guard.
     public bool HasSuccess(FichierJournalEntry entry) => throw new NotSupportedException();
 
     public void Record(FichierJournalEntry entry)
     {
-        if (this.failure is not null)
+        this.Calls++;
+        if (this.Failure is not null)
         {
-            throw this.failure;
+            throw this.Failure;
         }
 
         this.Entries.Add(entry);

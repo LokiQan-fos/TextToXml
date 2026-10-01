@@ -48,8 +48,9 @@ public sealed class InboxScannerTests : IDisposable
         IFichierProcessor processor,
         ImportOptions? options = null,
         RecordingLogger<InboxScanner>? logger = null,
-        DateTimeOffset? now = null) =>
-        new(fileSource, processor, options ?? Options(), new FixedClock(now ?? Now), logger ?? new RecordingLogger<InboxScanner>());
+        DateTimeOffset? now = null,
+        Dictionary<string, int>? attempts = null) =>
+        new(fileSource, processor, options ?? Options(), new FixedClock(now ?? Now), logger ?? new RecordingLogger<InboxScanner>(), attempts);
 
     private static FakeFichierProcessor AlwaysSucceeds() =>
         new((name, _) => new FichierProcessingResult { NormalizedXml = $"<file name=\"{name}\" />" });
@@ -679,4 +680,244 @@ public sealed class InboxScannerTests : IDisposable
         locked.Add("", "P60_847_682_001", Bytes("payload"), Now.AddMinutes(-1));
         Assert.True(Scanner(locked, AlwaysSucceeds()).RunTick());
     }
+
+    // AC-FR25-8 (Story 6.7): the Fichier name used by every retry-cap test.
+    private const string Stuck = "P60_847_682_001";
+
+    private static ImportOptions CappedOptions(int maxAttempts = 3)
+    {
+        ImportOptions options = Options();
+        options.MaxAttempts = maxAttempts;
+        return options;
+    }
+
+    private static FichierProcessingResult PersistenceFailure() => new()
+    {
+        Errors =
+        [
+            new ConversionError { Block = Block.File, Code = ErrorCode.PersistenceError, Message = "AscoLSI unreachable." },
+        ],
+    };
+
+    // Runs one tick with a fresh logger and returns it, so each tick's log lines can be checked alone.
+    private static RecordingLogger<InboxScanner> Tick(
+        InMemoryFileSource source, IFichierProcessor processor, ImportOptions options, Dictionary<string, int>? attempts)
+    {
+        RecordingLogger<InboxScanner> logger = new();
+        Scanner(source, processor, options, logger, attempts: attempts).RunTick();
+        return logger;
+    }
+
+    // AC-FR25-8: a Fichier left in processing/ (persistence failure, read fault, filing failure) logs only
+    // its usual Warning on ticks 1..N-1; tick N adds one Error naming the Fichier and the last cause. It is
+    // never moved to error/ (AC-FR15-3).
+    [Theory]
+    [InlineData("persistence", "AscoLSI unreachable.")]
+    [InlineData("read", "locked by another process")]
+    [InlineData("filing", "archive unreachable")]
+    [Trait("AC", "FR25-8")]
+    public void RunTick_FichierLeftInProcessingForMaxAttemptsTicks_LogsOneErrorOnTheLast_AcFr25_8(string cause, string reason)
+    {
+        InMemoryFileSource source = new();
+        source.Add("processing", Stuck, Bytes("payload"), Now.AddMinutes(-1));
+        switch (cause)
+        {
+            case "read":
+                source.ReadFault = new IOException(reason);
+                break;
+            case "filing":
+                source.MoveFault = new IOException(reason);
+                break;
+        }
+
+        FakeFichierProcessor processor = cause == "persistence"
+            ? new((_, _) => PersistenceFailure())
+            : AlwaysSucceeds();
+        Dictionary<string, int> attempts = new(StringComparer.OrdinalIgnoreCase);
+
+        for (int tick = 1; tick < 3; tick++)
+        {
+            RecordingLogger<InboxScanner> early = Tick(source, processor, CappedOptions(), attempts);
+            Assert.Single(early.AtLevel(LogLevel.Warning));
+            Assert.Empty(early.AtLevel(LogLevel.Error));
+        }
+
+        RecordingLogger<InboxScanner> last = Tick(source, processor, CappedOptions(), attempts);
+
+        Assert.Single(last.AtLevel(LogLevel.Warning));
+        string error = Assert.Single(last.AtLevel(LogLevel.Error)).Message;
+        Assert.Contains(Stuck, error);
+        Assert.Contains(reason, error);
+        Assert.True(source.Exists("processing", Stuck));
+        Assert.Empty(source.Names("error"));
+    }
+
+    // AC-FR25-8: from tick N+1, a frozen Fichier still in processing/ is not processed and logs nothing.
+    [Fact]
+    [Trait("AC", "FR25-8")]
+    public void RunTick_FrozenFichier_IsNotProcessedNorLogged_AcFr25_8()
+    {
+        InMemoryFileSource source = new();
+        source.Add("processing", Stuck, Bytes("payload"), Now.AddMinutes(-1));
+        FakeFichierProcessor processor = new((_, _) => PersistenceFailure());
+        Dictionary<string, int> attempts = new(StringComparer.OrdinalIgnoreCase);
+        for (int tick = 0; tick < 3; tick++)
+        {
+            Tick(source, processor, CappedOptions(), attempts);
+        }
+
+        RecordingLogger<InboxScanner> frozen = Tick(source, processor, CappedOptions(), attempts);
+        Tick(source, processor, CappedOptions(), attempts);
+
+        Assert.Equal(3, processor.Calls.Count);
+        Assert.Empty(frozen.Entries);
+        Assert.True(source.Exists("processing", Stuck));
+    }
+
+    // AC-FR25-8: a Fichier that fails N-1 times then succeeds logs no Error and its count is dropped.
+    [Fact]
+    [Trait("AC", "FR25-8")]
+    public void RunTick_SuccessBeforeTheCap_LogsNoErrorAndDropsTheCount_AcFr25_8()
+    {
+        InMemoryFileSource source = new();
+        source.Add("processing", Stuck, Bytes("payload"), Now.AddMinutes(-1));
+        int calls = 0;
+        FakeFichierProcessor processor = new((name, _) => ++calls < 3
+            ? PersistenceFailure()
+            : new FichierProcessingResult { NormalizedXml = $"<file name=\"{name}\" />" });
+        Dictionary<string, int> attempts = new(StringComparer.OrdinalIgnoreCase);
+
+        List<RecordingLogger<InboxScanner>> loggers = [];
+        for (int tick = 0; tick < 3; tick++)
+        {
+            loggers.Add(Tick(source, processor, CappedOptions(), attempts));
+        }
+
+        Assert.All(loggers, logger => Assert.Empty(logger.AtLevel(LogLevel.Error)));
+        Assert.True(source.Exists(ArchiveDateFolder, Stuck));
+        Assert.Empty(attempts);
+    }
+
+    // AC-FR25-8: a frozen Fichier removed from processing/ by an operator has its count dropped at the next
+    // processing/ listing; the same name dropped in the inbox later is processed normally. A key still in
+    // the listing is kept, matched ignoring case.
+    [Fact]
+    [Trait("AC", "FR25-8")]
+    public void RunTick_FrozenFichierLeftProcessing_IsProcessedAgainWhenItComesBack_AcFr25_8()
+    {
+        InMemoryFileSource source = new();
+        source.Add("processing", Stuck, Bytes("payload"), Now.AddMinutes(-1));
+        source.Add("processing", "P60_000_000_009", Bytes("other"), Now.AddMinutes(-1));
+        bool failing = true;
+        FakeFichierProcessor processor = new((name, _) => failing
+            ? PersistenceFailure()
+            : new FichierProcessingResult { NormalizedXml = $"<file name=\"{name}\" />" });
+        Dictionary<string, int> attempts = new(StringComparer.OrdinalIgnoreCase) { ["p60_000_000_009"] = 3 };
+        for (int tick = 0; tick < 3; tick++)
+        {
+            Tick(source, processor, CappedOptions(), attempts);
+        }
+
+        source.Delete("processing", Stuck);
+        Tick(source, processor, CappedOptions(), attempts);
+        Assert.False(attempts.ContainsKey(Stuck));
+        Assert.True(attempts.ContainsKey("P60_000_000_009"));
+        Assert.DoesNotContain("P60_000_000_009", processor.Calls);
+
+        failing = false;
+        source.Add("", Stuck, Bytes("payload"), Now.AddMinutes(-1));
+        Tick(source, processor, CappedOptions(), attempts);
+
+        Assert.Equal(4, processor.Calls.Count(name => name == Stuck));
+        Assert.True(source.Exists(ArchiveDateFolder, Stuck));
+    }
+
+    // AC-FR25-8: an inbox Fichier with the name of a frozen one still in processing/ replaces it on the move
+    // and starts afresh: it is processed, and if it keeps failing it gets its own Error at MaxAttempts.
+    [Fact]
+    [Trait("AC", "FR25-8")]
+    public void RunTick_InboxFichierReplacingAFrozenOne_StartsAfresh_AcFr25_8()
+    {
+        InMemoryFileSource source = new();
+        source.Add("processing", Stuck, Bytes("old"), Now.AddMinutes(-1));
+        FakeFichierProcessor processor = new((_, _) => PersistenceFailure());
+        Dictionary<string, int> attempts = new(StringComparer.OrdinalIgnoreCase);
+        for (int tick = 0; tick < 3; tick++)
+        {
+            Tick(source, processor, CappedOptions(), attempts);
+        }
+
+        source.Add("", Stuck, Bytes("new"), Now.AddMinutes(-1));
+        List<RecordingLogger<InboxScanner>> loggers = [];
+        for (int tick = 0; tick < 3; tick++)
+        {
+            loggers.Add(Tick(source, processor, CappedOptions(), attempts));
+        }
+
+        Assert.Equal(6, processor.Calls.Count);
+        Assert.Empty(loggers[0].AtLevel(LogLevel.Error));
+        Assert.Empty(loggers[1].AtLevel(LogLevel.Error));
+        Assert.Contains(Stuck, Assert.Single(loggers[2].AtLevel(LogLevel.Error)).Message);
+    }
+
+    // AC-FR25-8: with MaxAttempts = 1 the first retained attempt logs the Error and freezes the Fichier.
+    [Fact]
+    [Trait("AC", "FR25-8")]
+    public void RunTick_MaxAttemptsOne_FreezesAtTheFirstRetainedAttempt_AcFr25_8()
+    {
+        InMemoryFileSource source = new();
+        source.Add("processing", Stuck, Bytes("payload"), Now.AddMinutes(-1));
+        FakeFichierProcessor processor = new((_, _) => PersistenceFailure());
+        Dictionary<string, int> attempts = new(StringComparer.OrdinalIgnoreCase);
+
+        RecordingLogger<InboxScanner> first = Tick(source, processor, CappedOptions(1), attempts);
+        RecordingLogger<InboxScanner> second = Tick(source, processor, CappedOptions(1), attempts);
+
+        Assert.Contains(Stuck, Assert.Single(first.AtLevel(LogLevel.Error)).Message);
+        Assert.Empty(second.Entries);
+        Assert.Single(processor.Calls);
+    }
+
+    // AC-FR25-8: an inbox Fichier moved into processing/ and retained there counts as one attempt.
+    [Fact]
+    [Trait("AC", "FR25-8")]
+    public void RunTick_InboxFichierRetainedInProcessing_CountsOneAttempt_AcFr25_8()
+    {
+        InMemoryFileSource source = new();
+        source.Add("", Stuck, Bytes("payload"), Now.AddMinutes(-1));
+        Dictionary<string, int> attempts = new(StringComparer.OrdinalIgnoreCase);
+
+        Tick(source, new FakeFichierProcessor((_, _) => PersistenceFailure()), CappedOptions(), attempts);
+
+        Assert.Equal(1, attempts[Stuck]);
+    }
+
+    // AC-FR25-8: a library MaxAttempts of zero or less, or no counter passed, keeps today's behavior - the
+    // Fichier is retried every tick and no Error is logged.
+    [Theory]
+    [InlineData(0, true)]
+    [InlineData(-1, true)]
+    [InlineData(3, false)]
+    [Trait("AC", "FR25-8")]
+    public void RunTick_NoCap_RetriesEveryTickWithoutError_AcFr25_8(int maxAttempts, bool withCounter)
+    {
+        InMemoryFileSource source = new();
+        source.Add("processing", Stuck, Bytes("payload"), Now.AddMinutes(-1));
+        FakeFichierProcessor processor = new((_, _) => PersistenceFailure());
+        Dictionary<string, int>? attempts = withCounter ? new(StringComparer.OrdinalIgnoreCase) : null;
+
+        List<RecordingLogger<InboxScanner>> loggers = [];
+        for (int tick = 0; tick < 5; tick++)
+        {
+            loggers.Add(Tick(source, processor, CappedOptions(maxAttempts), attempts));
+        }
+
+        Assert.Equal(5, processor.Calls.Count);
+        Assert.All(loggers, logger => Assert.Empty(logger.AtLevel(LogLevel.Error)));
+    }
+
+    // AC-FR25-8: Import:MaxAttempts defaults to 10.
+    [Fact]
+    [Trait("AC", "FR25-8")]
+    public void ImportOptions_MaxAttempts_DefaultsToTen_AcFr25_8() => Assert.Equal(10, new ImportOptions().MaxAttempts);
 }

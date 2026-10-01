@@ -8,7 +8,7 @@ namespace Kape22Importer;
 // except InitiatingServer, which is a per-deployment value supplied by the host environment (Story 3.3),
 // StabilityQuietPeriod, whose 10-second default is the property initializer (Story 6.2), and
 // XmlExportPath, a per-deployment absolute folder, empty by default (export off at library level,
-// Story 6.3).
+// Story 6.3), and MaxAttempts, whose default of 10 is the property initializer (Story 6.7).
 // Properties are declared in alphabetical order (CC-4).
 public sealed class ImportOptions
 {
@@ -28,6 +28,12 @@ public sealed class ImportOptions
     // "Import:InitiatingServer" key to the LSI journal (AscoLsiFichierJournal), which falls back to
     // Environment.MachineName; the importer itself no longer reads it.
     public string InitiatingServer { get; set; } = string.Empty;
+
+    // AC-FR25-8 (Story 6.7): a Fichier left in processing/ this many consecutive attempts gets one Error
+    // and is no longer processed until the worker restarts. Defaults to 10; zero or less turns the cap off
+    // at library level (GpaoImportP60 refuses a value below 1). Only applies when InboxScanner is handed
+    // a caller-owned attempts counter.
+    public int MaxAttempts { get; set; } = 10;
 
     // Delay between two scans of the inbox.
     public TimeSpan PollingInterval { get; set; }
