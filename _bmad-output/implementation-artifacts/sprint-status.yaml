@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 16:00
-last_updated: 10-01-2026 12:00
+last_updated: 10-01-2026 13:03
 project: TextToXml
 project_key: NOKEY
 tracking_system: file-system
@@ -99,7 +99,7 @@ development_status:
   6-4-robustesse-commune-workers-gpao: done
   6-4-bis-realigner-harnais-e2e-worker-p60-config-6-4: done
   6-5-test-integration-client-gpao: done
-  epic-6-retrospective: optional
+  epic-6-retrospective: done
 action_items:
   - id: "story-4-6-decimal-scale-defect-story-4-3-bis"
     epic: 4
@@ -621,3 +621,29 @@ action_items:
     owner: "SM"
     status: open
     ref: "_bmad-output/implementation-artifacts/epic-5-retro-2026-09-28.md"
+  - id: "epic-6-retro-item-1-reclose-project-closed-svn-ledger"
+    epic: 6
+    action: "Re-close PROJECT-CLOSED.md (status, closed_date, last_commit, Epic 6
+      row with 6.1-6.5 + 6.4-bis and this retro, current test counts) and mark deferred-work.md:1350
+      (Story 6.2 SVN commit) RESOLVED with svn status GPAO clean / r541."
+    owner: "SM"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-6-retro-2026-10-01.md"
+  - id: "epic-6-retro-item-2-correct-course-unplanned-clusters"
+    epic: 6
+    action: "Run /bmad-correct-course on the open Epic 6 entries of deferred-work.md:1334-1426
+      in three clusters: (a) per-Fichier retry cap (:1334, :1338, :1360), (b) worker
+      startup config validation (:1334, :1368, :1374, :1382), (c) Logs sink flush
+      + E2E assertions (:1400, :1404, :1414, :1424); plan or explicitly accept each
+      cluster."
+    owner: "PM"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-6-retro-2026-10-01.md"
+  - id: "epic-6-retro-item-3-config-key-cross-repo-grep"
+    epic: 6
+    action: "Add a rule to _bmad-output/project-profile.md: a spec that removes or
+      renames a configuration key cites, in its Code Map, a grep of the key over TextToXml
+      (scripts/, tests/) and MicroServices."
+    owner: "SM"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-6-retro-2026-10-01.md"
