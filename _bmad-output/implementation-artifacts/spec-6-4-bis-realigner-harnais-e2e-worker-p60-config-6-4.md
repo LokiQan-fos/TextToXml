@@ -50,15 +50,29 @@ context:
 **Execution:**
 - [x] `tests/Kape22Importer.Tests/GpaoImportP60WorkerEndToEndTests.cs` -- run it before the fix and record the red (`Exception setting "MQTTnetServices"`) -- CC-1 red step.
 - [x] `scripts/e2e-worker-import.ps1` -- delete line 106; add a guard throwing when `$mqttLogTest` is blank, placed before step 0 (no side effect yet); update the step-3 comment -- AC-FR25-4 alignment + production-log safety.
+- [x] `scripts/e2e-worker-import.ps1` -- record the last `Logs.Id` before the Launcher starts and poll for newer rows after step 5 (the sink flushes in batches); the Logs connection string is parsed up front, must use `Server=`/`Database=` and target a `*_Test` database; sqlcmd scalars go through `ConvertFrom-SqlScalar` (no blank-to-0) -- AC-2 verification (build P-1, review P-1..P-4).
 
 **Acceptance Criteria:**
 - Given worker JSONs without `ConnectionStrings:MQTTnetServices`, when the script patches the config, then it neither reads nor assigns that key on the worker config and does not fail (AC-FR25-4).
-- Given the `AbstractService` Logs sink, when the worker runs under the script, then its logs go to `MQTTnetServices_Test` (verified by a `Logs` row of this run in `MQTTnetServices_Test`), never production.
+- Given the Launcher's shared logger (`SharedLogger`, routed by `MICROSERVICE_LOG_CONNECTION_STRING`), when the worker runs under the script, then the Launcher's logs of this run go to `MQTTnetServices_Test` (verified by a `Logs` row of this run in `MQTTnetServices_Test`), never production.
+  - *Renegotiated 2026-10-01 (code review D-1, human option 1):* the AC originally required the worker's own lines (`AbstractService` sink). Those rows never reach `Logs` because the batched sink is not flushed before `Stop-Process -Force`, so the AC is narrowed to the Launcher's shared-logger rows (Broker / CopyDataToDb). Proving the worker's own rows is tracked in `deferred-work.md` (6.4-bis D-1).
 - Given the full solution, when `dotnet test TextToXml.sln --filter Category=Integration -m:1` runs, then 0 failures.
+
+### Review Findings
+
+- [x] [Review][Decision] AC-2 worker logs not proven — the step-5 poll counts any new `Logs` row (Broker/CopyDataToDb satisfy it) while deferred D-1 states the worker's own rows never reach `MQTTnetServices_Test`; no dated renegotiation note. Options: renegotiate AC-2 / flush+filter now / keep in-progress. — resolved 2026-10-01: option 1, AC-2 renegotiated (dated note).
+- [x] [Review][Decision] `epic-6-context.md` edited outside the "Ask First" scope — ratify BMAD tracking artifacts as out of the boundary, or revert. — resolved 2026-10-01: option 1, ratified (BMAD tracking artifacts are outside the Ask First boundary); no action.
+- [x] [Review][Patch] Logs poll query lacks the `OBJECT_ID` guard of the baseline query [scripts/e2e-worker-import.ps1:206]
+- [x] [Review][Patch] `Server`/`Database` not validated after parsing the Logs connection string [scripts/e2e-worker-import.ps1:127]
+- [x] [Review][Patch] No guard that the Logs target database is a `*_Test` one [scripts/e2e-worker-import.ps1:72]
+- [x] [Review][Patch] Blank sqlcmd output silently casts to 0 [scripts/e2e-worker-import.ps1:130]
+- [x] [Review][Patch] Design Notes/Tasks do not describe the Logs baseline + poll [spec §Design Notes]
+- [x] [Review][Defer] sqlcmd ignores credentials of the Logs connection string [scripts/e2e-worker-import.ps1:127] — deferred, pre-existing script convention
+- [x] [Review][Defer] `Id > baseline` also counts rows from other writers (orphan Launcher) [scripts/e2e-worker-import.ps1:206] — deferred, depends on D-1
 
 ## Design Notes
 
-The only reachable Logs-sink selector for a Launcher-hosted worker is `SharedLogger`'s env-var-over-settings resolution; the worker JSON never carried it (6.4 finding). So the fix is a deletion plus a fail-fast guard, not a new config key.
+The only reachable Logs-sink selector for a Launcher-hosted worker is `SharedLogger`'s env-var-over-settings resolution; the worker JSON never carried it (6.4 finding). So the fix is a deletion plus a fail-fast guard, not a new config key. AC-2 is then proven by the script itself: a `Logs.Id` baseline taken before the Launcher starts, and a bounded poll for newer rows after the run, since the batched sink writes late.
 
 ## Verification
 

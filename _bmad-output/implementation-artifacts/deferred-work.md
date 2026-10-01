@@ -1404,3 +1404,13 @@ s'y trouver et rester à confirmer.
 - source_spec: `_bmad-output/implementation-artifacts/spec-6-4-bis-realigner-harnais-e2e-worker-p60-config-6-4.md` (D-2, low)
   summary: The E2E script lists the FR-26 export folder with `-ErrorAction SilentlyContinue` and asserts nothing, so a run whose XML export silently stopped still exits 0.
   evidence: blind-hunter lens, `scripts/e2e-worker-import.ps1` step 5 "Exported XML files (FR-26)". Pre-existing since Story 6.3; an export-count assertion (one file per Fichier) would close it.
+
+## Deferred from: code review of spec-6-4-bis-realigner-harnais-e2e-worker-p60-config-6-4.md (2026-10-01)
+
+- source_spec: `reviews/story-6-4-bis/aggregated-report.md` (F-1, low)
+  summary: The Logs probe in `scripts/e2e-worker-import.ps1` calls sqlcmd with Windows auth only, ignoring any `User Id`/`Password` in `ConnectionStrings:MQTTnetServices`.
+  evidence: edge-case-hunter + blind-hunter lenses, `scripts/e2e-worker-import.ps1:127`. Pre-existing script convention (`Invoke-Sql`, line 77); the test string uses `Trusted_Connection=True`.
+
+- source_spec: `reviews/story-6-4-bis/aggregated-report.md` (F-2, low)
+  summary: The step-5 check `Id > $logsIdBefore` counts rows from any writer (e.g. an orphaned Launcher from a killed run), so it can pass without this run logging.
+  evidence: edge-case-hunter + blind-hunter lenses, `scripts/e2e-worker-import.ps1:206`. Natural fix (filter on the GpaoImportP60 source) depends on D-1 above (sink flush).

@@ -72,6 +72,27 @@ if ([string]::IsNullOrWhiteSpace($ascoLsiTest)) {
 if ([string]::IsNullOrWhiteSpace($mqttLogTest)) {
     throw "ConnectionStrings:MQTTnetServices is not set in $testSettingsPath."
 }
+$logsDb = [System.Data.Common.DbConnectionStringBuilder]::new()
+# A plain property assignment would add a "ConnectionString" key through PowerShell's dictionary adapter.
+$logsDb.set_ConnectionString($mqttLogTest)
+# DbConnectionStringBuilder resolves no synonyms, so "Data Source"/"Initial Catalog" would yield an empty -S/-d.
+if (-not $logsDb.ContainsKey('Server') -or -not $logsDb.ContainsKey('Database') -or
+    [string]::IsNullOrWhiteSpace($logsDb['Server']) -or [string]::IsNullOrWhiteSpace($logsDb['Database'])) {
+    throw "ConnectionStrings:MQTTnetServices in $testSettingsPath must use the Server= and Database= keywords."
+}
+# The Logs sink of this run must never target production: only a *_Test database is accepted.
+if ($logsDb['Database'] -notlike '*_Test') {
+    throw "ConnectionStrings:MQTTnetServices in $testSettingsPath targets '$($logsDb['Database'])', not a *_Test database."
+}
+$logsSqlcmd = @('-S', $logsDb['Server'], '-d', $logsDb['Database'], '-C', '-b', '-h', '-1', '-W')
+
+# Returns the single integer a "SET NOCOUNT ON; SELECT <n>" sqlcmd call printed; throws on anything else,
+# so blank output never turns into 0.
+function ConvertFrom-SqlScalar([object[]] $Output, [string] $What) {
+    $line = $Output | Where-Object { "$_" -match '^\s*\d+\s*$' } | Select-Object -First 1
+    if ($null -eq $line) { throw "The $What query returned no integer: '$($Output -join ' ')'." }
+    return [long]"$line".Trim()
+}
 
 function Invoke-Sql([string] $Query) {
     & sqlcmd -S localhost -d AscoLSI_Test -C -Q $Query
@@ -121,13 +142,9 @@ try {
 
     # Story 6.4-bis: the last Logs row before the Launcher starts, so step 5 can prove this run logged to
     # the test Logs database. The table may not exist yet, since the Serilog sink creates it on first use.
-    $logsDb = [System.Data.Common.DbConnectionStringBuilder]::new()
-    # A plain property assignment would add a "ConnectionString" key through PowerShell's dictionary adapter.
-    $logsDb.set_ConnectionString($mqttLogTest)
-    $logsSqlcmd = @('-S', $logsDb['Server'], '-d', $logsDb['Database'], '-C', '-b', '-h', '-1', '-W')
     $logsIdBefore = & sqlcmd @logsSqlcmd -Q "SET NOCOUNT ON; IF OBJECT_ID('dbo.Logs') IS NULL SELECT 0 ELSE SELECT ISNULL(MAX(Id), 0) FROM dbo.Logs"
     if ($LASTEXITCODE -ne 0) { throw 'The Logs baseline query failed.' }
-    $logsIdBefore = [long]($logsIdBefore | Select-Object -First 1)
+    $logsIdBefore = ConvertFrom-SqlScalar $logsIdBefore 'Logs baseline'
 
     # MICROSERVICE_LOG_CONNECTION_STRING keeps the Serilog/SQL sink off the unreachable production Logs
     # server for this local run. It is the only Logs-sink routing: since Story 6.4 the worker JSON has no
@@ -203,9 +220,9 @@ try {
     Write-Host "--- Logs rows written this run ($($logsDb['Database'])) ---"
     $logsDeadline = (Get-Date).AddSeconds(15)
     do {
-        $newLogs = & sqlcmd @logsSqlcmd -Q "SET NOCOUNT ON; SELECT COUNT(*) FROM dbo.Logs WHERE Id > $logsIdBefore"
+        $newLogs = & sqlcmd @logsSqlcmd -Q "SET NOCOUNT ON; IF OBJECT_ID('dbo.Logs') IS NULL SELECT 0 ELSE SELECT COUNT(*) FROM dbo.Logs WHERE Id > $logsIdBefore"
         if ($LASTEXITCODE -ne 0) { throw 'The Logs check query failed.' }
-        $newLogs = [int]($newLogs | Select-Object -First 1)
+        $newLogs = ConvertFrom-SqlScalar $newLogs 'Logs check'
         if ($newLogs -gt 0) { break }
         Start-Sleep -Seconds 1
     } while ((Get-Date) -lt $logsDeadline)
