@@ -1309,7 +1309,7 @@ s'y trouver et rester à confirmer.
   summary: When a tick outlives the 4 s `ShutdownBudget`, `Stop()` returns and `WorkerAdapter.StopAsync` disconnects and disposes the `Client` (and its `CancellationTokenSource`) while the `Task.Run` tick may still be moving and journaling Fichiers.
   evidence: Raised by the edge-case-hunter and blind-hunter lenses, found by reading `Client.Stop`/`Dispose` against `Launcher/Adapters/WorkerAdapter.cs:48-56`. Same pattern in `GpaoImportP60.Client`; a Fichier in flight finishes its own move/journal steps, so no loss, but the orphaned tick logs through a disposed client. Revisit with the shared Publisher re-entrancy fix.
 
-- source_spec: **PARTIALLY COVERED 2026-09-29 by Story 6.4** (`ClientRobustnessTests` build a `Client` through its internal test constructor: error containment in `Actions`, the `LogOutcome` forwarder, `Dispose`; still no real instance) · **PLANNED 2026-09-28: Story 6.5** (real-instance test) — `reviews/story-5-2/aggregated-report.md` (F-1, medium)
+- source_spec: **RESOLVED 2026-10-01 by Story 6.5** (AC-FR25-7: `GPAO/Gpao.IntegrationTests` builds the real `GpaoImportP60.Client` and `GpaoConvertP89.Client` from an in-memory configuration with the Logs sink on `MQTTnetServices_Test` and asserts `Frequency`, error containment in `Actions`, `Stop()` cancelling the token so the next tick processes nothing (an in-flight tick is not exercised), and the Deferred → `Warning` row; also closes the P60 `Client.Actions` test owed in `MicroServices.sln` since Epic 3) · **PARTIALLY COVERED 2026-09-29 by Story 6.4** (`ClientRobustnessTests` build a `Client` through its internal test constructor: error containment in `Actions`, the `LogOutcome` forwarder, `Dispose`; still no real instance) · **PLANNED 2026-09-28: Story 6.5** (real-instance test) — `reviews/story-5-2/aggregated-report.md` (F-1, medium)
   summary: No test builds a real `GpaoConvertP89.Client`, so its instance wiring is unverified: `Frequency = FrequencyFor(...)`, error containment in `Actions`, `Stop()` cancelling the tick token, and the `LogOutcome` forwarder (Deferred → Warning).
   evidence: verification-gap lens, found by reading `GPAO/ConvertP89/Client.cs:33-41`, `:156-188`, `:244` against the tests (only the static `ReadConfig`/`RunTickCore`/`FrequencyFor` seams are exercised). Needs `AscoLSI_Test` because of the `AbstractService` SQL sink; same debt as the P60 `Client.Actions` test owed in `MicroServices.sln`. Cover both workers with one shared integration test.
 
@@ -1414,3 +1414,9 @@ s'y trouver et rester à confirmer.
 - source_spec: `reviews/story-6-4-bis/aggregated-report.md` (F-2, low)
   summary: The step-5 check `Id > $logsIdBefore` counts rows from any writer (e.g. an orphaned Launcher from a killed run), so it can pass without this run logging.
   evidence: edge-case-hunter + blind-hunter lenses, `scripts/e2e-worker-import.ps1:206`. Natural fix (filter on the GpaoImportP60 source) depends on D-1 above (sink flush).
+
+## Deferred from: code review of spec-6-5-test-integration-client-gpao.md (2026-10-01)
+
+- source_spec: `spec-6-5-test-integration-client-gpao.md`
+  summary: No real-instance test cancels a GPAO tick already in flight; `GpaoClientIntegrationTests` only proves that `Stop()` cancels the token the next tick uses.
+  evidence: blind-hunter lens, `GPAO/Gpao.IntegrationTests/GpaoClientIntegrationTests.cs` `Stop_ThenExecute_ProcessesNothing_AcFr25_7` (frozen matrix row "Stop cancels": `Stop()` awaited, then `Execute()`). Between-Fichier cancellation is covered at library level (`InboxScanner.RunTick`, `P89FolderConverter.RunTick`); a real-instance test would need a slow or blocking Fichier to hold a tick open.
