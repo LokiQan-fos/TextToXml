@@ -1331,7 +1331,7 @@ s'y trouver et rester à confirmer.
 
 ## Deferred from: code review of story-6.1 (2026-09-28)
 
-- source_spec: **PLANNED 2026-10-01: Story 6.6** (AC-FR25-9, `Import:Commande` <= 50 at startup) · remainder **Story 6.7** (AC-FR25-8, retry cap) — sprint-change-proposal-2026-10-01.md · **UNPLANNED 2026-09-29 (Story 6.4 scope decision)** — `spec-6-1-journal-p60-via-ifichierjournal.md`
+- source_spec: **RESOLVED 2026-10-01 by Story 6.6** (AC-FR25-9: `GpaoImportP60` `ReadConfig` refuses an `Import:Commande` over 50 chars, naming the key) · remainder **PLANNED: Story 6.7** (AC-FR25-8, retry cap) — sprint-change-proposal-2026-10-01.md · **UNPLANNED 2026-09-29 (Story 6.4 scope decision)** — `spec-6-1-journal-p60-via-ifichierjournal.md`
   summary: `Import:Commande` longer than `L_D_LOG_COMMANDE.Commande` (50) is not rejected at `GpaoImportP60` startup; every journal write then fails, and committed Fichiers loop in `processing/` (guard hit + failed journal each tick) until the setting is fixed. Every business rejection with a readable OF loops too (its failure entry fails, so it never reaches `error/`) and logs `ImportRejected` at Error each tick.
   evidence: Raised by the edge-case-hunter lens. No duplicate business data (D22 guard), and the `JournalPending` Warning names the cause every tick; startup validation of the worker's configuration keys was routed to Story 6.4 (AC-FR25-4), which excluded it on 2026-09-29.
 
@@ -1351,7 +1351,7 @@ s'y trouver et rester à confirmer.
   summary: The back-dating of the seeds in `MicroServices/GPAO/ConvertP89.Tests/RunTickCoreTests.cs:104`, required by the Story 6.2 spec, lives in SVN outside this git repository; its SVN commit is not yet confirmed.
   evidence: blind-hunter lens; the spec task is checked, but no git range can show the SVN change. The review report records the 34 `ConvertP89.Tests` tests green in the working copy.
 
-- source_spec: **PLANNED 2026-10-01: Story 6.6** (AC-FR25-9: `StabilityQuietPeriod` outside 0..1 h refused at startup, covers the misconfiguration case); share clock running ahead: **ACCEPTED** — sprint-change-proposal-2026-10-01.md · **UNPLANNED 2026-09-29 (Story 6.4 scope decision)** — `reviews/story-6-2/aggregated-report.md` (F-2, medium, from D-1 option 2)
+- source_spec: **RESOLVED 2026-10-01 by Story 6.6** (AC-FR25-9: `Import:` / `P89:StabilityQuietPeriod` outside 00:00:00..01:00:00 refused at startup, both workers, covers the misconfiguration case); share clock running ahead: **ACCEPTED** — sprint-change-proposal-2026-10-01.md · **UNPLANNED 2026-09-29 (Story 6.4 scope decision)** — `reviews/story-6-2/aggregated-report.md` (F-2, medium, from D-1 option 2)
   summary: A Fichier held back by the stability gate leaves no trace at any log level; a misconfigured quiet period (bare `10` read as 10 days) or a share clock running ahead blocks the P60 inbox or the P89 source folder with no signal to the operator.
   evidence: blind-hunter + edge-case-hunter lenses, `src/Kape22Importer/InboxScanner.cs:137`, `src/P89Converter/P89FolderConverter.cs:77`. The silence is what the spec requires (no log >= Warning; any logged outcome for a skipped Fichier is Ask First), decided 2026-09-29 (option 2); fix in the worker hardening, e.g. a Debug trace or a worker-side signal when a Fichier stays held back.
 
@@ -1371,7 +1371,7 @@ s'y trouver et rester à confirmer.
 
 ## Deferred from: code review of story-6.4 (2026-09-29)
 
-- source_spec: **PLANNED 2026-10-01: Story 6.6** (AC-FR25-9, `Import:RetentionDays` in 1..3650) — sprint-change-proposal-2026-10-01.md · `spec-6-4-robustesse-commune-workers-gpao.md`
+- source_spec: **RESOLVED 2026-10-01 by Story 6.6** (AC-FR25-9: `GpaoImportP60` `ReadConfig` refuses an absent `Import:RetentionDays` or one outside 1..3650) — sprint-change-proposal-2026-10-01.md · `spec-6-4-robustesse-commune-workers-gpao.md`
   summary: `Import:RetentionDays` is not range-checked at `GpaoImportP60` startup, so a huge value (e.g. `int.MaxValue`) makes every `PurgeRetention` throw (`DateTimeOffset.AddDays` out of range), and every tick then fails and publishes no heartbeat.
   evidence: Review finding of Story 6.4; a pre-existing `Client.ReadConfig` gap, not caused by 6.4 (the purge overflow was only used as a failing-tick trigger in a first version of the tests).
 
@@ -1379,7 +1379,7 @@ s'y trouver et rester à confirmer.
   summary: `StopAsync` during the `WorkerService` start-retry loop finds `_client` null and returns; the fire-and-forget `StartClientAsync` (no token) can then create and start a `Client` that is never disposed.
   evidence: edge-case-hunter + blind-hunter lenses, `GPAO/*/WorkerService.cs:36-83`. Pre-existing fire-and-forget pattern, standalone host only (`dotnet run`), not the Launcher; fixing it needs a `CancellationTokenSource` and an awaited task, beyond FR-25.
 
-- source_spec: **PLANNED 2026-10-01: Story 6.6** (AC-FR25-9; product decision: `Initial Catalog` required) — sprint-change-proposal-2026-10-01.md · `reviews/story-6-4/aggregated-report.md` (F-2, low)
+- source_spec: **RESOLVED 2026-10-01 by Story 6.6** (AC-FR25-9: `ReadConfig` refuses a `ConnectionStrings:AscoLSI` without `Initial Catalog` / `Database`, both workers) — sprint-change-proposal-2026-10-01.md · `reviews/story-6-4/aggregated-report.md` (F-2, low)
   summary: An `AscoLSI` connection string without `Initial Catalog` (e.g. `Server=x;`) passes `Client.ReadConfig` and targets the login's default database.
   evidence: edge-case-hunter + blind-hunter lenses, `GPAO/ImportP60/Client.cs` and `GPAO/ConvertP89/Client.cs` `ReadConfig`. The frozen matrix covers absent/blank/malformed only; requiring the catalog is a product choice (a login may legitimately have a default database).
 
@@ -1387,11 +1387,11 @@ s'y trouver et rester à confirmer.
   summary: A blocked tick makes the `Publisher` silently drop every following tick, with no watchdog and no Warning on an overlong tick.
   evidence: edge-case-hunter lens, `MicroService/Publish/Publisher.cs:98-126`. "A skipped tick is dropped" is intended (Always); a watchdog is a new feature that also touches Laminoir, Video and Zumbach.
 
-- source_spec: **PLANNED 2026-10-01: Story 6.6** (AC-FR25-10: share outage = failed tick, no heartbeat) — sprint-change-proposal-2026-10-01.md · `reviews/story-6-4/aggregated-report.md` (F-4, medium)
+- source_spec: **RESOLVED 2026-10-01 by Story 6.6** (AC-FR25-10: `InboxScanner.RunTick` returns false on a listing fault, `RunTickCore` returns false without `onError`, no heartbeat; the Warning is unchanged) — sprint-change-proposal-2026-10-01.md · `reviews/story-6-4/aggregated-report.md` (F-4, medium)
   summary: A share outage (`IOException`) is contained as a Warning by `InboxScanner` and the heartbeat keeps publishing, so AC-FR25-5 is only partly held for that case.
   evidence: blind-hunter lens, `src/Kape22Importer/InboxScanner.cs` (test comment at diff:1193-1204). Library behaviour; any change under `src/` is Ask First. Route to a story deciding whether a share outage is a failed tick.
 
-- source_spec: **PLANNED 2026-10-01: Story 6.6** (AC-FR25-10: folder check inside the tick task) — sprint-change-proposal-2026-10-01.md · `reviews/story-6-4/aggregated-report.md` (F-5, low)
+- source_spec: **RESOLVED 2026-10-01 by Story 6.6** (AC-FR25-10: the P60 `Directory.Exists` check runs inside the `Task.Run`; P89 already did) — sprint-change-proposal-2026-10-01.md · `reviews/story-6-4/aggregated-report.md` (F-5, low)
   summary: `Directory.Exists` on a hung SMB share runs on the timer thread outside `_tick`, so the 4 s `Stop()` budget does not cover the block.
   evidence: edge-case-hunter lens, `GPAO/ImportP60/Client.cs:303`. Fix is to move the check into the `Task.Run` (low impact); rare, no data loss.
 
@@ -1424,3 +1424,13 @@ s'y trouver et rester à confirmer.
 - source_spec: **PLANNED 2026-10-01: Story 6.8** (routing assert after the sink flush) — sprint-change-proposal-2026-10-01.md · `reviews/story-6-5/aggregated-report.md` (F-1, low)
   summary: No assertion checks the spec AC-1 clause "no Logs row lands outside MQTTnetServices_Test"; the routing relies only on `MICROSERVICE_LOG_CONNECTION_STRING` being set before the `Client` is built.
   evidence: blind-hunter lens, `GPAO/Gpao.IntegrationTests/GpaoClientIntegrationTests.cs:36`. The mechanism is sound (`SharedLogger` caches per connection string and re-reads the variable on each `GetDefault()`), but proving it needs a query on a second database (`AscoLSI_Test`); to pair with the sink-flush D-1 of Story 6.4-bis.
+
+## Deferred from: code review of spec-6-6-validation-config-panne-partage-workers-gpao.md (2026-10-01)
+
+- source_spec: `spec-6-6-validation-config-panne-partage-workers-gpao.md` (D-1, low)
+  summary: An empty or whitespace `Import:Commande` passes `GpaoImportP60` startup; `Kape22Persister` only falls back to `P60` on a null value, so `L_D_LOG_COMMANDE` rows would carry a blank `Commande`.
+  evidence: edge-case-hunter + blind-hunter lenses, `GPAO/ImportP60/Client.cs` `ReadConfig` and `src/Kape22Importer/Persistence/Kape22Persister.cs:269` (`configuration[CommandeKey] ?? DefaultCommande`). AC-FR25-9 only sets the > 50 chars rule; a blank-value rule is a product choice outside this story.
+
+- source_spec: `spec-6-6-validation-config-panne-partage-workers-gpao.md` (D-2, low)
+  summary: `Actions_MissingInbox_IsCheckedInsideTheTickTask_AcFr25_10` proves the inbox check runs inside the tick task by matching `TargetSite.Name` against the compiler-generated `<Actions>b__` lambda name, which a compiler or lowering change can break.
+  evidence: blind-hunter + acceptance-auditor (out of mandate) lenses, `GPAO/ImportP60.Tests/ClientRobustnessTests.cs`. The observable property (Stop() within budget while `Directory.Exists` blocks on a dead share) has no seam to test without production changes; the test is kept, the fragility recorded.

@@ -625,4 +625,54 @@ public sealed class InboxScannerTests : IDisposable
         Assert.True(source.Exists(ArchiveDateFolder, "P60_847_682_001"));
         Assert.Empty(this.ExportNames());
     }
+
+    // AC-FR25-10: a reception folder that cannot be listed (processing/ first, then the inbox) makes
+    // RunTick return false, so the worker treats the tick as failed and publishes no heartbeat.
+    [Fact]
+    [Trait("AC", "FR25-10")]
+    public void RunTick_ProcessingListingFault_ReturnsFalse_AcFr25_10()
+    {
+        InMemoryFileSource source = new() { ListingFault = new IOException("share unreachable") };
+
+        Assert.False(Scanner(source, AlwaysSucceeds()).RunTick());
+    }
+
+    // AC-FR25-10: processing/ lists, the inbox does not - the stranded Fichier's processing makes the
+    // share drop before the inbox is listed.
+    [Fact]
+    [Trait("AC", "FR25-10")]
+    public void RunTick_InboxListingFault_ReturnsFalse_AcFr25_10()
+    {
+        InMemoryFileSource source = new();
+        source.Add("processing", "P60_847_682_001", Bytes("stranded"), Now.AddMinutes(-1));
+        FakeFichierProcessor processor = new((name, _) =>
+        {
+            source.ListingFault = new IOException("share unreachable");
+            return new FichierProcessingResult { NormalizedXml = $"<file name=\"{name}\" />" };
+        });
+
+        Assert.False(Scanner(source, processor).RunTick());
+        Assert.Equal(["P60_847_682_001"], processor.Calls);
+    }
+
+    // AC-FR25-10: a clean tick, an empty inbox, a cancelled token and a failed move into processing/ (one
+    // locked Fichier, not an unreachable folder) are not failed ticks.
+    [Fact]
+    [Trait("AC", "FR25-10")]
+    public void RunTick_NoListingFault_ReturnsTrue_AcFr25_10()
+    {
+        Assert.True(Scanner(new InMemoryFileSource(), AlwaysSucceeds()).RunTick());
+
+        InMemoryFileSource clean = new();
+        clean.Add("", "P60_847_682_001", Bytes("payload"), Now.AddMinutes(-1));
+        Assert.True(Scanner(clean, AlwaysSucceeds()).RunTick());
+
+        InMemoryFileSource cancelled = new();
+        cancelled.Add("", "P60_847_682_001", Bytes("payload"), Now.AddMinutes(-1));
+        Assert.True(Scanner(cancelled, AlwaysSucceeds()).RunTick(new CancellationToken(canceled: true)));
+
+        InMemoryFileSource locked = new() { MoveFault = new IOException("locked") };
+        locked.Add("", "P60_847_682_001", Bytes("payload"), Now.AddMinutes(-1));
+        Assert.True(Scanner(locked, AlwaysSucceeds()).RunTick());
+    }
 }

@@ -55,18 +55,21 @@ public sealed class InboxScanner(
     // locked-down ACL) is logged once at Warning and the tick is abandoned - nothing is lost, the next
     // tick retries. A transient I/O fault touching one Fichier is contained inside ProcessFromProcessing
     // and never abandons the tick.
-    public void RunTick(CancellationToken cancellationToken = default)
+    // AC-FR25-10: returns false when a reception folder (processing/ or the inbox) could not be listed, so the
+    // worker counts the tick as failed and publishes no heartbeat; true otherwise, a cancelled tick and a
+    // failed move into processing/ included (one locked Fichier is not an unreachable folder).
+    public bool RunTick(CancellationToken cancellationToken = default)
     {
         if (!TryList(options.ProcessingFolder, out IReadOnlyList<FichierEntry> stranded))
         {
-            return;
+            return false;
         }
 
         foreach (FichierEntry entry in Ordered(stranded))
         {
             if (cancellationToken.IsCancellationRequested)
             {
-                return;
+                return true;
             }
 
             ProcessFromProcessing(entry.Name);
@@ -74,14 +77,14 @@ public sealed class InboxScanner(
 
         if (!TryStableInboxFichiers(out IReadOnlyList<FichierEntry> ready))
         {
-            return;
+            return false;
         }
 
         foreach (FichierEntry entry in Ordered(ready))
         {
             if (cancellationToken.IsCancellationRequested)
             {
-                return;
+                return true;
             }
 
             // AC-FR12-2: the Fichier is moved out of the inbox first; the processing/ copy is the one
@@ -97,11 +100,13 @@ public sealed class InboxScanner(
                     entry.Name,
                     options.ProcessingFolder,
                     exception.Message);
-                return;
+                return true;
             }
 
             ProcessFromProcessing(entry.Name);
         }
+
+        return true;
     }
 
     // Lists a reception folder, translating an unreachable folder (AC-FR15-2) into a single Warning and

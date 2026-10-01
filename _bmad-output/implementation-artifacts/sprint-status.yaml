@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 16:00
-last_updated: 10-01-2026 13:28
+last_updated: 10-01-2026 14:26
 project: TextToXml
 project_key: NOKEY
 tracking_system: file-system
@@ -99,7 +99,7 @@ development_status:
   6-4-robustesse-commune-workers-gpao: done
   6-4-bis-realigner-harnais-e2e-worker-p60-config-6-4: done
   6-5-test-integration-client-gpao: done
-  6-6-validation-config-panne-partage-workers-gpao: backlog
+  6-6-validation-config-panne-partage-workers-gpao: review
   6-7-plafond-reessai-par-fichier: backlog
   6-8-flush-sink-logs-assertions-harnais-e2e: backlog
   epic-6-retrospective: done
