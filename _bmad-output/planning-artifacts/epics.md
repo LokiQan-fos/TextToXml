@@ -3096,9 +3096,11 @@ l'état réel.
 - `Client.ReadConfig` des deux workers, corrigés à l'identique (D32) ;
   `deferred-work.md:1334`, `:1352`, `:1374`, `:1382`, `:1390`, `:1394`.
 - `AC-FR25-10` touche `InboxScanner` / `P89FolderConverter` (signaler un dossier
-  de réception injoignable au worker) : forme du signal décidée au checkpoint spec.
+  de réception injoignable au worker) : forme du signal décidée au checkpoint spec
+  (Story 6.6 : `InboxScanner.RunTick` renvoie `false`).
 - Code Map : `grep` de chaque clé touchée sur `TextToXml` (`scripts/`, `tests/`)
-  et `MicroServices` (règle A-3). README des workers à jour. Commit SVN par
+  et `MicroServices` (règle A-3), documentée dans les JSON des workers (aucun
+  README n'existe). Commit SVN par
   l'utilisateur.
 
 **Tests xUnit (TDD, CC-1) :** `GPAO/ImportP60.Tests`, `GPAO/ConvertP89.Tests`,

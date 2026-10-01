@@ -671,6 +671,10 @@ public sealed class InboxScannerTests : IDisposable
         cancelled.Add("", "P60_847_682_001", Bytes("payload"), Now.AddMinutes(-1));
         Assert.True(Scanner(cancelled, AlwaysSucceeds()).RunTick(new CancellationToken(canceled: true)));
 
+        InMemoryFileSource cancelledInProcessing = new();
+        cancelledInProcessing.Add("processing", "P60_847_682_001", Bytes("payload"), Now.AddMinutes(-1));
+        Assert.True(Scanner(cancelledInProcessing, AlwaysSucceeds()).RunTick(new CancellationToken(canceled: true)));
+
         InMemoryFileSource locked = new() { MoveFault = new IOException("locked") };
         locked.Add("", "P60_847_682_001", Bytes("payload"), Now.AddMinutes(-1));
         Assert.True(Scanner(locked, AlwaysSucceeds()).RunTick());

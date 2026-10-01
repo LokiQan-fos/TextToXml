@@ -1171,9 +1171,11 @@ corrigés à l'identique dans les deux (D32) ; la ré‑entrance, une fois dans
   `Import:Commande` dépasse 50 caractères (`L_D_LOG_COMMANDE.Commande`) ou
   `Import:RetentionDays` sort de 1..3650 — `GpaoImportP60`. *(Ajouté 2026-10-01.)*
 - `AC-FR25-10` : un dossier de réception injoignable (P60 inbox, P89 source)
-  fait échouer le tick : log `Warning` inchangé (`AC-FR15-2`), mais aucun
-  heartbeat (`AC-FR25-5`) ; le test d'existence du dossier s'exécute dans la
-  tâche du tick, donc dans le budget d'arrêt de 4 s (`AC-FR25-3`). *(Ajouté 2026-10-01.)*
+  fait échouer le tick, sans aucun heartbeat (`AC-FR25-5`) ; niveaux de log
+  inchangés : `Warning` d'un listing en échec (`AC-FR15-2`), `Error` d'un dossier
+  absent (`AC-FR25-5`) ; le test d'existence du dossier s'exécute dans la
+  tâche du tick, donc dans le budget d'arrêt de 4 s (`AC-FR25-3`). *(Ajouté 2026-10-01 ;
+  niveaux de log précisés le 2026-10-01, revue Story 6.6 P-1.)*
 
 #### FR-26 : Export XML P60 dans un dossier dédié
 

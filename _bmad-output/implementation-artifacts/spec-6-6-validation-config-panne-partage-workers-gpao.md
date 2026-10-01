@@ -51,6 +51,7 @@ MicroServices (SVN, user commits), root `C:\Users\Administrateur\Documents\Micro
 - `GPAO/ImportP60.Tests/ClientConfigurationTests.cs` -- the configs that must pass (`:37, :51, :77, :95, :127, :151, :170`) lack `Import:RetentionDays`: add `"30"`. `:121-132`: `RunTickCore_WhenTheFileSourceThrows_...` in `RunTickCoreTests.cs` must also assert `false`.
 - `GPAO/ConvertP89.Tests/ClientConfigurationTests.cs:208` -- `ValidValues()` helper, reuse it.
 - `GPAO/ImportP60/GpaoImportP60.json` already has `Database=` + `RetentionDays: 30`. `GPAO/ConvertP89/GpaoConvertP89.json` has empty values (filled per deployment). `Gpao.IntegrationTests` uses `Database=` + `RetentionDays: 30`. Nothing to change.
+  - *Amended 2026-10-01 (review D-1, human decision):* r545 fills `GpaoConvertP89.json` with the local dev values (`Server=localhost;Database=AscoLSI_Test`, `C:\Temp\GpaoConvertP89_E2E*` folders), the same way `GpaoImportP60.json` already does. Kept: the GPAO workers have never been deployed, and a deployment overrides these values.
 
 This repo:
 
@@ -74,6 +75,16 @@ This repo:
 - Given each matrix row, when the matching test runs, then it passes and carries its AC trait.
 - Given `TextToXml.sln`, when built with `-warnaserror` and `Category=Unit` runs, then 0 warnings and all green.
 - Given `MicroServices.sln`, when built with `-warnaserror` and its test projects run (`--blame-hang-timeout 2m`), then 0 warnings and 0 failed, `Gpao.IntegrationTests` included.
+
+### Review Findings
+
+Review of 2026-10-01 (`668b38f^..HEAD` + MicroServices SVN r545). Report: `reviews/story-6-6/aggregated-report.md`.
+
+- [x] [Review][Decision] D-1 `GpaoConvertP89.json` filled with test values — r545 replaces the empty P89 values with `Server=localhost;Database=AscoLSI_Test` and `C:\Temp\GpaoConvertP89_E2E*` paths, although the Code Map says "Nothing to change"; revert, or keep it (aligned with `GpaoImportP60.json`) and record it in the spec. — **Resolved 2026-10-01: option 2, kept, Code Map amended.**
+- [x] [Review][Patch] P-1 PRD `AC-FR25-10` and epic context still say "same Warning" for an unreachable folder; the approved reading keeps the `Error` of a missing inbox/source [`_bmad-output/planning-artifacts/PRD.md:1173`, `_bmad-output/implementation-artifacts/epic-6-context.md:31`]
+- [x] [Review][Patch] P-2 Epic context and epics require worker READMEs, which the spec's Never forbids creating [`_bmad-output/implementation-artifacts/epic-6-context.md:34`, `_bmad-output/planning-artifacts/epics.md:3101`]
+- [x] [Review][Patch] P-3 P89 database-accepted test asserts nothing, unlike its P60 twin [`GPAO/ConvertP89.Tests/ClientConfigurationTests.cs:221`]
+- [x] [Review][Patch] P-4 Cancel inside the `processing/` loop (returns `true`) is not covered [`tests/Kape22Importer.Tests/InboxScannerTests.cs:662`]
 
 ## Design Notes
 
