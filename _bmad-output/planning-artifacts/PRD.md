@@ -1156,6 +1156,24 @@ corrigés à l'identique dans les deux (D32) ; la ré‑entrance, une fois dans
   worker GPAO (`AscoLSI_Test`, logs sur `MQTTnetServices_Test`) et vérifie `Frequency`, le confinement des
   erreurs dans `Actions`, l'annulation par `Stop()` et le log `Warning` d'un
   Fichier `Deferred`.
+- `AC-FR25-8` : un Fichier qui reste dans `processing/` (P60) ou ressort
+  `Deferred` (P89) à `Import:MaxAttempts` / `P89:MaxAttempts` ticks consécutifs
+  (défaut 10) est signalé par **un** log `Error` nommant le Fichier et la
+  dernière cause, puis n'est plus retraité tant que le worker n'a pas redémarré :
+  aucune nouvelle ligne `Logs` ni `L_D_LOG_COMMANDE` pour lui. Ce plafond ne
+  déplace jamais un Fichier en `error/` (`AC-FR15-3` inchangé). Le compteur vit
+  en mémoire du worker et repart de zéro au redémarrage ou quand le Fichier
+  quitte `processing/`. *(Ajouté 2026-10-01, sprint-change-proposal-2026-10-01.md.)*
+- `AC-FR25-9` : le démarrage est refusé, avec un message nommant la clé, si :
+  `ConnectionStrings:AscoLSI` ne nomme pas de base (`Initial Catalog` /
+  `Database` absent) — les deux workers ; `Import:StabilityQuietPeriod` /
+  `P89:StabilityQuietPeriod` est négatif ou dépasse 1 h — les deux workers ;
+  `Import:Commande` dépasse 50 caractères (`L_D_LOG_COMMANDE.Commande`) ou
+  `Import:RetentionDays` sort de 1..3650 — `GpaoImportP60`. *(Ajouté 2026-10-01.)*
+- `AC-FR25-10` : un dossier de réception injoignable (P60 inbox, P89 source)
+  fait échouer le tick : log `Warning` inchangé (`AC-FR15-2`), mais aucun
+  heartbeat (`AC-FR25-5`) ; le test d'existence du dossier s'exécute dans la
+  tâche du tick, donc dans le budget d'arrêt de 4 s (`AC-FR25-3`). *(Ajouté 2026-10-01.)*
 
 #### FR-26 : Export XML P60 dans un dossier dédié
 

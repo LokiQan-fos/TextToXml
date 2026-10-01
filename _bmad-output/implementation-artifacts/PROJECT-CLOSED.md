@@ -1,14 +1,19 @@
 ---
-status: 'closed'
+status: 'reopened'
 closed_date: '2026-10-01'
 previous_closed_date: '2026-09-25'
-reopened_date: '2026-09-28'
-reopened_reason: 'Epic 6 — P60 journal migration, shared GPAO worker hardening, per-format XML export (sprint-change-proposal-2026-09-28.md)'
-previous_reopened_date: '2026-09-25'
+reopened_date: '2026-10-01'
+reopened_reason: 'Epic 6 post-retro corrections — stories 6.6-6.8 (sprint-change-proposal-2026-10-01.md)'
+previous_reopened_date: '2026-09-28'
 last_commit: 'bc9cf7d2c369eb0e284f5c83ffaf525be11b131f'
 ---
 
 # TextToXml / Kape22Importer — Project Closure
+
+> **Reopened 2026-10-01 for stories 6.6–6.8** (Epic 6 post-retro corrections: GPAO worker startup
+> validation and share outage, per-Fichier retry cap, Logs sink flush + E2E assertions) —
+> `sprint-change-proposal-2026-10-01.md`, which closes `epic-6-retro-item-2`. Re-close at Story 6.8
+> closure.
 
 > **Re-closed 2026-10-01 at Epic 6 closure** (retro `epic-6-retro-2026-10-01.md`,
 > `accepted-with-open-items`, commit `bc9cf7d`). `last_commit` is the retro commit; this re-close ships
@@ -25,8 +30,8 @@ last_commit: 'bc9cf7d2c369eb0e284f5c83ffaf525be11b131f'
 > (`f425eb5`, `1c58af6` and the review-closure commit).
 
 **Decision:** the project is functionally complete. All planned Epics (1–6), including every
-post-retrospective hardening story, are `done`. No Epic 7 is planned (user decision 2026-10-01). No
-story is in progress.
+post-retrospective hardening story, are `done`. No Epic 7 is planned (user decision 2026-10-01).
+Epic 6 reopened 2026-10-01 for stories 6.6–6.8 (see top banner).
 
 ---
 

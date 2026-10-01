@@ -14,6 +14,9 @@ Pay down the debt shared by the P60 and P89 pipelines (ten "fix with P60 / fix o
 - Story 6.4: Robustesse commune des workers GPAO
 - Story 6.4-bis: Réaligner le harnais E2E worker P60 sur la config 6.4
 - Story 6.5: Test d'intégration d'un vrai `Client` GPAO
+- Story 6.6: Validation de configuration et panne de partage des workers GPAO
+- Story 6.7: Plafond de réessai par Fichier
+- Story 6.8: Flush du sink Logs et assertions du harnais E2E
 
 ## Requirements & Constraints
 
@@ -24,6 +27,7 @@ Pay down the debt shared by the P60 and P89 pipelines (ten "fix with P60 / fix o
 - **Stability gate** (P60 `Import:StabilityQuietPeriod`, P89 `P89:StabilityQuietPeriod`, default 10 s): a Fichier whose last write is more recent than the quiet period is left in place, no error, retried next tick; clock via `TimeProvider`.
 - **XML export per format:** `<nom>_<yyyyMMddHHmmss>.xml` in a dedicated folder, never overwritten, never purged by the worker; only Fichiers that converted without error; P60 key `Import:XmlExportPath` (absolute, distinct, validated at startup); P89 already complies via `P89:XmlPath`. Existing `archive/` / `error/` XML unchanged. Export write failure ⇒ Fichier stays in `processing/`.
 - **Worker robustness:** no overlapping ticks (skipped, not queued); `Client.Actions()` leaks no exception (broker connect included); no access to a disposed `Client` after the shutdown budget; `ConnectionStrings:AscoLSI` and `:MQTTnetServices` validated at startup with a message naming the key, no leaked SQL sink on refusal; no heartbeat after a failed tick; standalone `WorkerService` does not retry configuration errors and disposes the `Client`.
+- **Post-retro (AC-FR25-8..10, sprint-change-proposal-2026-10-01.md):** startup refuses an `AscoLSI` connection string without `Initial Catalog`, a quiet period outside 0..1 h, `Import:Commande` > 50, `Import:RetentionDays` outside 1..3650; an unreachable reception folder is a failed tick (no heartbeat), checked inside the tick task; per-Fichier retry cap (`Import:MaxAttempts` / `P89:MaxAttempts`, default 10) logs one `Error` then freezes the Fichier in place until the worker restarts, never moves it to `error/`; the E2E harness flushes the Logs sink before stopping the Launcher and asserts worker rows and one export per Fichier.
 - Cross-cutting: strict TDD with AC-named tests carrying `[Trait("AC", ...)]`; English comments; alphabetical ordering; glossary vocabulary; no secrets in code. Revised closed ACs (`AC-FR11-3`, `AC-FR11-6`, `AC-FR14-7`, `AC-FR12-5`) must be reconciled in the same change as the behavior.
 
 ## Technical Decisions

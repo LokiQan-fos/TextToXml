@@ -2905,7 +2905,8 @@ Solder les 10 entrées « fix with P60 / fix once » de `deferred-work.md`
 **FRs couverts :** FR-24, FR-25, FR-26 (+ `AC-FR11-3`, `AC-FR11-6`, `AC-FR12-5`,
 `AC-FR14-7` révisés, `AC-FR16-5`, `AC-FR22-9`).
 
-**Séquencement :** 6.1 → 6.2 → 6.3 → 6.4 → 6.4-bis → 6.5 (6.4-bis ajoutée le 2026-09-29, bloquante avant 6.5).
+**Séquencement :** 6.1 → 6.2 → 6.3 → 6.4 → 6.4-bis → 6.5 (6.4-bis ajoutée le 2026-09-29, bloquante avant 6.5)
+→ 6.6 → 6.7 → 6.8 (ajoutées le 2026-10-01, sprint-change-proposal-2026-10-01.md).
 
 ### Story 6.1 : Journal P60 via `IFichierJournal`
 
@@ -3068,6 +3069,105 @@ forwarder de log) ne régresse plus en silence.
   `AscoLSI_Test` pour `ConnectionStrings:AscoLSI`, sink SQL d'`AbstractService`
   sur `MQTTnetServices_Test` ; `[SkippableTheory]` si absente.
 - Solde aussi le test `Client.Actions` P60 dû depuis l'Épic 3.
+
+**Critères transverses :** CC-1, CC-2, CC-4, CC-7.
+
+Owner : Dev.
+
+## Corrections post-rétrospective Épic 6
+
+Planifier ou accepter les 19 entrées ouvertes de l'Épic 6 dans `deferred-work.md`
+(rétro Épic 6, F-1 / A-2 ; sprint-change-proposal-2026-10-01.md). 12 sont
+planifiées ci-dessous (dont `:1352` en partie), 7 acceptées avec motif dans
+`deferred-work.md`.
+
+### Story 6.6 : Validation de configuration et panne de partage des workers GPAO
+
+As an exploitant,
+I want qu'un worker GPAO refuse de démarrer sur une configuration qui le ferait
+boucler ou échouer à chaque tick, et qu'une panne du partage ne soit pas
+signalée « alive »,
+So that une erreur de déploiement se voit au démarrage et la supervision reflète
+l'état réel.
+
+**Acceptance Criteria:** `AC-FR25-9`, `AC-FR25-10`.
+
+**Notes dev :**
+- `Client.ReadConfig` des deux workers, corrigés à l'identique (D32) ;
+  `deferred-work.md:1334`, `:1352`, `:1374`, `:1382`, `:1390`, `:1394`.
+- `AC-FR25-10` touche `InboxScanner` / `P89FolderConverter` (signaler un dossier
+  de réception injoignable au worker) : forme du signal décidée au checkpoint spec.
+- Code Map : `grep` de chaque clé touchée sur `TextToXml` (`scripts/`, `tests/`)
+  et `MicroServices` (règle A-3). README des workers à jour. Commit SVN par
+  l'utilisateur.
+
+**Tests xUnit (TDD, CC-1) :** `GPAO/ImportP60.Tests`, `GPAO/ConvertP89.Tests`,
+`Kape22Importer.Tests`, `P89Converter.Tests` ; `[Trait("AC", "FR25-…")]`.
+
+**Critères transverses :** CC-1, CC-2, CC-4, CC-7.
+
+Owner : Dev.
+
+### Story 6.7 : Plafond de réessai par Fichier
+
+As an exploitant,
+I want qu'un Fichier qui échoue tick après tick soit signalé une fois puis
+laissé de côté,
+So that il ne réécrit plus des lignes `Logs` / `L_D_LOG_COMMANDE` indéfiniment.
+
+**Acceptance Criteria:** `AC-FR25-8`.
+
+**Notes dev :**
+- `deferred-work.md:1338`, `:1360` (et le reliquat de `:1334`).
+- Compteur dans le `Client` de chaque worker (le scanner P60 est recréé à chaque
+  tick, `RunTickCore`) ; `InboxScanner.RunTick` ne rend aujourd'hui aucune issue
+  par Fichier : exposer ce qu'il faut, forme décidée au checkpoint spec.
+- Clés `Import:MaxAttempts` / `P89:MaxAttempts` (défaut 10, < 1 refusé au
+  démarrage), ajoutées aux JSON et README. Commit SVN par l'utilisateur.
+- Conséquence acceptée (utilisateur, 2026-10-01) : une panne `AscoLSI` plus
+  longue que N ticks impose un redémarrage du worker pour reprendre les Fichiers
+  gelés.
+
+**Tests xUnit (TDD, CC-1) :** `GPAO/ImportP60.Tests`, `GPAO/ConvertP89.Tests`,
+bibliothèques si leur surface change ; `[Trait("AC", "FR25-8")]`.
+
+**Critères transverses :** CC-1, CC-2, CC-4, CC-7.
+
+Owner : Dev.
+
+### Story 6.8 : Flush du sink Logs et assertions du harnais E2E
+
+As a développeur,
+I want que les lignes `Logs` du worker atteignent la base de test avant la fin
+du harnais E2E, et que le harnais les vérifie,
+So that un worker qui cesse de journaliser ou d'exporter fait échouer la suite.
+
+**Acceptance Criteria :**
+
+**Given** `scripts/e2e-worker-import.ps1` en fin de run
+**When** il arrête le Launcher
+**Then** le sink Logs batché du worker est vidé avant l'arrêt (arrêt propre ou
+flush explicite) (`deferred-work.md:1400`).
+
+**Given** l'étape 5 du script
+**When** elle contrôle la base `MQTTnetServices_Test`
+**Then** elle exige au moins une ligne de la source `GpaoImportP60` postérieure à
+la ligne de référence (`:1414`) et exactement un XML exporté par Fichier semé
+(`:1404`).
+
+**Given** `GpaoClientIntegrationTests` (MicroServices)
+**When** le sink est vidé
+**Then** aucune ligne `Logs` du test n'est écrite hors de `MQTTnetServices_Test` (`:1424`).
+
+**Given** la solution complète
+**When** `dotnet test TextToXml.sln --filter Category=Integration -m:1` s'exécute
+**Then** 0 échec.
+
+**Notes dev :**
+- Mécanisme d'arrêt propre / flush choisi au checkpoint spec ; s'il touche le
+  Launcher ou `SharedLogger` (MicroServices / PortalSharedLibrary) : Ask First,
+  commit SVN par l'utilisateur.
+- `--blame-hang-timeout 2m` sur les runs Integration (orphelins bcp / Launcher).
 
 **Critères transverses :** CC-1, CC-2, CC-4, CC-7.
 
