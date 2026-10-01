@@ -16,8 +16,9 @@
 # them for inspection.
 #
 # Requires: the MicroServices.sln checkout (MicroServicesRoot), a local SQL Server reachable at the
-# connection strings configured in tests/Kape22Importer.Tests/appsettings.Test.json (AscoLSI, and
-# AscoLSI_Production for -SkipProductionCompare:$false), and sqlcmd on PATH.
+# connection strings configured in tests/Kape22Importer.Tests/appsettings.Test.json (AscoLSI,
+# MQTTnetServices for the Launcher's Logs sink, and AscoLSI_Production for -SkipProductionCompare:$false),
+# and sqlcmd on PATH.
 #
 # Usage:
 #   pwsh scripts/e2e-worker-import.ps1
@@ -66,6 +67,11 @@ $mqttLogTest = $testSettings.ConnectionStrings.MQTTnetServices
 if ([string]::IsNullOrWhiteSpace($ascoLsiTest)) {
     throw "ConnectionStrings:AscoLSI is not set in $testSettingsPath."
 }
+# Story 6.4-bis: this value only feeds MICROSERVICE_LOG_CONNECTION_STRING (step 3). Assigning a blank value
+# to that variable removes it, and SharedLogger then falls back to the production Logs server.
+if ([string]::IsNullOrWhiteSpace($mqttLogTest)) {
+    throw "ConnectionStrings:MQTTnetServices is not set in $testSettingsPath."
+}
 
 function Invoke-Sql([string] $Query) {
     & sqlcmd -S localhost -d AscoLSI_Test -C -Q $Query
@@ -103,7 +109,6 @@ Write-Host "Dropped $($Fichiers.Count) Fichier(s) into $InboxPath"
 $originalConfig = [System.IO.File]::ReadAllText($configPath)
 $patchedConfig = $originalConfig | ConvertFrom-Json
 $patchedConfig.ConnectionStrings.AscoLSI = $ascoLsiTest
-$patchedConfig.ConnectionStrings.MQTTnetServices = $mqttLogTest
 $patchedConfig.Import.InboxPath = $InboxPath
 $patchedConfig.Import | Add-Member -NotePropertyName XmlExportPath -NotePropertyValue $exportPath -Force
 [System.IO.File]::WriteAllText($configPath, ($patchedConfig | ConvertTo-Json -Depth 5))
@@ -114,8 +119,20 @@ try {
     dotnet build $launcherProject -c Debug --nologo -v minimal
     if ($LASTEXITCODE -ne 0) { throw 'Launcher build failed.' }
 
+    # Story 6.4-bis: the last Logs row before the Launcher starts, so step 5 can prove this run logged to
+    # the test Logs database. The table may not exist yet, since the Serilog sink creates it on first use.
+    $logsDb = [System.Data.Common.DbConnectionStringBuilder]::new()
+    # A plain property assignment would add a "ConnectionString" key through PowerShell's dictionary adapter.
+    $logsDb.set_ConnectionString($mqttLogTest)
+    $logsSqlcmd = @('-S', $logsDb['Server'], '-d', $logsDb['Database'], '-C', '-b', '-h', '-1', '-W')
+    $logsIdBefore = & sqlcmd @logsSqlcmd -Q "SET NOCOUNT ON; IF OBJECT_ID('dbo.Logs') IS NULL SELECT 0 ELSE SELECT ISNULL(MAX(Id), 0) FROM dbo.Logs"
+    if ($LASTEXITCODE -ne 0) { throw 'The Logs baseline query failed.' }
+    $logsIdBefore = [long]($logsIdBefore | Select-Object -First 1)
+
     # MICROSERVICE_LOG_CONNECTION_STRING keeps the Serilog/SQL sink off the unreachable production Logs
-    # server for this local run; LAUNCHER_API_KEY empty matches the unauthenticated local default.
+    # server for this local run. It is the only Logs-sink routing: since Story 6.4 the worker JSON has no
+    # MQTTnetServices key. Assigning '' to LAUNCHER_API_KEY removes the variable, and the Launcher then
+    # defaults to an empty key, the unauthenticated local mode.
     $env:MICROSERVICE_LOG_CONNECTION_STRING = $mqttLogTest
     $env:LAUNCHER_API_KEY = ''
     $launcherProcess = Start-Process -FilePath 'dotnet' -ArgumentList 'Launcher.dll' `
@@ -180,6 +197,20 @@ try {
     if ([int]$unpaired -ne 0) { throw "$unpaired decoded L_D_CONSIGNES row(s) without their ConsigneGPAO=0/1 counterpart." }
     if ([int]$unresolvedComposites -ne 0) { throw "$unresolvedComposites ConsigneGPAO=0 composite row(s) persisted with LibelleConsigne '?'." }
     if ([int]$svtWorking -ne 0) { throw "$svtWorking SVT L_D_CONSIGNES row(s) persisted with ConsigneGPAO=0." }
+
+    # Story 6.4-bis: the Launcher's shared logger must have written to the test Logs database. The sink
+    # flushes in batches, so its rows are polled for a short while instead of read once.
+    Write-Host "--- Logs rows written this run ($($logsDb['Database'])) ---"
+    $logsDeadline = (Get-Date).AddSeconds(15)
+    do {
+        $newLogs = & sqlcmd @logsSqlcmd -Q "SET NOCOUNT ON; SELECT COUNT(*) FROM dbo.Logs WHERE Id > $logsIdBefore"
+        if ($LASTEXITCODE -ne 0) { throw 'The Logs check query failed.' }
+        $newLogs = [int]($newLogs | Select-Object -First 1)
+        if ($newLogs -gt 0) { break }
+        Start-Sleep -Seconds 1
+    } while ((Get-Date) -lt $logsDeadline)
+    Write-Host "$newLogs row(s)"
+    if ($newLogs -eq 0) { throw "No Logs row was written to $($logsDb['Database']) during this run." }
 }
 finally {
     # --- 6. Always tear down the Launcher and its broker, and always restore the tracked config. ---
@@ -222,7 +253,7 @@ if (-not $SkipProductionCompare) {
         # filtering the class by FullyQualifiedName and the Fichier by DisplayName is what actually narrows
         # to one test case; a FullyQualifiedName~ filter on the Fichier alone matches nothing.
         dotnet @dotnetTestArgs --filter "FullyQualifiedName~Kape22ProductionDataParityTests&DisplayName~$fichier" --nologo -v minimal
-        # B-4 (Story 4.10): guarded the same way as the dotnet build step above (line 106) - a forced
+        # B-4 (Story 4.10): guarded the same way as the Launcher build step above - a forced
         # production-parity failure must stop the script instead of continuing silently.
         if ($LASTEXITCODE -ne 0) { throw "Production-parity test failed for $fichier." }
     }

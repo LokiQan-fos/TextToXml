@@ -1394,3 +1394,13 @@ s'y trouver et rester à confirmer.
 - source_spec: `reviews/story-6-4/aggregated-report.md` (F-5, low)
   summary: `Directory.Exists` on a hung SMB share runs on the timer thread outside `_tick`, so the 4 s `Stop()` budget does not cover the block.
   evidence: edge-case-hunter lens, `GPAO/ImportP60/Client.cs:303`. Fix is to move the check into the `Task.Run` (low impact); rare, no data loss.
+
+## Deferred from: code review of story-6.4-bis (2026-09-29)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-4-bis-realigner-harnais-e2e-worker-p60-config-6-4.md` (D-1, low)
+  summary: The GpaoImportP60 worker's own lines ("Fichier ... processed") never reach `MQTTnetServices_Test.Logs` during the E2E run; only the Broker and CopyDataToDb rows do.
+  evidence: standalone run 2026-09-29: the "processed" lines appear in the Launcher console log only. `SharedLogger` builds a batched MSSqlServer sink (5 s period) that is never flushed, because `scripts/e2e-worker-import.ps1` ends the Launcher with `Stop-Process -Force`. Pre-existing; a graceful Launcher stop (or an explicit flush) is needed before a worker-row assertion can be written.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-4-bis-realigner-harnais-e2e-worker-p60-config-6-4.md` (D-2, low)
+  summary: The E2E script lists the FR-26 export folder with `-ErrorAction SilentlyContinue` and asserts nothing, so a run whose XML export silently stopped still exits 0.
+  evidence: blind-hunter lens, `scripts/e2e-worker-import.ps1` step 5 "Exported XML files (FR-26)". Pre-existing since Story 6.3; an export-count assertion (one file per Fichier) would close it.

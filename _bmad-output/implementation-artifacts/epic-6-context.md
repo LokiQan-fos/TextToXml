@@ -12,6 +12,7 @@ Pay down the debt shared by the P60 and P89 pipelines (ten "fix with P60 / fix o
 - Story 6.2: Garde de stabilité des Fichiers P60 + P89
 - Story 6.3: Export XML P60 dans un dossier dédié
 - Story 6.4: Robustesse commune des workers GPAO
+- Story 6.4-bis: Réaligner le harnais E2E worker P60 sur la config 6.4
 - Story 6.5: Test d'intégration d'un vrai `Client` GPAO
 
 ## Requirements & Constraints
@@ -36,5 +37,5 @@ Pay down the debt shared by the P60 and P89 pipelines (ten "fix with P60 / fix o
 
 ## Cross-Story Dependencies
 
-- Strict order 6.1 → 6.2 → 6.3 → 6.4 → 6.5. 6.1 rewires `GpaoImportP60`'s journal and changes the D22 guard that the later hardening and export stories rely on; 6.3's "ignored by the D22 guard" export case assumes 6.1's guard; 6.5 tests the behavior produced by 6.1, 6.3 and 6.4.
+- Strict order 6.1 → 6.2 → 6.3 → 6.4 → 6.4-bis → 6.5; 6.4-bis (test-harness only, no production code) realigns `scripts/e2e-worker-import.ps1` with the `MQTTnetServices` key removed by 6.4 and restores a green `Category=Integration` suite before 6.5. 6.1 rewires `GpaoImportP60`'s journal and changes the D22 guard that the later hardening and export stories rely on; 6.3's "ignored by the D22 guard" export case assumes 6.1's guard; 6.5 tests the behavior produced by 6.1, 6.3 and 6.4.
 - Builds on Epic 5's `FichierJournal` / `AscoLsiJournal` projects (Story 5.0) and on the P89 worker composition (Story 5.2).
