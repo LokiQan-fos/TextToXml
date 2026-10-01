@@ -1347,7 +1347,7 @@ s'y trouver et rester à confirmer.
 
 ## Deferred from: code review of story-6.2, closure (2026-09-29)
 
-- source_spec: `reviews/story-6-2/aggregated-report.md` (F-1, low)
+- source_spec: **RESOLVED 2026-10-01 by the Epic 6 retro** (`epic-6-retro-2026-10-01.md` F-3, A-1): `svn status GPAO` shows no modified or unversioned source file and `svn info GPAO` gives `Last Changed Rev: 541` (2026-09-29 16:03), so the change is committed — `reviews/story-6-2/aggregated-report.md` (F-1, low)
   summary: The back-dating of the seeds in `MicroServices/GPAO/ConvertP89.Tests/RunTickCoreTests.cs:104`, required by the Story 6.2 spec, lives in SVN outside this git repository; its SVN commit is not yet confirmed.
   evidence: blind-hunter lens; the spec task is checked, but no git range can show the SVN change. The review report records the 34 `ConvertP89.Tests` tests green in the working copy.
 

@@ -51,6 +51,14 @@ amont au lieu de les dupliquer — toute règle vit dans son fichier d'origine.
 - Le gate CI refuse un commit `chore(story-*)` dont le corps (hors trailer
   Co-Authored-By) ne mentionne ni `AC-FRx-y` ni « test » (epic-3-retro-item-2).
 
+## Clés de configuration
+
+Une spec qui retire ou renomme une clé de configuration cite, dans sa Code Map, le résultat d'un
+`grep` de la clé sur les deux dépôts : `TextToXml` (`scripts/`, `tests/`, `src/`) et `MicroServices`
+(sources hors `bin/obj`). Motivation : la Story 6.4 a retiré `ConnectionStrings:MQTTnetServices`
+après un `grep` limité à `MicroServices` ; `scripts/e2e-worker-import.ps1` l'utilisait encore, ce qui
+a cassé la suite Integration et imposé la Story 6.4-bis (`epic-6-retro-2026-10-01.md` F-4, A-3).
+
 ## Langues
 
 - Commentaires de code : anglais (CC-2).

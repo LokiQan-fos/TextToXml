@@ -1,26 +1,32 @@
 ---
-status: 'reopened'
+status: 'closed'
+closed_date: '2026-10-01'
+previous_closed_date: '2026-09-25'
 reopened_date: '2026-09-28'
 reopened_reason: 'Epic 6 — P60 journal migration, shared GPAO worker hardening, per-format XML export (sprint-change-proposal-2026-09-28.md)'
 previous_reopened_date: '2026-09-25'
-closed_date: '2026-09-25'
-previous_closed_date: '2026-09-22'
-last_commit: '1fcfbf2404176014e27cff77fb40d2c72779e5a4'
+last_commit: 'bc9cf7d2c369eb0e284f5c83ffaf525be11b131f'
 ---
 
 # TextToXml / Kape22Importer — Project Closure
 
+> **Re-closed 2026-10-01 at Epic 6 closure** (retro `epic-6-retro-2026-10-01.md`,
+> `accepted-with-open-items`, commit `bc9cf7d`). `last_commit` is the retro commit; this re-close ships
+> on top of it. No Epic 7 is planned. One planning item stays open: `epic-6-retro-item-2` (a
+> `/bmad-correct-course` over the 19 open Epic 6 entries of `deferred-work.md`, see §4); the user will
+> run it and decide what it proposes.
+
 > **Reopened 2026-09-28 for Epic 6** (P60 journal migration, shared GPAO worker hardening, per-format
 > XML export) — `sprint-change-proposal-2026-09-28.md`. Epic 5 closed 2026-09-28 (retro
-> `epic-5-retro-2026-09-28.md`, `accepted-with-open-items`). Re-close at Epic 6 closure.
+> `epic-5-retro-2026-09-28.md`, `accepted-with-open-items`).
 
 > **Re-closed 2026-09-25**, after a reopening on 2026-09-24 (test/correction session 2). `last_commit`
 > is the last commit before this re-close; the re-close itself ships in the Story 4.14 commits
 > (`f425eb5`, `1c58af6` and the review-closure commit).
 
-**Decision:** the project is functionally complete. All planned Epics (1–4), including every
-post-retrospective hardening story, are `done`. No Epic 5 is planned — confirmed by the donneur
-d'ordre. No story is in progress.
+**Decision:** the project is functionally complete. All planned Epics (1–6), including every
+post-retrospective hardening story, are `done`. No Epic 7 is planned (user decision 2026-10-01). No
+story is in progress.
 
 ---
 
@@ -33,6 +39,7 @@ d'ordre. No story is in progress.
 | **Epic 3** | Structural repositioning as a library, inbox scanning/file lifecycle, per-file orchestration, double journalization, worker loop + graceful shutdown, loop robustness, E2E coverage harness (3.0–3.6) | 7/7 done | `accepted-with-open-items` (`epic-3-retro-2026-09-11.md`) — action items done, 1 reconciled at closure (see §3) |
 | **Epic 4** | Downstream-table dispatch: 10 `L_D_*` entities, mapping annex, OF/Coulée + Consignes mappers, bundle orchestrator, single-transaction persister, 10-table E2E suite, plus 5 post-retro hardening stories (4.1–4.7, 4.2-bis, 4.3-bis, 4.9, 4.10, 4.11), then 4 production-parity stories (4.4-bis, 4.12, 4.13, 4.14) | 11/11 base + 5/5 hardening + 4/4 parity = done | `accepted-with-open-items`, 4 retro passes (`epic-4-retro-2026-09-17.md`, `-18.md`, `-21.md`, `-25.md`) — every routed action item done as of this closure (see §3) |
 | **Epic 5** | P89 Step 1: `IFichierJournal` + LSI implementation, `P89Converter` (raw P89 folder → timestamped normalized XML + XSD), worker `GpaoConvertP89` under the Launcher (5.0–5.2) | 3/3 done | `accepted-with-open-items` (`epic-5-retro-2026-09-28.md`) — A-1, A-3 done 2026-09-28; A-2, A-4 open |
+| **Epic 6** | P60 journal via `IFichierJournal` (D22 guard on `L_D_KAPE22`), stability gate for P60 + P89, P60 XML export to a dedicated never-purged folder, shared hardening of the two GPAO workers + `MicroService.Publisher`, E2E harness realignment, real-`Client` integration test (6.1–6.5, 6.4-bis) | 6/6 done | `accepted-with-open-items` (`epic-6-retro-2026-10-01.md`) — A-1 done at this re-close; A-3 done 2026-10-01; A-2 open (correct-course) |
 
 Every epic closed with the same verdict shape: **accepted-with-open-items**, never a hard rejection.
 Each round of open items was either fixed by a dedicated follow-up story or explicitly accepted as a
@@ -125,7 +132,21 @@ manual-session fix commits, and all four are `done` at this re-close:
   `manual-session-fix-review`: such a fix goes through `/run-review` or a story before commit, and a
   changed declared AC is reconciled in the same commit. It binds agent sessions only.
 
+At the 2026-10-01 re-close, four `sprint-status.yaml` action items are not `done`:
+`epic-5-retro-item-2` (CI comment), `epic-5-retro-item-4` (closure check in `/commit-review`, the
+prevention for this document going stale three times), and `epic-6-retro-item-2` (correct-course, see
+§4). `epic-6-retro-item-1` (this re-close) and `epic-6-retro-item-3` (project-profile rule) are done.
+
 ## 4. Deferred work — not resolved at closure
+
+**Epic 6 (2026-10-01).** 19 entries of `deferred-work.md:1334-1426` stay open, in three clusters
+routed to a `/bmad-correct-course` (`epic-6-retro-item-2`, user decision 2026-10-01: plan them, no
+Epic 7 yet): (a) per-Fichier retry cap / quarantine — a Fichier can loop in `processing/` forever
+(`:1334`, `:1338`, `:1360`); (b) worker startup configuration validation (`:1334`, `:1368`, `:1374`,
+`:1382`); (c) Logs sink flush + E2E assertions (`:1400`, `:1404`, `:1414`, `:1424`). The rest is listed
+in `epic-6-retro-2026-10-01.md` F-1.
+
+Older categories (Epics 1–4):
 
 `deferred-work.md` accumulates ~50 dated sections of review findings the team explicitly chose not to fix,
 each with its own non-blocking rationale. None are closure blockers; none are tracked as open
@@ -164,6 +185,17 @@ starting punch list.
 
 ## 5. Final test state
 
+At the 2026-10-01 re-close (HEAD `bc9cf7d`, measured by the Epic 6 retro):
+
+- **Build** (`dotnet build TextToXml.sln -warnaserror`): 0 warnings, 0 errors.
+- **Unit** (`Category=Unit`): **1178 passed, 0 failed, 0 skipped** — 192 `TextToXml.Tests`, 917
+  `Kape22Importer.Tests`, 48 `P89Converter.Tests`, 21 `AscoLsiJournal.Tests`.
+- **Integration** (`Category=Integration -m:1`): **1253 passed, 0 failed, 18 skipped** — 1251
+  `Kape22Importer.Tests` (worker E2E included), 2 `AscoLsiJournal.Tests`; the 18 skips are
+  `Kape22ProductionDataParityTests` Fichiers with no production row.
+- **MicroServices.sln**: build 0 warnings; `GpaoImportP60.Tests` 46, `GpaoConvertP89.Tests` 52,
+  `Gpao.IntegrationTests` 8, `Launcher.Tests` 4, `MicroService.Tests` 39 — all passed.
+
 At the 2026-09-25 re-close (Story 4.14 working tree):
 
 - **Unit** (`Category=Unit`, re-run): **1026 passed, 0 failed, 0 skipped** — 192 in `TextToXml.Tests`,
@@ -186,8 +218,7 @@ At the 2026-09-22 closure (commit `8f6e79e`), for reference:
 
 ## 6. Closure
 
-TextToXml / Kape22Importer is closed as of 2026-09-25 (re-close after the 2026-09-24 reopening), with
-the Story 4.14 commits (`f425eb5`, `1c58af6` and the review-closure commit) on top of `1fcfbf2`. The
-first closure was 2026-09-22, commit `8f6e79e`. No story is in progress; no Epic 5 is planned. Any further
-work on this codebase starts as a new, explicitly re-opened initiative, not a continuation of Epic 4's
-sprint.
+TextToXml / Kape22Importer is closed as of 2026-10-01 (re-close at Epic 6 closure, on top of
+`bc9cf7d`). Earlier closures: 2026-09-25 (Story 4.14 commits on top of `1fcfbf2`) and 2026-09-22
+(commit `8f6e79e`). No story is in progress; no Epic 7 is planned. Any further work, including what the
+pending correct-course proposes, starts as a new, explicitly re-opened initiative.
