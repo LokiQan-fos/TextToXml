@@ -3065,7 +3065,8 @@ forwarder de log) ne régresse plus en silence.
 
 **Notes dev :**
 - Un seul harnais partagé pour P60 et P89 (`deferred-work.md:1313`) ; base
-  `AscoLSI_Test` (sink SQL d'`AbstractService`), `[SkippableFact]` si absente.
+  `AscoLSI_Test` pour `ConnectionStrings:AscoLSI`, sink SQL d'`AbstractService`
+  sur `MQTTnetServices_Test` ; `[SkippableTheory]` si absente.
 - Solde aussi le test `Client.Actions` P60 dû depuis l'Épic 3.
 
 **Critères transverses :** CC-1, CC-2, CC-4, CC-7.

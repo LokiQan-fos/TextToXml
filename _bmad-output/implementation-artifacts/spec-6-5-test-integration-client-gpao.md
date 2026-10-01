@@ -71,6 +71,8 @@ This repo:
 
 The `Logs` sink of `MQTTnetServices_Test` is used rather than `AscoLSI_Test` (story note): `Logs` already lives there (`scripts/schema/02-mqtt-tables.sql`) and is the 6.4-bis E2E target, while `AutoCreateSqlTable` would otherwise add a foreign table to the database the TextToXml fixtures reset. The `Client`'s own `ConnectionStrings:AscoLSI` does target `AscoLSI_Test`; none of the four scenarios writes to it (a locked Fichier is deferred before any journal or business write).
 
+**Ask First granted 2026-10-01 (review D-1):** r543 adds `TestResults` to `svn:global-ignores` on the existing `ImportP60.Tests` and `ConvertP89.Tests`. These folders hold test-run output, not source, and are kept out of SVN on purpose.
+
 `Execute` (= `Actions`) is invoked directly rather than through `Start()`, so the test controls the tick; this is the same delegate the Publisher timer calls.
 
 ## Verification

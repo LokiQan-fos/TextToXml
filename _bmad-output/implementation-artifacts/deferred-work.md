@@ -1417,6 +1417,10 @@ s'y trouver et rester à confirmer.
 
 ## Deferred from: code review of spec-6-5-test-integration-client-gpao.md (2026-10-01)
 
-- source_spec: `spec-6-5-test-integration-client-gpao.md`
+- source_spec: `spec-6-5-test-integration-client-gpao.md` (D-1, low)
   summary: No real-instance test cancels a GPAO tick already in flight; `GpaoClientIntegrationTests` only proves that `Stop()` cancels the token the next tick uses.
   evidence: blind-hunter lens, `GPAO/Gpao.IntegrationTests/GpaoClientIntegrationTests.cs` `Stop_ThenExecute_ProcessesNothing_AcFr25_7` (frozen matrix row "Stop cancels": `Stop()` awaited, then `Execute()`). Between-Fichier cancellation is covered at library level (`InboxScanner.RunTick`, `P89FolderConverter.RunTick`); a real-instance test would need a slow or blocking Fichier to hold a tick open.
+
+- source_spec: `reviews/story-6-5/aggregated-report.md` (F-1, low)
+  summary: No assertion checks the spec AC-1 clause "no Logs row lands outside MQTTnetServices_Test"; the routing relies only on `MICROSERVICE_LOG_CONNECTION_STRING` being set before the `Client` is built.
+  evidence: blind-hunter lens, `GPAO/Gpao.IntegrationTests/GpaoClientIntegrationTests.cs:36`. The mechanism is sound (`SharedLogger` caches per connection string and re-reads the variable on each `GetDefault()`), but proving it needs a query on a second database (`AscoLSI_Test`); to pair with the sink-flush D-1 of Story 6.4-bis.

@@ -1153,7 +1153,7 @@ corrigés à l'identique dans les deux (D32) ; la ré‑entrance, une fois dans
 - `AC-FR25-6` : l'hôte autonome `WorkerService` ne retente pas une erreur de
   configuration et libère le `Client` à l'arrêt.
 - `AC-FR25-7` : un test d'intégration construit un vrai `Client` de chaque
-  worker GPAO (`AscoLSI_Test`) et vérifie `Frequency`, le confinement des
+  worker GPAO (`AscoLSI_Test`, logs sur `MQTTnetServices_Test`) et vérifie `Frequency`, le confinement des
   erreurs dans `Actions`, l'annulation par `Stop()` et le log `Warning` d'un
   Fichier `Deferred`.
 
