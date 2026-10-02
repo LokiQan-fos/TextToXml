@@ -1455,3 +1455,21 @@ s'y trouver et rester à confirmer.
   summary: Without `-KeepArtifacts`, `scripts/e2e-worker-import.ps1` cleans up only `L_D_LOG_COMMANDE` and `L_D_KAPE22`, not `L_D_CONSIGNES` or the other downstream tables, so a second standalone run in a row leaves both Fichiers in `processing/` on a `PK_L_D_CONSIGNES` violation and times out.
   evidence: Story 6.8 implementation and verification runs 2026-10-02 (standalone run: "Fichier ... left in processing/ after a persistence failure"). Pre-existing since the downstream dispatch (Epic 4); runs through `dotnet test` are unaffected because `SqlServerIntegrationFixture` resets the database first.
   disposition: PLANNED 2026-10-02 — Story 6.10 (D34: a re-sent OF in state GPAO is replaced, so a second run no longer hits `PK_L_D_CONSIGNES`; sprint-change-proposal-2026-10-02.md).
+
+## Deferred from: code review of spec-6-9-controle-coulee-froide-typeconsigne-12.md (2026-10-02)
+
+- source_spec: `reviews/story-6-9/aggregated-report.md` (F-1, low)
+  summary: The A-4 test name `ColdConsignePits_IsTheOneSharedConstantBothCollaboratorsReference_A4` claims two collaborators reference the constant; only `Kape22Persister` does, and did before Story 6.9.
+  evidence: blind-hunter + acceptance-auditor lenses, `tests/Kape22Importer.Tests/TransactionalPersistenceTests.cs:808`. Story 6.9 fixed the comment, not the name; renaming touches A-4 traceability. Pre-existing, cosmetic.
+
+- source_spec: `reviews/story-6-9/aggregated-report.md` (F-2, low)
+  summary: No Unit-tier test covers the cold predicate (`CodeConsignePits` first character); every new Story 6.9 test is Integration and skipped without the local SQL instance.
+  evidence: verification-gap lens, Story 6.9 diff (`ColdCouleeRealFichierTests`, `TransactionalPersistenceTests` theory). Project convention AR-12 (integration tests on local SQL Server); joins the Epic 4 retro action item on Unit-tier downstream assertions.
+
+- source_spec: `reviews/story-6-9/aggregated-report.md` (F-3, low)
+  summary: The MicroServices change to `GPAO/ImportP60.Tests/EndToEndSmokeTests.cs` (cold Coulée seeding) lives outside the git diff, was not reviewed, and its SVN commit is still owed by the user.
+  evidence: acceptance-auditor lens; verified during review that `Gpao.IntegrationTests`, `ClientRobustnessTests` and `RunTickCoreTests` import no cold reference Fichier, so no other MicroServices test is affected.
+
+- source_spec: `reviews/story-6-9/aggregated-report.md` (F-4, low)
+  summary: `ColdCouleeRealFichierTests.Counts()` (11-table list) and `Import()` (ImportOptions + processor wiring) duplicate `RejectionAtomicityIntegrationTests.AssertNoDispatchRows`, the inline lists in `TransactionalPersistenceTests` and other classes' `Processor()` helpers.
+  evidence: blind-hunter lens, `tests/Kape22Importer.Tests/ColdCouleeRealFichierTests.cs`. Test-only cleanup outside Story 6.9 scope, no functional impact.

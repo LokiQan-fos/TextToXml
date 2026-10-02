@@ -163,7 +163,7 @@ $launcherProcess = $null
 try {
     # --- 2b. Story 6.9 (AC-FR20-5): a cold Coulee (CodeConsignePits starting with "1", TypeConsigne 12)
     # must already be in L_D_COULEE, as it is in production when a P60 names it. Each requested cold
-    # Fichier's own Coulee is added to the test database (the row CouleeMapper builds: IdCoulee, Nuance,
+    # Fichier's own Coulee is added to the test database as a minimal row (IdCoulee, Nuance, current
     # timestamps, zero states) unless already on file. Runs inside the try, so the finally block removes
     # the rows added here even when a later step fails. ---
     foreach ($fichier in $Fichiers) {
@@ -176,8 +176,9 @@ try {
         if ($detail.Substring(146, 1) -ne '1') { continue }
         # Trimmed like the mapped L_D_KAPE22.Coulee the persister compares with L_D_COULEE.IdCoulee.
         $coulee = $detail.Substring(50, 6).Trim()
+        $couleeSql = $coulee.Replace("'", "''")
         $nuance = $detail.Substring(43, 7).Trim().Replace("'", "''")
-        $added = & sqlcmd -S localhost -d AscoLSI_Test -C -b -h -1 -W -Q "SET NOCOUNT ON; IF EXISTS (SELECT 1 FROM L_D_COULEE WHERE IdCoulee = '$coulee') SELECT 0 ELSE BEGIN INSERT INTO L_D_COULEE (IdCoulee, Nuance, DateReception, EtatReception, DerniereModif, NbLingotRestantARefroidir, Externe) VALUES ('$coulee', N'$nuance', GETDATE(), 0, GETDATE(), 0, 0); SELECT 1 END"
+        $added = & sqlcmd -S localhost -d AscoLSI_Test -C -b -h -1 -W -Q "SET NOCOUNT ON; IF EXISTS (SELECT 1 FROM L_D_COULEE WHERE IdCoulee = '$couleeSql') SELECT 0 ELSE BEGIN INSERT INTO L_D_COULEE (IdCoulee, Nuance, DateReception, EtatReception, DerniereModif, NbLingotRestantARefroidir, Externe) VALUES ('$couleeSql', N'$nuance', GETDATE(), 0, GETDATE(), 0, 0); SELECT 1 END"
         if ($LASTEXITCODE -ne 0) { throw "Seeding the cold Coulee $coulee of $fichier failed." }
         if ((ConvertFrom-SqlScalar $added "cold Coulee $coulee seed") -eq 1) { $seededCoulees += $coulee }
     }
@@ -314,7 +315,7 @@ finally {
         $numeros = $Fichiers | ForEach-Object { ($_ -split '_')[-1] }
         Invoke-Sql "DELETE FROM L_D_LOG_COMMANDE WHERE [OF] IN (SELECT RTRIM([OF]) FROM L_D_KAPE22 WHERE NumeroFichier IN ('$($numeros -join "','")')); DELETE FROM L_D_KAPE22 WHERE NumeroFichier IN ('$($numeros -join "','")');" | Out-Null
         if ($seededCoulees.Count -gt 0) {
-            Invoke-Sql "DELETE FROM L_D_COULEE WHERE IdCoulee IN ('$($seededCoulees -join "','")');" | Out-Null
+            Invoke-Sql "DELETE FROM L_D_COULEE WHERE IdCoulee IN ('$(($seededCoulees | ForEach-Object { $_.Replace("'", "''") }) -join "','")');" | Out-Null
         }
         Remove-Item -LiteralPath $InboxPath -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item -LiteralPath $exportPath -Recurse -Force -ErrorAction SilentlyContinue

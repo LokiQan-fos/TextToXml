@@ -359,8 +359,8 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
     }
 
     // AC-FR20-5: a cold Coulee (CodeConsignePits starting with "1", here the bare "1") whose L_D_COULEE
-    // row does not exist yet is rejected before anything is added - no L_D_KAPE22 row, no downstream entity, one REJETÉ log row
-    // citing the missing Coulee, and a BusinessRuleViolation error naming it.
+    // row does not exist yet is rejected before anything is added - no L_D_KAPE22 row, no downstream
+    // entity, one REJETÉ log row citing the missing Coulee, and a BusinessRuleViolation error naming it.
     [SkippableFact]
     [Trait("AC", "FR20-5")]
     public void Persist_ColdCouleeMissingFromLDCoulee_RejectsWithNoInsertsAndBusinessRuleViolation_AcFr20_5()
@@ -408,10 +408,11 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
     // AC-FR20-5 (Story 6.9): a real P60 Fichier carries the full 12-character CodeConsignePits, and the
     // Coulee is cold when its first character - the TypeConsigne 12 slice - is "1". With the Coulee
     // absent from L_D_COULEE, a cold full code is rejected in the AC-FR20-5 shape and a hot one imports
-    // and inserts the Coulee row.
+    // and inserts the Coulee row. A blank code is hot, never an exception (spec Boundaries).
     [SkippableTheory]
     [InlineData("1 207 00 000", false)]
     [InlineData("3 148 00 740", true)]
+    [InlineData("", true)]
     [Trait("AC", "FR20-5")]
     public void Persist_FullCodeConsignePits_ColdOnlyOnFirstCharacter_AcFr20_5(string codeConsignePits, bool accepted)
     {
@@ -422,7 +423,7 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
             SetChamp(d, "message", "CodeConsignePits", codeConsignePits);
         });
         Assert.True(bundle.Success, string.Join("; ", bundle.Errors.Select(error => error.Message)));
-        Assert.Equal(codeConsignePits, bundle.Kape22!.CodeConsignePits);
+        Assert.Equal(codeConsignePits, bundle.Kape22!.CodeConsignePits ?? string.Empty);
         string coulee = bundle.Kape22.Coulee;
 
         ImportResult result = Persist(bundle);
@@ -800,9 +801,9 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
     // A-4 (Epic 4 retro) non-regression: Kape22Persister reads the one shared
     // Kape22ImportBundle.ColdConsignePits constant for the hot/cold Coulee marker (the first character of
     // CodeConsignePits since Story 6.9), and neither it nor Kape22ImportBundleMapper carries its own "1"
-    // literal - pinned by reflection so a future revert back to a private duplicate
-    // fails this test instead of silently reintroducing the drift risk the retro flagged. Pure
-    // reflection, no database needed.
+    // literal - pinned by reflection so a future revert back to a private duplicate fails this test
+    // instead of silently reintroducing the drift risk the retro flagged. Pure reflection, no database
+    // needed.
     [Fact]
     [Trait("AC", "A-4")]
     public void ColdConsignePits_IsTheOneSharedConstantBothCollaboratorsReference_A4()

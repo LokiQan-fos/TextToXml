@@ -112,6 +112,9 @@ internal static class TestSupport
         Assert.Equal(seeded.Nuance.Trim(), row.Nuance.Trim());
         Assert.Equal(seeded.DateReception, row.DateReception);
         Assert.Equal(seeded.DerniereModif, row.DerniereModif);
+        Assert.Equal(seeded.EtatReception, row.EtatReception);
+        Assert.Equal(seeded.Externe, row.Externe);
+        Assert.Equal(seeded.NbLingotRestantARefroidir, row.NbLingotRestantARefroidir);
     }
 
     // Story 6.9: adds the bundle's own Coulee row to L_D_COULEE unless it is already on file. The bundle

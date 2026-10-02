@@ -97,8 +97,9 @@ public class EndToEndPerformanceTests
         const double budgetMs = 200;
         const int iterations = 30;
 
-        SingleFichierScanner(content).RunTick();
-        InboxScanner[] scanners = [.. Enumerable.Range(0, iterations).Select(_ => SingleFichierScanner(content))];
+        Scanner(SingleFichierSource(content)).RunTick();
+        InMemoryFileSource[] sources = [.. Enumerable.Range(0, iterations).Select(_ => SingleFichierSource(content))];
+        InboxScanner[] scanners = [.. sources.Select(Scanner)];
 
         Stopwatch stopwatch = Stopwatch.StartNew();
         foreach (InboxScanner scanner in scanners)
@@ -108,6 +109,8 @@ public class EndToEndPerformanceTests
 
         stopwatch.Stop();
 
+        // Story 6.9: every tick imported the Fichier - none was rejected for a missing cold Coulee.
+        Assert.All(sources, source => Assert.Empty(source.ListRecursive("error")));
         double averageMs = stopwatch.Elapsed.TotalMilliseconds / iterations;
         Assert.True(
             averageMs < budgetMs,
@@ -139,16 +142,19 @@ public class EndToEndPerformanceTests
         stopwatch.Stop();
 
         Assert.Empty(source.Names(InboxRoot));
+
+        // Story 6.9: no Fichier was rejected for a missing cold Coulee.
+        Assert.Empty(source.ListRecursive("error"));
         Assert.True(
             stopwatch.Elapsed < TimeSpan.FromSeconds(30),
             $"A 500-Fichier tick took {stopwatch.Elapsed.TotalSeconds:F1} s, above the 30 s NFR-2 budget (FTP/SQL excluded).");
     }
 
-    // A scanner over its own database and an inbox holding only the given Fichier.
-    private static InboxScanner SingleFichierScanner(byte[] content)
+    // An inbox holding only the given Fichier.
+    private static InMemoryFileSource SingleFichierSource(byte[] content)
     {
         InMemoryFileSource source = new();
         source.Add(InboxRoot, ReferenceFichierName, content, Now.AddMinutes(-1));
-        return Scanner(source);
+        return source;
     }
 }

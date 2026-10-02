@@ -178,13 +178,14 @@ public class Kape22ImportBundleMapperTests
         Assert.Empty(bundle.Errors);
     }
 
-    // AC-FR20-3 removed 2026-09-22 (Kape22ImportBundleMapper.cs Design Notes): the reference Fichier is
-    // hot (CodeConsignePits is a real 12-char consigne code, never literally "1") with an externally-cast
-    // Coulee (165718, does not start with '0') - confirmed by the process owner as a legitimate,
-    // real-world combination, not a data defect. Replaces the two AC-FR20-3 tests that used to assert
-    // this exact case as a rejection: a hot, externally-sourced Coulee must succeed with no violation.
+    // AC-FR20-3 removed 2026-09-22 (Kape22ImportBundleMapper.cs Design Notes): the reference Fichier
+    // carries an externally-cast Coulee (165718, does not start with '0') - confirmed by the process owner
+    // as a legitimate, real-world combination, not a data defect. Replaces the two AC-FR20-3 tests that
+    // used to assert this exact case as a rejection: an externally-sourced Coulee must map with no
+    // violation. Story 6.9: the reference is cold (CodeConsignePits "1 205 00 999"), but the mapper applies
+    // no cold-Coulee check - AC-FR20-5 belongs to Kape22Persister.
     [Fact]
-    public void Map_UnmutatedReferenceFichier_HotExternalCoulee_Succeeds()
+    public void Map_UnmutatedReferenceFichier_ExternalCoulee_Succeeds()
     {
         Kape22ImportBundle bundle = new Kape22ImportBundleMapper(WinterClock())
             .Map(ConvertReferenceFichier(), ReferenceFichierName);

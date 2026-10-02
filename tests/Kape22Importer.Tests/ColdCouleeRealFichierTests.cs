@@ -66,13 +66,16 @@ public class ColdCouleeRealFichierTests(SqlServerIntegrationFixture fixture)
     public void Import_ColdCouleePresent_IsAccepted_AcFr20_5()
     {
         Ready();
-        SeedCouleeOf("P60_847_682_412");
+        Assert.Equal("063241", SeedCouleeOf("P60_847_682_412"));
 
         ImportResult result = Import("P60_847_682_412");
 
         Assert.True(result.Success, string.Join("; ", result.Errors.Select(error => error.Message)));
         using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
         Assert.Single(verify.Kape22Rows.AsNoTracking());
+
+        // The Coulee on file is reused, never inserted a second time.
+        Assert.Single(verify.CouleeRows.AsNoTracking());
     }
 
     private static byte[] Read(string relativePath) =>
