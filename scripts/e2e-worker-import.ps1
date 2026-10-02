@@ -100,16 +100,18 @@ function ConvertFrom-SqlScalar([object[]] $Output, [string] $What) {
 }
 
 # Story 6.8: polls the test Logs table for rows after $logsIdBefore matching $Where, for at most
-# $PollTimeoutSeconds; returns their count, or throws naming the Logs database when none landed.
-function Wait-LogsRow([string] $Where, [string] $What) {
-    $deadline = (Get-Date).AddSeconds($PollTimeoutSeconds)
+# $PollTimeoutSeconds (a single read with -Once); returns their count, or throws naming the Logs
+# database when none landed.
+function Wait-LogsRow([string] $Where, [string] $What, [switch] $Once) {
+    $deadline = (Get-Date).AddSeconds($(if ($Once) { 0 } else { $PollTimeoutSeconds }))
     while ($true) {
         $output = & sqlcmd @logsSqlcmd -Q "SET NOCOUNT ON; IF OBJECT_ID('dbo.Logs') IS NULL SELECT 0 ELSE SELECT COUNT(*) FROM dbo.Logs WHERE Id > $logsIdBefore AND $Where"
         if ($LASTEXITCODE -ne 0) { throw "The $What Logs query failed." }
         $count = ConvertFrom-SqlScalar $output "$What Logs"
         if ($count -gt 0) { return $count }
         if ((Get-Date) -ge $deadline) {
-            throw "No $What row was written to $($logsDb['Database']) within $PollTimeoutSeconds s."
+            $within = if ($Once) { 'after the flush marker' } else { "within $PollTimeoutSeconds s" }
+            throw "No $What row was written to $($logsDb['Database']) $within."
         }
         Start-Sleep -Seconds 1
     }
@@ -246,25 +248,26 @@ try {
     if ([int]$unresolvedComposites -ne 0) { throw "$unresolvedComposites ConsigneGPAO=0 composite row(s) persisted with LibelleConsigne '?'." }
     if ([int]$svtWorking -ne 0) { throw "$svtWorking SVT L_D_CONSIGNES row(s) persisted with ConsigneGPAO=0." }
 
-    # Story 6.8: the worker itself must have journaled to the test Logs database: at least one row written
-    # by the worker during its tick (AbstractService prefixes them with its padded Name; the Launcher's
-    # WorkerLifecycle rows are excluded) and exactly one "processed: archived" row per seeded Fichier, all
-    # after the baseline.
+    # Story 6.8: the worker itself must have journaled to the test Logs database: at least one tick row
+    # (AbstractService prefixes the worker's rows with its padded Name; matching the tick message keeps
+    # the startup "Connecting"/"Starting" rows from satisfying it) and exactly one "processed: archived"
+    # row per seeded Fichier, all after the baseline.
     # The shared Logs sink batches its writes and is never disposed, so the Stop-Process teardown below
     # would drop its pending rows. The worker is stopped through the Launcher API first: its last act is
     # the "Worker stopped." row on the worker's own logger, and the sink writes in order, so once that row
-    # has landed every earlier worker row has too.
+    # has landed every earlier worker row has too. Only that marker is polled; the later checks read once,
+    # so a failure stays well inside the test's hang timeout.
     Write-Host "--- Logs rows written this run ($($logsDb['Database'])) ---"
     Invoke-RestMethod -Method Post 'http://127.0.0.1:5050/workers/GpaoImportP60/stop' -TimeoutSec $PollTimeoutSeconds | Out-Null
     [void](Wait-LogsRow "LEFT(Message, 15) = '[GpaoImportP60 ' AND CHARINDEX('Worker stopped.', Message) > 0" "'GpaoImportP60 Worker stopped.'")
-    $workerRows = Wait-LogsRow "LEFT(Message, 15) = '[GpaoImportP60 ' AND CHARINDEX('WorkerLifecycle', Message) = 0" 'GpaoImportP60 tick'
+    $workerRows = Wait-LogsRow "LEFT(Message, 15) = '[GpaoImportP60 ' AND CHARINDEX('Executing import tick.', Message) > 0" 'GpaoImportP60 tick' -Once
     Write-Host "$workerRows GpaoImportP60 tick row(s)"
     foreach ($fichier in $Fichiers) {
         # The exact rendered InboxScanner message, so the retry-cap row ("no longer processed"), a rejected
         # outcome or a longer Fichier name containing this one never matches. The double quotes Serilog
         # renders are spelled CHAR(34): a literal one would split the sqlcmd -Q argument.
         $escaped = $fichier.Replace("'", "''")
-        $processed = Wait-LogsRow "CHARINDEX(CONCAT('Fichier ', CHAR(34), '$escaped', CHAR(34), ' processed: ', CHAR(34), 'archived', CHAR(34)), Message) > 0" "'$fichier processed: archived'"
+        $processed = Wait-LogsRow "CHARINDEX(CONCAT('Fichier ', CHAR(34), '$escaped', CHAR(34), ' processed: ', CHAR(34), 'archived', CHAR(34)), Message) > 0" "'$fichier processed: archived'" -Once
         if ($processed -ne 1) { throw "Expected 1 '$fichier processed: archived' Logs row, found $processed." }
     }
 }

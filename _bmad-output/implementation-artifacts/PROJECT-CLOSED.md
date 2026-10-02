@@ -10,6 +10,9 @@ last_commit: 'bc9cf7d2c369eb0e284f5c83ffaf525be11b131f'
 
 # TextToXml / Kape22Importer — Project Closure
 
+> **Epic 6 done 2026-10-02, story 6.8; retrospective pending.** Stories 6.6–6.8 (post-retro
+> corrections) are all `done`; the second Epic 6 retrospective re-closes the project.
+
 > **Reopened 2026-10-01 for stories 6.6–6.8** (Epic 6 post-retro corrections: GPAO worker startup
 > validation and share outage, per-Fichier retry cap, Logs sink flush + E2E assertions) —
 > `sprint-change-proposal-2026-10-01.md`, which closes `epic-6-retro-item-2`. Re-close at Story 6.8
@@ -44,7 +47,7 @@ Epic 6 reopened 2026-10-01 for stories 6.6–6.8 (see top banner).
 | **Epic 3** | Structural repositioning as a library, inbox scanning/file lifecycle, per-file orchestration, double journalization, worker loop + graceful shutdown, loop robustness, E2E coverage harness (3.0–3.6) | 7/7 done | `accepted-with-open-items` (`epic-3-retro-2026-09-11.md`) — action items done, 1 reconciled at closure (see §3) |
 | **Epic 4** | Downstream-table dispatch: 10 `L_D_*` entities, mapping annex, OF/Coulée + Consignes mappers, bundle orchestrator, single-transaction persister, 10-table E2E suite, plus 5 post-retro hardening stories (4.1–4.7, 4.2-bis, 4.3-bis, 4.9, 4.10, 4.11), then 4 production-parity stories (4.4-bis, 4.12, 4.13, 4.14) | 11/11 base + 5/5 hardening + 4/4 parity = done | `accepted-with-open-items`, 4 retro passes (`epic-4-retro-2026-09-17.md`, `-18.md`, `-21.md`, `-25.md`) — every routed action item done as of this closure (see §3) |
 | **Epic 5** | P89 Step 1: `IFichierJournal` + LSI implementation, `P89Converter` (raw P89 folder → timestamped normalized XML + XSD), worker `GpaoConvertP89` under the Launcher (5.0–5.2) | 3/3 done | `accepted-with-open-items` (`epic-5-retro-2026-09-28.md`) — A-1, A-3 done 2026-09-28; A-2, A-4 done 2026-10-01 |
-| **Epic 6** | P60 journal via `IFichierJournal` (D22 guard on `L_D_KAPE22`), stability gate for P60 + P89, P60 XML export to a dedicated never-purged folder, shared hardening of the two GPAO workers + `MicroService.Publisher`, E2E harness realignment, real-`Client` integration test (6.1–6.5, 6.4-bis) | 6/6 done | `accepted-with-open-items` (`epic-6-retro-2026-10-01.md`) — A-1 done at this re-close; A-3 done 2026-10-01; A-2 open (correct-course) |
+| **Epic 6** | P60 journal via `IFichierJournal` (D22 guard on `L_D_KAPE22`), stability gate for P60 + P89, P60 XML export to a dedicated never-purged folder, shared hardening of the two GPAO workers + `MicroService.Publisher`, E2E harness realignment, real-`Client` integration test (6.1–6.5, 6.4-bis), then 3 post-retro stories: worker config validation + share outage, per-Fichier retry cap, Logs sink flush + E2E assertions (6.6–6.8) | 6/6 base + 3/3 post-retro = done | retro pending (second pass); first pass `accepted-with-open-items` (`epic-6-retro-2026-10-01.md`) — A-1, A-3 done 2026-10-01; A-2 done by the 2026-10-01 correct-course (6.6–6.8) |
 
 Every epic closed with the same verdict shape: **accepted-with-open-items**, never a hard rejection.
 Each round of open items was either fixed by a dedicated follow-up story or explicitly accepted as a
@@ -191,6 +194,16 @@ nice-to-have. If the project is ever reopened, this section plus the full `defer
 starting punch list.
 
 ## 5. Final test state
+
+At the Story 6.8 review closure (2026-10-02, Epic 6 done, retrospective pending):
+
+- **Build** (`dotnet build TextToXml.sln -warnaserror`): 0 warnings, 0 errors.
+- **Unit** (`Category=Unit`): **1253 passed, 0 failed, 0 skipped** — 192 `TextToXml.Tests`, 984
+  `Kape22Importer.Tests`, 56 `P89Converter.Tests`, 21 `AscoLsiJournal.Tests`.
+- **Integration** (`Category=Integration -m:1`): **1398 passed, 0 failed, 20 skipped** — 1396
+  `Kape22Importer.Tests` (worker E2E included, production Fichiers `P60_847_682_409..461` added),
+  2 `AscoLsiJournal.Tests`; the 20 skips are `Kape22ProductionDataParityTests` Fichiers with no
+  production row.
 
 At the 2026-10-01 re-close (HEAD `bc9cf7d`, measured by the Epic 6 retro):
 

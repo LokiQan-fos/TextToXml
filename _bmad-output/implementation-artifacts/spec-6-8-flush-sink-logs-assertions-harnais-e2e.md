@@ -77,6 +77,11 @@ context:
 - [x] [Review][Patch] P-6 (found during patch verification, outside the triage) `MSBUILDDISABLENODEREUSE=1`: MSBuild nodes spawned by the script's builds inherited its redirected stdout and hung the E2E test until they idled out [scripts/e2e-worker-import.ps1]
 - [x] [Review][Defer] W-1 standalone cleanup misses `L_D_CONSIGNES` and downstream tables — deferred, pre-existing
 
+Post-commit review 2026-10-02 (`reviews/story-6-8/aggregated-report.md`, verdict REFUSÉ, D=0 P=2 F=0):
+
+- [x] [Review][Patch] P-1 the tick-row check was met by the startup `Connecting`/`Starting` rows; now matches `Executing import tick.` — mutation red (tick log removed from `Client.cs`: "No GpaoImportP60 tick row ... after the flush marker"), reverted [scripts/e2e-worker-import.ps1:262]
+- [x] [Review][Patch] P-2 every `Wait-LogsRow` call restarted a 30 s deadline, so a failure path could outlive `--blame-hang-timeout 2m`; only the `Worker stopped.` marker is polled, the later checks read once (`-Once`) — `processed` mutation red in 19 s with its named message [scripts/e2e-worker-import.ps1:104]
+
 ## Spec Change Log
 
 ## Design Notes
