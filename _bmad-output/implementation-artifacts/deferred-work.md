@@ -1448,3 +1448,9 @@ s'y trouver et rester à confirmer.
 - source_spec: `reviews/story-6-7/aggregated-report.md` (F-2, low)
   summary: The P60 Client's `_attempts` field wiring is not tested at instance level: a mutation recreating the counter every tick would pass every test, since `RunTickCoreTests` supplies its own dictionary.
   evidence: verification-gap lens, `MicroServices/GPAO/ImportP60/Client.cs:54` and `:378-386`. An instance-level test needs the Story 6.5 Client harness (`Gpao.IntegrationTests`, MicroServices), outside the story's unit scope.
+
+## Deferred from: code review of spec-6-8-flush-sink-logs-assertions-harnais-e2e.md (2026-10-02)
+
+- source_spec: `spec-6-8-flush-sink-logs-assertions-harnais-e2e.md` (W-1, low)
+  summary: Without `-KeepArtifacts`, `scripts/e2e-worker-import.ps1` cleans up only `L_D_LOG_COMMANDE` and `L_D_KAPE22`, not `L_D_CONSIGNES` or the other downstream tables, so a second standalone run in a row leaves both Fichiers in `processing/` on a `PK_L_D_CONSIGNES` violation and times out.
+  evidence: Story 6.8 implementation and verification runs 2026-10-02 (standalone run: "Fichier ... left in processing/ after a persistence failure"). Pre-existing since the downstream dispatch (Epic 4); runs through `dotnet test` are unaffected because `SqlServerIntegrationFixture` resets the database first.

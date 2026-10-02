@@ -2,8 +2,10 @@
 # actual Launcher (MicroServices.sln) which spawns its own local MQTT broker and starts every worker
 # in-process, let the real InboxScanner tick pick the Fichier(s) up, and verify the outcome from the
 # outside - the Launcher /workers API, the archived files on disk, and the rows written to the local
-# AscoLSI_Test database. Optionally follows up with Kape22ProductionDataParityTests (already in this
-# repo) filtered to the same Fichier(s), to confirm the mapped columns match what the legacy
+# AscoLSI_Test database, one exported XML per Fichier, and the worker's rows in the test Logs database
+# (the worker is stopped through the Launcher API first, so its batched Logs rows are flushed).
+# Optionally follows up with Kape22ProductionDataParityTests (already in this repo) filtered to the
+# same Fichier(s), to confirm the mapped columns match what the legacy
 # application wrote for them in production (read-only).
 #
 # This is the manual procedure run ad hoc against Epic 3 (Story 3.4/3.5/3.6); kept here so it can be
@@ -37,6 +39,9 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# Reused MSBuild nodes spawned by the builds below outlive this script and inherit its redirected stdout,
+# so GpaoImportP60WorkerEndToEndTests (which reads that stream to the end) would hang until they idle out.
+$env:MSBUILDDISABLENODEREUSE = '1'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $testProject = Join-Path $repoRoot 'tests\Kape22Importer.Tests'
 $testSettingsPath = Join-Path $testProject 'appsettings.Test.json'
@@ -92,6 +97,22 @@ function ConvertFrom-SqlScalar([object[]] $Output, [string] $What) {
     $line = $Output | Where-Object { "$_" -match '^\s*\d+\s*$' } | Select-Object -First 1
     if ($null -eq $line) { throw "The $What query returned no integer: '$($Output -join ' ')'." }
     return [long]"$line".Trim()
+}
+
+# Story 6.8: polls the test Logs table for rows after $logsIdBefore matching $Where, for at most
+# $PollTimeoutSeconds; returns their count, or throws naming the Logs database when none landed.
+function Wait-LogsRow([string] $Where, [string] $What) {
+    $deadline = (Get-Date).AddSeconds($PollTimeoutSeconds)
+    while ($true) {
+        $output = & sqlcmd @logsSqlcmd -Q "SET NOCOUNT ON; IF OBJECT_ID('dbo.Logs') IS NULL SELECT 0 ELSE SELECT COUNT(*) FROM dbo.Logs WHERE Id > $logsIdBefore AND $Where"
+        if ($LASTEXITCODE -ne 0) { throw "The $What Logs query failed." }
+        $count = ConvertFrom-SqlScalar $output "$What Logs"
+        if ($count -gt 0) { return $count }
+        if ((Get-Date) -ge $deadline) {
+            throw "No $What row was written to $($logsDb['Database']) within $PollTimeoutSeconds s."
+        }
+        Start-Sleep -Seconds 1
+    }
 }
 
 function Invoke-Sql([string] $Query) {
@@ -173,7 +194,8 @@ try {
         throw "Timed out waiting for: $($pending -join ', '). See $logFile"
     }
 
-    # --- 5. Report what actually happened, from the outside, for the user to inspect directly. ---
+    # --- 5. Report what actually happened, from the outside, and assert the exports, the persisted
+    # labels and the worker's Logs rows (after a graceful worker stop that flushes them). ---
     Write-Host "`n--- Launcher /workers ---"
     (Invoke-RestMethod 'http://127.0.0.1:5050/workers') | Where-Object Name -eq 'GpaoImportP60' | Format-List
 
@@ -182,8 +204,17 @@ try {
     # test output that follows, out of order, since dotnet.exe writes to the console directly.
     Get-ChildItem -LiteralPath (Join-Path $InboxPath 'archive') -Recurse -File | ForEach-Object { Write-Host $_.FullName }
 
+    # Story 6.8: exactly one <Fichier>_<yyyyMMddHHmmss>.xml per seeded Fichier, and nothing else.
     Write-Host "`n--- Exported XML files (FR-26) ---"
-    Get-ChildItem -LiteralPath $exportPath -File -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.FullName }
+    $exports = @(if (Test-Path -LiteralPath $exportPath) { Get-ChildItem -LiteralPath $exportPath -File })
+    $exports | ForEach-Object { Write-Host $_.FullName }
+    foreach ($fichier in $Fichiers) {
+        $count = @($exports | Where-Object Name -match ('^' + [regex]::Escape($fichier) + '_\d{14}\.xml$')).Count
+        if ($count -ne 1) { throw "Expected 1 exported XML for $fichier in $exportPath, found $count." }
+    }
+    if ($exports.Count -ne $Fichiers.Count) {
+        throw "Expected $($Fichiers.Count) exported XML file(s) in $exportPath, found $($exports.Count): $($exports.Name -join ', ')."
+    }
 
     Write-Host "`n--- L_D_KAPE22 rows inserted this run ---"
     $numeros = $Fichiers | ForEach-Object { ($_ -split '_')[-1] }
@@ -215,22 +246,31 @@ try {
     if ([int]$unresolvedComposites -ne 0) { throw "$unresolvedComposites ConsigneGPAO=0 composite row(s) persisted with LibelleConsigne '?'." }
     if ([int]$svtWorking -ne 0) { throw "$svtWorking SVT L_D_CONSIGNES row(s) persisted with ConsigneGPAO=0." }
 
-    # Story 6.4-bis: the Launcher's shared logger must have written to the test Logs database. The sink
-    # flushes in batches, so its rows are polled for a short while instead of read once.
+    # Story 6.8: the worker itself must have journaled to the test Logs database: at least one row written
+    # by the worker during its tick (AbstractService prefixes them with its padded Name; the Launcher's
+    # WorkerLifecycle rows are excluded) and exactly one "processed: archived" row per seeded Fichier, all
+    # after the baseline.
+    # The shared Logs sink batches its writes and is never disposed, so the Stop-Process teardown below
+    # would drop its pending rows. The worker is stopped through the Launcher API first: its last act is
+    # the "Worker stopped." row on the worker's own logger, and the sink writes in order, so once that row
+    # has landed every earlier worker row has too.
     Write-Host "--- Logs rows written this run ($($logsDb['Database'])) ---"
-    $logsDeadline = (Get-Date).AddSeconds(15)
-    do {
-        $newLogs = & sqlcmd @logsSqlcmd -Q "SET NOCOUNT ON; IF OBJECT_ID('dbo.Logs') IS NULL SELECT 0 ELSE SELECT COUNT(*) FROM dbo.Logs WHERE Id > $logsIdBefore"
-        if ($LASTEXITCODE -ne 0) { throw 'The Logs check query failed.' }
-        $newLogs = ConvertFrom-SqlScalar $newLogs 'Logs check'
-        if ($newLogs -gt 0) { break }
-        Start-Sleep -Seconds 1
-    } while ((Get-Date) -lt $logsDeadline)
-    Write-Host "$newLogs row(s)"
-    if ($newLogs -eq 0) { throw "No Logs row was written to $($logsDb['Database']) during this run." }
+    Invoke-RestMethod -Method Post 'http://127.0.0.1:5050/workers/GpaoImportP60/stop' -TimeoutSec $PollTimeoutSeconds | Out-Null
+    [void](Wait-LogsRow "LEFT(Message, 15) = '[GpaoImportP60 ' AND CHARINDEX('Worker stopped.', Message) > 0" "'GpaoImportP60 Worker stopped.'")
+    $workerRows = Wait-LogsRow "LEFT(Message, 15) = '[GpaoImportP60 ' AND CHARINDEX('WorkerLifecycle', Message) = 0" 'GpaoImportP60 tick'
+    Write-Host "$workerRows GpaoImportP60 tick row(s)"
+    foreach ($fichier in $Fichiers) {
+        # The exact rendered InboxScanner message, so the retry-cap row ("no longer processed"), a rejected
+        # outcome or a longer Fichier name containing this one never matches. The double quotes Serilog
+        # renders are spelled CHAR(34): a literal one would split the sqlcmd -Q argument.
+        $escaped = $fichier.Replace("'", "''")
+        $processed = Wait-LogsRow "CHARINDEX(CONCAT('Fichier ', CHAR(34), '$escaped', CHAR(34), ' processed: ', CHAR(34), 'archived', CHAR(34)), Message) > 0" "'$fichier processed: archived'"
+        if ($processed -ne 1) { throw "Expected 1 '$fichier processed: archived' Logs row, found $processed." }
+    }
 }
 finally {
-    # --- 6. Always tear down the Launcher and its broker, and always restore the tracked config. ---
+    # --- 6. Always tear down the Launcher and its broker, and always restore the tracked config. On the
+    # happy path the worker is already stopped and its Logs rows flushed (step 5). ---
     if ($launcherProcess -and -not $launcherProcess.HasExited) {
         Stop-Process -Id $launcherProcess.Id -Force -ErrorAction SilentlyContinue
     }
