@@ -38,6 +38,12 @@ public class EndToEndPerformanceTests
         "P60_847_682_006", "P60_847_682_007", "P60_847_682_008", "P60_847_682_009", "P60_847_682_010",
     ];
 
+    // Story 6.9: every sample is cold, so its Coulee must be on file for the tick to time a real insert
+    // rather than a cold-Coulee rejection. Mapped once; seeded when each scanner is built, before the
+    // stopwatch starts.
+    private static readonly Lazy<Kape22ImportBundle[]> SampleBundles =
+        new(() => [.. TenFichiers.Select(name => MapFichier(ReadValidFixture(name), name))]);
+
     private static ImportOptions Options() => new()
     {
         ArchiveFolder = "archive",
@@ -63,6 +69,11 @@ public class EndToEndPerformanceTests
     private static InboxScanner Scanner(InMemoryFileSource source)
     {
         InMemoryContextFactory contexts = new();
+        foreach (Kape22ImportBundle bundle in SampleBundles.Value)
+        {
+            SeedCoulee(contexts.Reader, bundle);
+        }
+
         Kape22FichierProcessor processor = new(
             contexts.Next,
             Configuration(),
@@ -76,7 +87,8 @@ public class EndToEndPerformanceTests
 
     // NFR-1: a single Fichier through the whole pipeline averages well under the 200 ms end-to-end
     // budget once FTP and SQL latency are excluded. Measured over repeated ticks after a warm-up tick,
-    // each on its own scanner and database.
+    // each on its own scanner and database; Story 6.9: every scanner (and its seeded Coulees) is built
+    // before the stopwatch starts, so only the ticks are timed.
     [Fact]
     [Trait("NFR", "1")]
     public void Tick_SingleFichier_StaysUnderTheEndToEndBudget_Nfr1()
@@ -85,12 +97,13 @@ public class EndToEndPerformanceTests
         const double budgetMs = 200;
         const int iterations = 30;
 
-        RunSingleFichierTick(content);
+        SingleFichierScanner(content).RunTick();
+        InboxScanner[] scanners = [.. Enumerable.Range(0, iterations).Select(_ => SingleFichierScanner(content))];
 
         Stopwatch stopwatch = Stopwatch.StartNew();
-        for (int i = 0; i < iterations; i++)
+        foreach (InboxScanner scanner in scanners)
         {
-            RunSingleFichierTick(content);
+            scanner.RunTick();
         }
 
         stopwatch.Stop();
@@ -102,7 +115,8 @@ public class EndToEndPerformanceTests
     }
 
     // NFR-2: one tick of 500 Fichiers finishes far under 30 s. The 500 are the ten samples cycled 50
-    // times under distinct names.
+    // times under distinct names. Story 6.9: the scanner (and its seeded Coulees) is built before the
+    // stopwatch starts, so only the tick is timed.
     // ponytail: the 50 copies of each sample share a Header roulette, so the D22 guard skips the insert
     // on the repeats - the tick still runs Kape22FichierProcessor's full pipeline (Kape22ImportBundleMapper,
     // then Kape22Persister's guard query) per Fichier. Swap in 500 distinct Headers if NFR-2 must time 500
@@ -118,8 +132,10 @@ public class EndToEndPerformanceTests
             source.Add(InboxRoot, $"P60_847_682_{i:D5}", pool[i % pool.Length], Now.AddMinutes(-1).AddSeconds(-i));
         }
 
+        InboxScanner scanner = Scanner(source);
+
         Stopwatch stopwatch = Stopwatch.StartNew();
-        Scanner(source).RunTick();
+        scanner.RunTick();
         stopwatch.Stop();
 
         Assert.Empty(source.Names(InboxRoot));
@@ -128,10 +144,11 @@ public class EndToEndPerformanceTests
             $"A 500-Fichier tick took {stopwatch.Elapsed.TotalSeconds:F1} s, above the 30 s NFR-2 budget (FTP/SQL excluded).");
     }
 
-    private static void RunSingleFichierTick(byte[] content)
+    // A scanner over its own database and an inbox holding only the given Fichier.
+    private static InboxScanner SingleFichierScanner(byte[] content)
     {
         InMemoryFileSource source = new();
         source.Add(InboxRoot, ReferenceFichierName, content, Now.AddMinutes(-1));
-        Scanner(source).RunTick();
+        return Scanner(source);
     }
 }

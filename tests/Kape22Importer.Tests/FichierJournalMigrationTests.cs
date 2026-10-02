@@ -253,11 +253,26 @@ public class FichierJournalMigrationTests
     }
 
     // An in-memory context whose SaveChanges fails the way SQL Server rejects a duplicate key.
-    private sealed class FailingSaveContext()
-        : AscoLsiDbContext(new DbContextOptionsBuilder<AscoLsiDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options)
+    private sealed class FailingSaveContext : AscoLsiDbContext
     {
+        public FailingSaveContext()
+            : this(Guid.NewGuid().ToString())
+        {
+        }
+
+        // Story 6.9: the reference Fichier's cold Coulee is on file (seeded through a plain context on the
+        // same in-memory database), so the persister reaches the failing SaveChanges.
+        private FailingSaveContext(string databaseName)
+            : base(Options(databaseName))
+        {
+            SeedCoulees(() => new AscoLsiDbContext(Options(databaseName)), ReferenceFichierName);
+        }
+
         public override int SaveChanges() => throw new DbUpdateException(
             "An error occurred while saving the entity changes.",
             new InvalidOperationException("Violation of PRIMARY KEY constraint in table 'dbo.L_D_ORDRE_FABRICATION'."));
+
+        private static DbContextOptions<AscoLsiDbContext> Options(string databaseName) =>
+            new DbContextOptionsBuilder<AscoLsiDbContext>().UseInMemoryDatabase(databaseName).Options;
     }
 }

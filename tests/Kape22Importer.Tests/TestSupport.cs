@@ -63,8 +63,9 @@ internal static class TestSupport
 
     // Story 4.6: a mapped, insertable Kape22ImportBundle from the reference Fichier, mirroring
     // MapReferenceFichier(). Coulee is set to the conventional internal value "065718" used throughout
-    // this assembly's hand-built fixtures. Stays "hot" (CodeConsignePits untouched), so Kape22Persister's
-    // AC-FR20-5 cold-Coulee existence check does not apply either.
+    // this assembly's hand-built fixtures. Story 6.9: the reference Fichier is cold (its CodeConsignePits
+    // "1 205 00 999" starts with "1"), so it persists only once its Coulee is in L_D_COULEE - see
+    // SeedCoulees.
     public static Kape22ImportBundle MapReferenceBundle() =>
         MapMutatedBundle(document => SetChamp(document, "message", "Coulee", "065718"));
 
@@ -75,6 +76,60 @@ internal static class TestSupport
         XDocument document = XDocument.Parse(ConvertReferenceFichier());
         mutate(document);
         return new Kape22ImportBundleMapper(WinterClock()).Map(document.ToString(), ReferenceFichierName);
+    }
+
+    // Converts a raw Fichier and maps it through Kape22ImportBundleMapper, the way Kape22FichierProcessor
+    // does.
+    public static Kape22ImportBundle MapFichier(byte[] content, string fichierName)
+    {
+        ConversionResult conversion = Converter.Convert(content, EmbeddedDescriptor.Xml);
+        Assert.True(
+            conversion.Success && conversion.Xml is not null,
+            $"{fichierName} failed to convert: {string.Join("; ", conversion.Errors.Select(error => error.Message))}");
+        return new Kape22ImportBundleMapper(WinterClock()).Map(conversion.Xml!, fichierName);
+    }
+
+    // Story 6.9 (AC-FR20-5): every sample Fichier (001..010) is cold - its CodeConsignePits starts with
+    // "1" - so it imports only once its Coulee is in L_D_COULEE, the state production is in when a P60
+    // names a cold Coulee. Adds the Coulee row each named sample maps to (the reference one through
+    // InsertableReferenceFichier, hence "065718"), skipping a Coulee already on file.
+    public static void SeedCoulees(Func<AscoLsiDbContext> newContext, params string[] fichierNames)
+    {
+        foreach (string fichierName in fichierNames)
+        {
+            byte[] content = fichierName == ReferenceFichierName ? InsertableReferenceFichier() : InsertableFichier(fichierName);
+            SeedCoulee(newContext, MapFichier(content, fichierName));
+        }
+    }
+
+    // Story 6.9: L_D_COULEE holds exactly the reference Coulee SeedCoulees put there, unmodified - the
+    // rejected or rolled-back import under test added and changed nothing.
+    public static void AssertOnlyTheSeededReferenceCoulee(IQueryable<L_D_COULEE> rows)
+    {
+        L_D_COULEE seeded = MapFichier(InsertableReferenceFichier(), ReferenceFichierName).Coulee!;
+        L_D_COULEE row = Assert.Single(rows.AsNoTracking());
+        Assert.Equal(seeded.IdCoulee.Trim(), row.IdCoulee.Trim());
+        Assert.Equal(seeded.Nuance.Trim(), row.Nuance.Trim());
+        Assert.Equal(seeded.DateReception, row.DateReception);
+        Assert.Equal(seeded.DerniereModif, row.DerniereModif);
+    }
+
+    // Story 6.9: adds the bundle's own Coulee row to L_D_COULEE unless it is already on file. The bundle
+    // must have mapped cleanly, since a failed mapping carries no Coulee.
+    public static void SeedCoulee(Func<AscoLsiDbContext> newContext, Kape22ImportBundle bundle)
+    {
+        Assert.True(
+            bundle.Success,
+            $"{bundle.NumeroFichier} failed to map: {string.Join("; ", bundle.Errors.Select(error => error.Message))}");
+        L_D_COULEE coulee = bundle.Coulee
+            ?? throw new InvalidOperationException($"{bundle.NumeroFichier} mapped without a Coulee to seed.");
+
+        using AscoLsiDbContext context = newContext();
+        if (!context.CouleeRows.Any(row => row.IdCoulee == coulee.IdCoulee))
+        {
+            context.CouleeRows.Add(coulee);
+            context.SaveChanges();
+        }
     }
 
     // Sets the text of a Champ element in the named Bloc. Blanking a NOT NULL string Champ (Client, ...)
@@ -183,9 +238,12 @@ internal sealed class InMemoryContextFactory
 
     private readonly string journalDatabaseName = Guid.NewGuid().ToString();
 
+    // Story 6.9: the reference Fichier's cold Coulee is on file from the start (see
+    // TestSupport.SeedCoulees), through Reader so it is not counted in Handed.
     public InMemoryContextFactory()
     {
         this.Journal = new AscoLsiFichierJournal(this.JournalContext, SqlServerIntegrationFixture.JournalInitiatingServer);
+        TestSupport.SeedCoulees(this.Reader, TestSupport.ReferenceFichierName);
     }
 
     public List<AscoLsiDbContext> Handed { get; } = [];

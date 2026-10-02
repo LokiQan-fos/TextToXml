@@ -157,8 +157,32 @@ $patchedConfig.Import.InboxPath = $InboxPath
 $patchedConfig.Import | Add-Member -NotePropertyName XmlExportPath -NotePropertyValue $exportPath -Force
 [System.IO.File]::WriteAllText($configPath, ($patchedConfig | ConvertTo-Json -Depth 5))
 
+# Story 6.9: the cold Coulees step 2b adds, removed by the finally block below with the other test rows.
+$seededCoulees = @()
 $launcherProcess = $null
 try {
+    # --- 2b. Story 6.9 (AC-FR20-5): a cold Coulee (CodeConsignePits starting with "1", TypeConsigne 12)
+    # must already be in L_D_COULEE, as it is in production when a P60 names it. Each requested cold
+    # Fichier's own Coulee is added to the test database (the row CouleeMapper builds: IdCoulee, Nuance,
+    # timestamps, zero states) unless already on file. Runs inside the try, so the finally block removes
+    # the rows added here even when a later step fails. ---
+    foreach ($fichier in $Fichiers) {
+        # Detail line, Templates/P60.xml positions (0-based): Nuance 43/7, Coulee 50/6, CodeConsignePits 146/12.
+        $lines = [System.IO.File]::ReadAllLines((Join-Path $p60Dir $fichier), [System.Text.Encoding]::Latin1)
+        if ($lines.Count -lt 2 -or $lines[1].Length -lt 158) {
+            throw "Fichier $fichier has no Detail line long enough (158 characters) to read its Coulee and CodeConsignePits."
+        }
+        $detail = $lines[1]
+        if ($detail.Substring(146, 1) -ne '1') { continue }
+        # Trimmed like the mapped L_D_KAPE22.Coulee the persister compares with L_D_COULEE.IdCoulee.
+        $coulee = $detail.Substring(50, 6).Trim()
+        $nuance = $detail.Substring(43, 7).Trim().Replace("'", "''")
+        $added = & sqlcmd -S localhost -d AscoLSI_Test -C -b -h -1 -W -Q "SET NOCOUNT ON; IF EXISTS (SELECT 1 FROM L_D_COULEE WHERE IdCoulee = '$coulee') SELECT 0 ELSE BEGIN INSERT INTO L_D_COULEE (IdCoulee, Nuance, DateReception, EtatReception, DerniereModif, NbLingotRestantARefroidir, Externe) VALUES ('$coulee', N'$nuance', GETDATE(), 0, GETDATE(), 0, 0); SELECT 1 END"
+        if ($LASTEXITCODE -ne 0) { throw "Seeding the cold Coulee $coulee of $fichier failed." }
+        if ((ConvertFrom-SqlScalar $added "cold Coulee $coulee seed") -eq 1) { $seededCoulees += $coulee }
+    }
+    if ($seededCoulees.Count -gt 0) { Write-Host "Seeded cold Coulee(s) $($seededCoulees -join ', ') into L_D_COULEE." }
+
     # --- 3. Build and start the real Launcher; it spawns its own local MQTT broker. ---
     dotnet build $launcherProject -c Debug --nologo -v minimal
     if ($LASTEXITCODE -ne 0) { throw 'Launcher build failed.' }
@@ -289,6 +313,9 @@ finally {
     if (-not $KeepArtifacts) {
         $numeros = $Fichiers | ForEach-Object { ($_ -split '_')[-1] }
         Invoke-Sql "DELETE FROM L_D_LOG_COMMANDE WHERE [OF] IN (SELECT RTRIM([OF]) FROM L_D_KAPE22 WHERE NumeroFichier IN ('$($numeros -join "','")')); DELETE FROM L_D_KAPE22 WHERE NumeroFichier IN ('$($numeros -join "','")');" | Out-Null
+        if ($seededCoulees.Count -gt 0) {
+            Invoke-Sql "DELETE FROM L_D_COULEE WHERE IdCoulee IN ('$($seededCoulees -join "','")');" | Out-Null
+        }
         Remove-Item -LiteralPath $InboxPath -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item -LiteralPath $exportPath -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item -LiteralPath $logFile, $errLogFile -Force -ErrorAction SilentlyContinue

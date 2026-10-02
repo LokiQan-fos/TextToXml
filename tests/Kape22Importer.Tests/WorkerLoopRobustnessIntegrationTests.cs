@@ -73,6 +73,9 @@ public class WorkerLoopRobustnessIntegrationTests(SqlServerIntegrationFixture fi
     {
         Skip.IfNot(fixture.Available, fixture.SkipReason ?? "SQL Server test instance unavailable.");
         fixture.ResetData();
+
+        // Story 6.9: both samples these tests import are cold, so their Coulees are on file.
+        SeedCoulees(fixture.NewAscoLsiContext, ReferenceFichierName, "P60_847_682_002");
     }
 
     // AC-FR15-4: a batch interrupted mid-way - one Fichier stranded in processing/ by the crash, another

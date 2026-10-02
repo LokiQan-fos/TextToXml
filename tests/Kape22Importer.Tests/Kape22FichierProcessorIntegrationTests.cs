@@ -56,6 +56,9 @@ public class Kape22FichierProcessorIntegrationTests(SqlServerIntegrationFixture 
     {
         Skip.IfNot(fixture.Available, fixture.SkipReason ?? "SQL Server test instance unavailable.");
         fixture.ResetData();
+
+        // Story 6.9: the reference Fichier is cold, so its Coulee is on file.
+        SeedCoulees(fixture.NewAscoLsiContext, ReferenceFichierName);
     }
 
     // AC-FR13-1: on a clean Fichier the pipeline runs through to the L_D_KAPE22 + "<NumeroFichier> — OK"

@@ -224,7 +224,10 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
         using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
         Assert.Empty(verify.Kape22Rows.AsNoTracking());
         Assert.Empty(verify.OrdreFabricationRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
-        Assert.Empty(verify.CouleeRows.AsNoTracking().Where(row => row.IdCoulee.Trim() == bundle.Kape22!.Coulee.Trim()));
+
+        // Story 6.9: L_D_COULEE holds only the reference Coulee Ready() seeded, unmodified; the
+        // rolled-back transaction added none.
+        AssertOnlyTheSeededReferenceCoulee(verify.CouleeRows);
         Assert.Empty(verify.SectionChargeChutageRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
         Assert.Empty(verify.SectionChargeDecoupeRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
         Assert.Empty(verify.SectionChargeLingotRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
@@ -355,8 +358,8 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
         Assert.True(result.Success);
     }
 
-    // AC-FR20-5: a cold Coulee (CodeConsignePits == "1") whose L_D_COULEE row does not exist yet is
-    // rejected before anything is added - no L_D_KAPE22 row, no downstream entity, one REJETÉ log row
+    // AC-FR20-5: a cold Coulee (CodeConsignePits starting with "1", here the bare "1") whose L_D_COULEE
+    // row does not exist yet is rejected before anything is added - no L_D_KAPE22 row, no downstream entity, one REJETÉ log row
     // citing the missing Coulee, and a BusinessRuleViolation error naming it.
     [SkippableFact]
     [Trait("AC", "FR20-5")]
@@ -402,13 +405,92 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
         Assert.Empty(verify.ConsignesRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
     }
 
-    // AC-FR20-5 / AC-FR21-1: a cold Coulee (CodeConsignePits == "1") whose L_D_COULEE row already exists
-    // is the spec's own described "expected, normal" case (several OF from the same cast) - it must
-    // succeed, not be rejected, and must not re-insert the already-present Coulee row. A mutation check
-    // confirms this is the guard the previous review left untested: narrowing Kape22Persister.cs's cold
-    // guard from `CodeConsignePits == ColdConsignePits && !couleeAlreadyExists` to just
-    // `CodeConsignePits == ColdConsignePits` (rejecting every cold order unconditionally) passed the full
-    // suite until this test was added.
+    // AC-FR20-5 (Story 6.9): a real P60 Fichier carries the full 12-character CodeConsignePits, and the
+    // Coulee is cold when its first character - the TypeConsigne 12 slice - is "1". With the Coulee
+    // absent from L_D_COULEE, a cold full code is rejected in the AC-FR20-5 shape and a hot one imports
+    // and inserts the Coulee row.
+    [SkippableTheory]
+    [InlineData("1 207 00 000", false)]
+    [InlineData("3 148 00 740", true)]
+    [Trait("AC", "FR20-5")]
+    public void Persist_FullCodeConsignePits_ColdOnlyOnFirstCharacter_AcFr20_5(string codeConsignePits, bool accepted)
+    {
+        Ready(seedReferenceCoulee: false);
+        Kape22ImportBundle bundle = MapMutatedBundle(d =>
+        {
+            SetChamp(d, "message", "Coulee", "065718");
+            SetChamp(d, "message", "CodeConsignePits", codeConsignePits);
+        });
+        Assert.True(bundle.Success, string.Join("; ", bundle.Errors.Select(error => error.Message)));
+        Assert.Equal(codeConsignePits, bundle.Kape22!.CodeConsignePits);
+        string coulee = bundle.Kape22.Coulee;
+
+        ImportResult result = Persist(bundle);
+
+        using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
+        if (accepted)
+        {
+            Assert.True(result.Success, string.Join("; ", result.Errors.Select(error => error.Message)));
+            Assert.Single(verify.Kape22Rows.AsNoTracking());
+            Assert.Single(verify.CouleeRows.AsNoTracking().Where(row => row.IdCoulee == coulee));
+            return;
+        }
+
+        Assert.False(result.Success);
+        ConversionError error = Assert.Single(result.Errors);
+        Assert.Equal(Block.File, error.Block);
+        Assert.Equal(ErrorCode.BusinessRuleViolation, error.Code);
+        Assert.Equal($"OF '{bundle.OF}' : la coulée '{coulee}' est introuvable dans L_D_COULEE.", error.Message);
+        Assert.Empty(verify.Kape22Rows.AsNoTracking());
+        Assert.Empty(verify.CouleeRows.AsNoTracking());
+        Assert.Empty(verify.OrdreFabricationRows.AsNoTracking());
+        Assert.Empty(verify.SectionChargeChutageRows.AsNoTracking());
+        Assert.Empty(verify.SectionChargeDecoupeRows.AsNoTracking());
+        Assert.Empty(verify.SectionChargeLingotRows.AsNoTracking());
+        Assert.Empty(verify.SectionChargePitsRows.AsNoTracking());
+        Assert.Empty(verify.SectionChargePoidsMetriqueRows.AsNoTracking());
+        Assert.Empty(verify.SectionChargeRefroidissoirsRows.AsNoTracking());
+        Assert.Empty(verify.SectionChargeSvtRows.AsNoTracking());
+        Assert.Empty(verify.ConsignesRows.AsNoTracking());
+        L_D_LOG_COMMANDE log = Assert.Single(fixture.LogRows());
+        Assert.Contains("REJETÉ", log.Message);
+    }
+
+    // AC-FR11-5 (Story 6.9): with every reference Coulee now seeded, the rollback of a staged L_D_COULEE
+    // insert is proven here instead - a hot full code with no Coulee on file stages the Coulee row in the
+    // same SaveChanges as L_D_KAPE22, and the forced SQL failure (the over-long LibelleConsigneChutage of
+    // Persist_SqlFailure_ReturnsPersistenceErrorWithVerifiedRollback_AcFr11_5) rolls it back with the rest.
+    [SkippableFact]
+    [Trait("AC", "FR11-5")]
+    [Trait("AC", "FR20-5")]
+    public void Persist_SqlFailureWithHotCouleeStaged_RollsBackTheCouleeInsert_AcFr11_5()
+    {
+        Ready(seedReferenceCoulee: false);
+        Kape22ImportBundle bundle = MapMutatedBundle(d =>
+        {
+            SetChamp(d, "message", "Coulee", "065718");
+            SetChamp(d, "message", "CodeConsignePits", "3 148 00 740");
+            SetChamp(d, "message", "LibelleConsigneChutage", new string('A', 50));
+        });
+        Assert.True(bundle.Success, "over-long LibelleConsigneChutage is only rejected by the database, not by the mapper.");
+        Assert.NotNull(bundle.Coulee);
+        string coulee = bundle.Kape22!.Coulee;
+
+        ImportResult result = Persist(bundle);
+
+        Assert.False(result.Success);
+        Assert.Equal(Block.File, Assert.Single(result.Errors, e => e.Code == ErrorCode.PersistenceError).Block);
+        using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
+        Assert.Empty(verify.Kape22Rows.AsNoTracking());
+        Assert.Empty(verify.CouleeRows.AsNoTracking().Where(row => row.IdCoulee.Trim() == coulee.Trim()));
+    }
+
+    // AC-FR20-5 / AC-FR21-1: a cold Coulee (CodeConsignePits starting with "1", here the bare "1") whose
+    // L_D_COULEE row already exists is the spec's own described "expected, normal" case (several OF from
+    // the same cast) - it must succeed, not be rejected, and must not re-insert the already-present
+    // Coulee row. A mutation check confirms this is the guard the previous review left untested:
+    // narrowing Kape22Persister.cs's cold guard from `cold && !couleeAlreadyExists` to just `cold`
+    // (rejecting every cold order unconditionally) passed the full suite until this test was added.
     [SkippableFact]
     [Trait("AC", "FR20-5")]
     [Trait("AC", "FR21-1")]
@@ -565,7 +647,10 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
         Assert.Contains("REJETÉ", log.Message);
 
         Assert.Empty(verify.OrdreFabricationRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
-        Assert.Empty(verify.CouleeRows.AsNoTracking().Where(row => row.IdCoulee.Trim() == bundle.Kape22!.Coulee.Trim()));
+
+        // Story 6.9: L_D_COULEE holds only the reference Coulee Ready() seeded, unmodified; the
+        // rejection added none.
+        AssertOnlyTheSeededReferenceCoulee(verify.CouleeRows);
         Assert.Empty(verify.SectionChargeChutageRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
         Assert.Empty(verify.SectionChargeDecoupeRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
         Assert.Empty(verify.SectionChargeLingotRows.AsNoTracking().Where(row => row.OF.Trim() == DownstreamOf.Pad(bundle.OF!)));
@@ -603,7 +688,10 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
         Assert.Empty(verify.Kape22Rows.AsNoTracking());
         Assert.Empty(fixture.LogRows());
         Assert.Empty(verify.OrdreFabricationRows.AsNoTracking());
-        Assert.Empty(verify.CouleeRows.AsNoTracking());
+
+        // Story 6.9: L_D_COULEE holds only the reference Coulee Ready() seeded, unmodified; the
+        // rejection added none.
+        AssertOnlyTheSeededReferenceCoulee(verify.CouleeRows);
         Assert.Empty(verify.SectionChargeChutageRows.AsNoTracking());
         Assert.Empty(verify.SectionChargeDecoupeRows.AsNoTracking());
         Assert.Empty(verify.SectionChargeLingotRows.AsNoTracking());
@@ -709,9 +797,10 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
         Assert.Empty(verify.ConsignesRows);
     }
 
-    // A-4 (Epic 4 retro) non-regression: Kape22Persister and Kape22ImportBundleMapper both read the one
-    // shared Kape22ImportBundle.ColdConsignePits constant for the hot/cold Coulee marker, instead of each
-    // carrying its own "1" literal - pinned by reflection so a future revert back to a private duplicate
+    // A-4 (Epic 4 retro) non-regression: Kape22Persister reads the one shared
+    // Kape22ImportBundle.ColdConsignePits constant for the hot/cold Coulee marker (the first character of
+    // CodeConsignePits since Story 6.9), and neither it nor Kape22ImportBundleMapper carries its own "1"
+    // literal - pinned by reflection so a future revert back to a private duplicate
     // fails this test instead of silently reintroducing the drift risk the retro flagged. Pure
     // reflection, no database needed.
     [Fact]
@@ -746,10 +835,16 @@ public class TransactionalPersistenceTests(SqlServerIntegrationFixture fixture)
         Assert.Equal(typeof(Kape22ImportBundle), parameter.ParameterType);
     }
 
-    private void Ready()
+    // Story 6.9: the reference Fichier is cold, so its Coulee ("065718") is on file unless a test needs
+    // it absent.
+    private void Ready(bool seedReferenceCoulee = true)
     {
         Skip.IfNot(fixture.Available, fixture.SkipReason ?? "SQL Server test instance unavailable.");
         fixture.ResetData();
+        if (seedReferenceCoulee)
+        {
+            SeedCoulees(fixture.NewAscoLsiContext, ReferenceFichierName);
+        }
     }
 
     // Story 6.1: the persister records through the real LSI journal on the test instance; a blank

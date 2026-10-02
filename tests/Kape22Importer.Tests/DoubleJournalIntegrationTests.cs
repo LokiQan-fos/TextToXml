@@ -172,6 +172,9 @@ public class DoubleJournalIntegrationTests(SqlServerIntegrationFixture fixture)
     {
         Skip.IfNot(fixture.Available, fixture.SkipReason ?? "SQL Server test instance unavailable.");
         fixture.ResetData();
+
+        // Story 6.9: the reference Fichier is cold, so its Coulee is on file.
+        SeedCoulees(fixture.NewAscoLsiContext, ReferenceFichierName);
         fixture.ResetMqttLogs();
     }
 

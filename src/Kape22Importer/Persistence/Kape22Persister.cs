@@ -82,7 +82,8 @@ public sealed class Kape22Persister(
                 return CompleteAlreadyImported(bundle, numeroFichier, of);
             }
 
-            // AC-FR20-5: a cold Coulee (CodeConsignePits == "1") must already have its L_D_COULEE row -
+            // AC-FR20-5 (Story 6.9): a Coulee is cold when the first character of CodeConsignePits is "1" (the
+            // TypeConsigne 12 slice, as the legacy reads it). A cold Coulee must already have its L_D_COULEE row -
             // it is tracked elsewhere in AscoLSI before a P60 dispatch ever names it. A hot Coulee carries
             // no such precondition. Either way, one real Coulee routinely dispatches through several P60
             // Fichiers (several OF from the same cast) sharing the same IdCoulee, so an already-present
@@ -94,7 +95,8 @@ public sealed class Kape22Persister(
             // references it, and reused as-is by every later OF of the same Coulee - a later OF never
             // modifies the row a previous one created.
             bool couleeAlreadyExists = context.CouleeRows.Any(row => row.IdCoulee == coulee);
-            if (entity.CodeConsignePits == Kape22ImportBundle.ColdConsignePits && !couleeAlreadyExists)
+            bool cold = entity.CodeConsignePits?.StartsWith(Kape22ImportBundle.ColdConsignePits, StringComparison.Ordinal) == true;
+            if (cold && !couleeAlreadyExists)
             {
                 string couleeMessage = $"OF '{of}' : la coulée '{coulee}' est introuvable dans L_D_COULEE.";
                 ConversionError couleeError = new() { Block = Block.File, Code = ErrorCode.BusinessRuleViolation, Message = couleeMessage };

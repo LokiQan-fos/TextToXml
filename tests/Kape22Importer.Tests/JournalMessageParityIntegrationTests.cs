@@ -76,7 +76,14 @@ public class JournalMessageParityIntegrationTests(SqlServerIntegrationFixture fi
         Skip.IfNot(fixture.Available, fixture.SkipReason ?? "SQL Server test instance unavailable.");
         fixture.ResetData();
 
-        foreach ((string name, byte[] content) in Fichiers())
+        foreach ((string name, byte[] content) in CouleeMissingFichiers())
+        {
+            Processor().Import(name, content);
+        }
+
+        // Story 6.9: every sample is cold, so the remaining Fichiers meet their Coulees on file.
+        SeedCoulees(fixture.NewAscoLsiContext, TenFichiers);
+        foreach ((string name, byte[] content) in CouleeOnFileFichiers())
         {
             Processor().Import(name, content);
         }
@@ -84,10 +91,10 @@ public class JournalMessageParityIntegrationTests(SqlServerIntegrationFixture fi
         Assert.Equal(ExpectedMessages, ReadMessages());
     }
 
-    private static IEnumerable<(string Name, byte[] Content)> Fichiers()
+    // The rejections written before any Coulee is on file, ending with the missing cold Coulee.
+    private static IEnumerable<(string Name, byte[] Content)> CouleeMissingFichiers()
     {
         byte[] reference = InsertableReferenceFichier();
-        string codeOpeChutage = ReadDetailChamp(reference, CodeOpeChutagePosition, CodeOpeChutageSize);
 
         // Kape22Mapper rejection (RequiredFieldMissing), summarized as "<count> erreur(s) : ...".
         yield return (ReferenceFichierName, BlankClientReferenceFichier());
@@ -96,8 +103,16 @@ public class JournalMessageParityIntegrationTests(SqlServerIntegrationFixture fi
         yield return (ReferenceFichierName, WithDetailChamp(reference, NombreLingotsFour1Position, NombreLingotsFour1Size, "99"));
         yield return (ReferenceFichierName, WithDetailChamp(reference, CodeOpePitsPosition, CodeOpePitsSize, string.Empty));
 
-        // Kape22Persister rejections: the missing cold Coulee and the accumulated business-rule message.
+        // Kape22Persister rejection: the missing cold Coulee.
         yield return (ReferenceFichierName, WithDetailChamp(reference, CodeConsignePitsPosition, CodeConsignePitsSize, "1"));
+    }
+
+    // The accumulated business-rule rejection, then the ten successes.
+    private static IEnumerable<(string Name, byte[] Content)> CouleeOnFileFichiers()
+    {
+        byte[] reference = InsertableReferenceFichier();
+        string codeOpeChutage = ReadDetailChamp(reference, CodeOpeChutagePosition, CodeOpeChutageSize);
+
         yield return (ReferenceFichierName, WithDetailChamp(reference, CodeOpeDecoupePosition, CodeOpeDecoupeSize, codeOpeChutage));
 
         foreach (string name in TenFichiers)

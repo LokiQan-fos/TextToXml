@@ -80,6 +80,9 @@ public class EndToEndImportIntegrationTests(SqlServerIntegrationFixture fixture)
     {
         Skip.IfNot(fixture.Available, fixture.SkipReason ?? "SQL Server test instance unavailable.");
         fixture.ResetData();
+
+        // Story 6.9: the ten samples are cold, so their Coulees are on file.
+        SeedCoulees(fixture.NewAscoLsiContext, TenFichiers);
     }
 
     // SM-2 / AC-FR21-4: the ten samples import as ten L_D_KAPE22 rows whose visible business fields (OF,

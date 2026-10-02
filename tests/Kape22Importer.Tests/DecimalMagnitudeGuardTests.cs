@@ -51,7 +51,10 @@ public class DecimalMagnitudeGuardTests
         using AscoLsiDbContext verify = contexts.Reader();
         Assert.Empty(verify.Kape22Rows);
         Assert.Empty(verify.OrdreFabricationRows);
-        Assert.Empty(verify.CouleeRows);
+
+        // Story 6.9: L_D_COULEE holds only the reference Coulee InMemoryContextFactory seeded, unmodified;
+        // the rejection added none.
+        AssertOnlyTheSeededReferenceCoulee(verify.CouleeRows);
         L_D_LOG_COMMANDE log = Assert.Single(contexts.LogRows());
         Assert.Contains("REJETÉ", log.Message);
     }

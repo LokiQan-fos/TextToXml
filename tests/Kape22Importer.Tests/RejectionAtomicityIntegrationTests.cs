@@ -101,7 +101,7 @@ public class RejectionAtomicityIntegrationTests(SqlServerIntegrationFixture fixt
         L_D_LOG_COMMANDE log = Assert.Single(fixture.LogRows());
         Assert.Contains("REJETÉ", log.Message);
 
-        AssertAllElevenTablesEmpty(verify);
+        AssertNoDispatchRows(verify);
     }
 
     // AC-FR20-2 / AC-FR21-5: the OF's two furnace ingot counts no longer sum to its own expected
@@ -128,7 +128,7 @@ public class RejectionAtomicityIntegrationTests(SqlServerIntegrationFixture fixt
         L_D_LOG_COMMANDE log = Assert.Single(fixture.LogRows());
         Assert.Contains("REJETÉ", log.Message);
 
-        AssertAllElevenTablesEmpty(verify);
+        AssertNoDispatchRows(verify);
     }
 
     // AC-FR21-2 / AC-FR21-5 / AC-FR24-3: a genuine SQL failure on the one SaveChanges - an
@@ -143,6 +143,9 @@ public class RejectionAtomicityIntegrationTests(SqlServerIntegrationFixture fixt
     public void Import_SimulatedSqlFailure_RollsBackEveryDispatchTableAndJournalsTheCause_AcFr21_5()
     {
         Ready();
+
+        // Story 6.9: the reference Fichier is cold, so its Coulee is on file.
+        SeedCoulees(fixture.NewAscoLsiContext, ReferenceFichierName);
         using (AscoLsiDbContext seed = fixture.NewAscoLsiContext())
         {
             seed.OrdreFabricationRows.Add(MapReferenceBundle().OrdreFabrication!);
@@ -166,7 +169,10 @@ public class RejectionAtomicityIntegrationTests(SqlServerIntegrationFixture fixt
         using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
         Assert.Empty(verify.Kape22Rows.AsNoTracking());
         Assert.Single(verify.OrdreFabricationRows.AsNoTracking());
-        Assert.Empty(verify.CouleeRows.AsNoTracking());
+
+        // Story 6.9: L_D_COULEE holds only the seeded reference Coulee, unmodified; the rolled-back
+        // transaction added none.
+        AssertOnlyTheSeededReferenceCoulee(verify.CouleeRows);
         Assert.Empty(verify.SectionChargeChutageRows.AsNoTracking());
         Assert.Empty(verify.SectionChargeDecoupeRows.AsNoTracking());
         Assert.Empty(verify.SectionChargeLingotRows.AsNoTracking());
@@ -189,6 +195,9 @@ public class RejectionAtomicityIntegrationTests(SqlServerIntegrationFixture fixt
     {
         Ready();
         byte[] content = ReadValidFixture(ReferenceFichierName);
+
+        // Story 6.9: the untouched reference Fichier is cold too, so its external Coulee is on file.
+        SeedCoulee(fixture.NewAscoLsiContext, MapFichier(content, ReferenceFichierName));
 
         ImportResult result = RunWithSerilog(ReferenceFichierName, content);
 
@@ -228,7 +237,7 @@ public class RejectionAtomicityIntegrationTests(SqlServerIntegrationFixture fixt
         L_D_LOG_COMMANDE log = Assert.Single(fixture.LogRows());
         Assert.Contains("REJETÉ", log.Message);
 
-        AssertAllElevenTablesEmpty(verify);
+        AssertNoDispatchRows(verify);
     }
 
     // C-5: A-5 - two sections sharing the same CodeOperation for one OF (CodeOpeDecoupe forced onto
@@ -246,6 +255,10 @@ public class RejectionAtomicityIntegrationTests(SqlServerIntegrationFixture fixt
         string codeOpeChutage = ReadDetailChamp(fichier, CodeOpeChutagePosition, CodeOpeChutageSize);
         byte[] content = WithDetailChamp(fichier, CodeOpeDecoupePosition, CodeOpeDecoupeSize, codeOpeChutage);
 
+        // Story 6.9: the reference Fichier is cold, so its Coulee is on file and the collision is what
+        // rejects it.
+        SeedCoulee(fixture.NewAscoLsiContext, MapFichier(fichier, ReferenceFichierName));
+
         ImportResult result = RunWithSerilog(ReferenceFichierName, content);
 
         Assert.False(result.Success);
@@ -259,7 +272,7 @@ public class RejectionAtomicityIntegrationTests(SqlServerIntegrationFixture fixt
         L_D_LOG_COMMANDE log = Assert.Single(fixture.LogRows());
         Assert.Contains("REJETÉ", log.Message);
 
-        AssertAllElevenTablesEmpty(verify);
+        AssertNoDispatchRows(verify, referenceCouleeSeeded: true);
     }
 
     private void Ready()
@@ -269,15 +282,24 @@ public class RejectionAtomicityIntegrationTests(SqlServerIntegrationFixture fixt
         fixture.ResetMqttLogs();
     }
 
-    // The "list every *Rows.AsNoTracking(), assert empty" pattern from TransactionalPersistenceTests.cs
-    // (lines 127-141, 291-330), covering all 11 AscoLSI dispatch tables (L_D_KAPE22 + the 10 Story 4.1
-    // downstream tables) - never L_D_LOG_COMMANDE, which is asserted separately per scenario since every
-    // cause records a REJETÉ row there on purpose.
-    private static void AssertAllElevenTablesEmpty(AscoLsiDbContext verify)
+    // The "list every *Rows.AsNoTracking(), assert empty" pattern from TransactionalPersistenceTests.cs,
+    // covering all 11 AscoLSI dispatch tables (L_D_KAPE22 + the 10 Story 4.1 downstream tables) - never
+    // L_D_LOG_COMMANDE, which is asserted separately per scenario since every cause records a REJETÉ row
+    // there on purpose. Story 6.9: when a test seeded the reference Coulee, L_D_COULEE must hold exactly
+    // that row, unmodified, instead of nothing.
+    private static void AssertNoDispatchRows(AscoLsiDbContext verify, bool referenceCouleeSeeded = false)
     {
         Assert.Empty(verify.Kape22Rows.AsNoTracking());
         Assert.Empty(verify.OrdreFabricationRows.AsNoTracking());
-        Assert.Empty(verify.CouleeRows.AsNoTracking());
+        if (referenceCouleeSeeded)
+        {
+            AssertOnlyTheSeededReferenceCoulee(verify.CouleeRows);
+        }
+        else
+        {
+            Assert.Empty(verify.CouleeRows.AsNoTracking());
+        }
+
         Assert.Empty(verify.SectionChargeChutageRows.AsNoTracking());
         Assert.Empty(verify.SectionChargeDecoupeRows.AsNoTracking());
         Assert.Empty(verify.SectionChargeLingotRows.AsNoTracking());
