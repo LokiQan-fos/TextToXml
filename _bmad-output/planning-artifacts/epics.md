@@ -310,8 +310,8 @@ microservices à UI et ne s'appliquent à aucune story v1.
 | FR-17 | Épic 4 — 4.2 | AC-FR17-1 … AC-FR17-5 |
 | FR-18 | Épic 4 — 4.3 | AC-FR18-1 … AC-FR18-4 |
 | FR-19 | Épic 4 — 4.4 (`AC-FR19-1..4`), 4.12 (`AC-FR19-5`, `LibelleConsigne`), 4.13 (`AC-FR19-6`, ligne `ConsigneGPAO=0`) | AC-FR19-1 … AC-FR19-6 |
-| FR-20 | Épic 4 — 4.5 (contrôles purs), 4.6 (`AC-FR20-5`, existence coulée) | AC-FR20-1 … AC-FR20-5 |
-| FR-21 | Épic 4 — 4.6 (persister), 4.7 (E2E) | AC-FR21-1 … AC-FR21-5 |
+| FR-20 | Épic 4 — 4.5 (contrôles purs), 4.6 (`AC-FR20-5`, existence coulée) ; Épic 6 — 6.9 (`AC-FR20-5` précisé), 6.10 (`AC-FR20-6`) | AC-FR20-1 … AC-FR20-6 |
+| FR-21 | Épic 4 — 4.6 (persister), 4.7 (E2E) ; Épic 6 — 6.10 (`AC-FR21-6`) | AC-FR21-1 … AC-FR21-6 |
 | FR-22 | Épic 5 — 5.1 (`AC-FR22-1..7`), 5.2 (`AC-FR22-8`) | AC-FR22-1 … AC-FR22-8 |
 | FR-23 | Épic 5 — 5.0 | AC-FR23-1 … AC-FR23-4 |
 | CTR-1/2/3 | Épic 1 — 1.8 | contrat `decimal`/`datetime`/`convert` + round‑trip typé |
@@ -436,7 +436,7 @@ stable, `MicroService.Publisher` n'empile plus les ticks, et les `Client`
 `GpaoImportP60` / `GpaoConvertP89` sont durcis et testés sur une vraie
 instance ; chaque format exporte son XML dans son propre dossier (D33). `AC-FR24-1..6`, `AC-FR25-1..7`, `AC-FR26-1..6`, `AC-FR16-5`, `AC-FR12-5` (révisé) et
 `AC-FR22-9` sont verts.
-**FRs couverts :** FR-24, FR-25, FR-26 (+ FR-11, FR-12, FR-14, FR-16, FR-22 révisés).
+**FRs couverts :** FR-24, FR-25, FR-26 (+ FR-11, FR-12, FR-14, FR-16, FR-22 révisés ; FR-20, FR-21 révisés par 6.9 et 6.10).
 
 ---
 
@@ -3174,3 +3174,118 @@ la ligne de référence (`:1414`) et exactement un XML exporté par Fichier sem�
 **Critères transverses :** CC-1, CC-2, CC-4, CC-7.
 
 Owner : Dev.
+
+## Corrections post-recette (Fichiers refusés par le legacy, 2026-10-02)
+
+Rejeu des 6 Fichiers P60 refusés par le legacy en production (`P60/error/`) avec
+l'état production reconstitué (sprint-change-proposal-2026-10-02.md) : le contrôle
+Coulée froide ne se déclenche jamais sur un Fichier réel, et le renvoi d'un OF
+existant n'était pas spécifié.
+
+### Story 6.9 : Contrôle Coulée froide sur le TypeConsigne 12
+
+As an exploitant,
+I want qu'un Fichier dont la Coulée froide n'existe pas soit refusé avec cette cause,
+So that un OF ne soit jamais créé sur une Coulée absente du stock.
+
+**Acceptance Criteria :** `AC-FR20-5` (précisé).
+
+**Given** `P60_847_682_407` et aucune ligne `L_D_COULEE` `063241`
+**When** il est importé
+**Then** il est refusé (`BusinessRuleViolation`, « la coulée '063241' est introuvable
+dans L_D_COULEE »), aucune ligne dans les 10 tables.
+
+**Given** la même base, puis `408` ; et `430` avec l'OF `2040297` déjà créé par `428`
+et sans Coulée `063196`
+**When** ils sont importés
+**Then** même refus, même cause (jamais `PersistenceError`).
+
+**Given** la Coulée `063241` présente
+**When** `P60_847_682_412` est importé
+**Then** il est accepté.
+
+**Notes dev :**
+- `Kape22Persister.cs:97` : comparer le premier caractère de `CodeConsignePits`
+  (même tranche que `ConsignesMapper.cs:73`) à `Kape22ImportBundle.ColdConsignePits`.
+- `P60/error/` : dossier versionné des Fichiers refusés en production (alimenté
+  par l'utilisateur) ; ses 6 Fichiers actuels servent de fixtures. Hors du
+  périmètre de `Kape22ProductionDataParityTests` (qui ne lit que `P60/`).
+- Les tests existants qui sèment `CodeConsignePits = "1"` restent valides ; ajouter
+  un cas `"1 207 00 000"` et un cas chaud `"3 148 00 740"`.
+
+**Tests xUnit (TDD, CC-1) :** `Kape22Importer.Tests`, `[Trait("AC", "FR20-5")]`.
+**Critères transverses :** CC-1, CC-2, CC-4, CC-7. Owner : Dev.
+
+### Story 6.10 : Renvoi d'un OF existant — remplacement ou refus explicite
+
+As an exploitant,
+I want qu'un Fichier qui renvoie un OF existant remplace cet OF s'il n'est pas
+engagé en production, et soit refusé avec la raison sinon,
+So that les renvois GPAO se comportent comme avec le legacy et chaque refus
+dise pourquoi.
+
+**Acceptance Criteria :** `AC-FR20-6`, `AC-FR21-6` (D34).
+
+**Given** l'OF `2040310` créé par `443`, `Etat` = 2 (EVC)
+**When** `P60_847_682_446` est importé
+**Then** refus explicite nommant l'OF et l'état, aucune écriture ; idem `447` et
+`449` sur l'OF `2040311` (créé par `444`).
+
+**Given** un OF remplaçable par son état, mais présent dans `L_D_PLANS_FOURS`,
+`L_D_FOURS.OFEnCours` ou `L_D_PSO` (un cas par table)
+**When** un Fichier le renvoie
+**Then** refus explicite nommant la table, aucune écriture.
+
+**Given** l'OF `2040312` créé par `445`, `Etat` = 0 (GPAO), absent des 3 tables
+**When** `P60_847_682_448` est importé
+**Then** il est accepté : les lignes de l'OF dans les 9 tables portent les valeurs
+de `448`, la Coulée et la ligne `L_D_KAPE22` de `445` sont inchangées.
+
+**Given** un remplacement dont le `SaveChanges()` échoue (échec SQL simulé)
+**When** l'import se termine
+**Then** l'ancien OF est intact dans les 9 tables (AC-FR21-2).
+
+**Given** chaque Fichier de `P60/error/` (un cas de théorie par Fichier) et la
+production configurée (`ConnectionStrings:AscoLSI_Production`, lecture seule,
+`ApplicationIntent=ReadOnly`, SELECT uniquement)
+**When** le test lit dans `L_D_LOG_COMMANDE` de production le traitement legacy
+de ce Fichier (ligne `GPAO` « Traitement du fichier GPAO '…\<nom>' » jusqu'à
+« s'est terminé avec une erreur », et les lignes `KAP22` entre les deux), puis
+reconstitue dans `AscoLSI_Test` l'état que le Fichier a rencontré (Coulée
+présente si sa `DateReception` de production précède le traitement ; OF existant
+et son `Etat` à cet instant d'après l'historique `L_D_LOG_COMMANDE` de l'OF ;
+`L_P_CONSIGNES_*` copiées), et l'importe avec le vrai `Kape22FichierProcessor`
+**Then** le Fichier est refusé avec la cause qui correspond à la raison legacy :
+
+| Raison legacy (`KAP22`) | Cause attendue |
+|---|---|
+| « demande une coulée froide … qui n'existe pas » | `AC-FR20-5` |
+| « nombre d'OF sauvés : 0 » (OF existant, état protégé) | `AC-FR20-6` |
+| « sans consignes d'enfournement » | `AC-FR20-4` |
+| « nombre de produit … different de la somme des lingots » / « pas de consignes pour la répartition » | `AC-FR20-2` |
+| « coulée chaude … ne commance pas par le caractère '0' » | aucune : accepté (`AC-FR20-3` retiré), signalé comme écart connu |
+
+**And** une raison legacy absente de la table, ou un refus pour une autre cause,
+fait échouer le cas avec la raison legacy et la cause obtenue dans le message ;
+aucune trace legacy pour le Fichier, ou production non configurée → cas
+`Skip` avec la raison (comme `Kape22ProductionDataParityTests`).
+**And** le test est marqué à retirer à la bascule vers le nouveau worker (plus
+aucun refus legacy à comparer) — limite acceptée par l'utilisateur le 2026-10-02.
+
+**Notes dev :**
+- Branche après la garde D22 et le contrôle Coulée froide, avant les pré-contrôles
+  A-5/B-5/C-4.
+- 3 entités lecture seule (`L_D_PLANS_FOURS`, `L_D_FOURS`, `L_D_PSO`, colonnes
+  utilisées seulement) + miroir minimal dans `scripts/schema/01-ascolsi-tables.sql`.
+  OF comparé au format `NCHAR(12)` complété de zéros (`DownstreamOf.Pad`).
+- Suppression des 9 tables = script de l'utilisateur + `POIDSMETRIQUE` et `SVT`.
+- Test générique `P60/error/` : catégorie Integration (base de test réinitialisée,
+  production en SELECT seul — mémoire « Production DB read-only ») ; la
+  reconstitution de l'état à l'instant T est la partie délicate, à figer au
+  checkpoint spec (le rejeu manuel du 2026-10-02 en donne les 6 cas de référence).
+- Résout `deferred-work.md:1454` (W-1 de la 6.8) : un second run du script E2E
+  remplace l'OF au lieu d'échouer sur `PK_L_D_CONSIGNES`.
+
+**Tests xUnit (TDD, CC-1) :** `Kape22Importer.Tests` (Integration),
+`[Trait("AC", "FR20-6")]`, `[Trait("AC", "FR21-6")]`.
+**Critères transverses :** CC-1, CC-2, CC-4, CC-7. Owner : Dev.

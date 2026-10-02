@@ -67,6 +67,11 @@ flowchart LR
   `SaveChanges()`. Aucune écriture partielle : soit tout commit, soit rien.
 - **Note (Épic 6, D31) :** `L_D_LOG_COMMANDE` est écrit par `IFichierJournal` après ce
   `SaveChanges()` ; la garde anti-doublon lit `L_D_KAPE22` (D22 révisé).
+- **Note (2026-10-02, D34, Story 6.10) :** le dispatch est en insertion seule,
+  **sauf** le renvoi d'un OF remplaçable : suppression de ses lignes dans
+  `L_D_ORDRE_FABRICATION`, les 7 `L_D_SECTIONCHARGE_*` et `L_D_CONSIGNES`, puis
+  insertion, dans ce même `SaveChanges()`. `L_D_PLANS_FOURS`, `L_D_FOURS` et
+  `L_D_PSO` sont lues seulement (préconditions de refus), jamais écrites.
 
 ### AD-2 — Mapping explicite, sans réflexion
 

@@ -17,6 +17,8 @@ Pay down the debt shared by the P60 and P89 pipelines (ten "fix with P60 / fix o
 - Story 6.6: Validation de configuration et panne de partage des workers GPAO
 - Story 6.7: Plafond de réessai par Fichier
 - Story 6.8: Flush du sink Logs et assertions du harnais E2E
+- Story 6.9: Contrôle Coulée froide sur le TypeConsigne 12
+- Story 6.10: Renvoi d'un OF existant — remplacement ou refus explicite
 
 ## Requirements & Constraints
 
@@ -31,6 +33,9 @@ Pay down the debt shared by the P60 and P89 pipelines (ten "fix with P60 / fix o
 - **Unreachable reception folder** (P60 inbox, P89 source) fails the tick with no heartbeat; log levels unchanged (`Warning` for a listing fault, `Error` for a missing folder); the existence check runs inside the tick task, hence within the 4 s shutdown budget. Signal shape (Story 6.6): `InboxScanner.RunTick` returns `false` when a reception folder could not be listed.
 - **Retry cap:** a Fichier left in `processing/` (P60) or returned `Deferred` (P89) for `Import:MaxAttempts` / `P89:MaxAttempts` consecutive ticks (default 10, < 1 refused at startup) gets one `Error` log naming it and the last cause, then is no longer processed until the worker restarts (no new `Logs` / `L_D_LOG_COMMANDE` rows). Never moved to `error/` (no quarantine). Counter is in memory in each worker's `Client` (the P60 scanner is rebuilt every tick), reset on restart or when the Fichier leaves `processing/`. Accepted consequence: an `AscoLSI` outage longer than N ticks needs a worker restart.
 - **E2E harness:** the worker's batched Logs sink is flushed (clean stop or explicit flush) before the Launcher stops; the harness requires at least one `GpaoImportP60` `Logs` row after the reference row and exactly one exported XML per seeded Fichier; the real-`Client` integration test writes no `Logs` row outside `MQTTnetServices_Test`; `Category=Integration` ends with 0 failures.
+- **Cold Coulée (AC-FR20-5, Story 6.9):** a Coulée is cold when the first character of `CodeConsignePits` is `1` (TypeConsigne 12, as the legacy reads it), not when the whole 12-character code equals `1`.
+- **Re-sent OF (D34, AC-FR20-6, AC-FR21-6, Story 6.10):** an OF already in `L_D_ORDRE_FABRICATION` is refused (explicit `BusinessRuleViolation`, no write) when its `Etat` is ENC 1, EVC 2, ENFOURNE 3, LAMINAGE 5 or LAMINE 8, or when it appears in `L_D_PLANS_FOURS.[OF]`, `L_D_FOURS.OFEnCours` or `L_D_PSO.[OF]` (read-only, `NCHAR(12)` zero-padded); otherwise its rows in `L_D_ORDRE_FABRICATION`, the 7 `L_D_SECTIONCHARGE_*` and `L_D_CONSIGNES` are deleted and re-inserted in the same `SaveChanges()`; `L_D_COULEE` and earlier `L_D_KAPE22` rows are kept.
+- **`P60/error/`:** versioned folder of P60 Fichiers rejected in production; a generic theory reads each one's legacy reason from production (`SELECT` only), rebuilds the state it met and checks the worker rejects it for the same cause; retired at the switchover to the new worker.
 - Any new or touched config key is grepped across both repos (`scripts/`, `tests/`, MicroServices) and documented in the worker JSON files (no worker README exists).
 - Cross-cutting: strict TDD with AC-named tests carrying `[Trait("AC", ...)]`; English comments; alphabetical ordering; glossary vocabulary; no secrets in code. Revised closed ACs (`AC-FR11-3`, `AC-FR11-6`, `AC-FR14-7`, `AC-FR12-5`) must be reconciled in the same change as the behavior.
 
@@ -47,5 +52,6 @@ Pay down the debt shared by the P60 and P89 pipelines (ten "fix with P60 / fix o
 
 - Strict order 6.1 → 6.2 → 6.3 → 6.4 → 6.4-bis → 6.5; 6.4-bis (test-harness only, no production code) realigns `scripts/e2e-worker-import.ps1` with the `MQTTnetServices` key removed by 6.4 and restores a green `Category=Integration` suite before 6.5. 6.1 rewires `GpaoImportP60`'s journal and changes the D22 guard that the later hardening and export stories rely on; 6.3's "ignored by the D22 guard" export case assumes 6.1's guard; 6.5 tests the behavior produced by 6.1, 6.3 and 6.4.
 - Post-retro order 6.6 → 6.7 → 6.8, after 6.5. 6.7's `MaxAttempts` key joins the startup validation added by 6.6 and needs `InboxScanner.RunTick` to expose a per-Fichier outcome (both delivered). 6.8 builds on the 6.4-bis harness and the 6.5 `GpaoClientIntegrationTests`; a flush mechanism touching the Launcher or `SharedLogger` (MicroServices / PortalSharedLibrary) requires asking first.
+- Post-recette order 6.9 → 6.10: 6.10's legacy-reason theory needs 6.9's cold-Coulée check to reject 407/408/430 for the right cause.
 - Integration runs use `--blame-hang-timeout 2m` (killed runs orphan bcp / Launcher processes).
 - Builds on Epic 5's `FichierJournal` / `AscoLsiJournal` projects (Story 5.0) and on the P89 worker composition (Story 5.2).

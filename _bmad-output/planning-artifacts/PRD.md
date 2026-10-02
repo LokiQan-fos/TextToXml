@@ -98,7 +98,7 @@ part ailleurs.*
 | D4 | Champ `Date` de l'entête = **numéro du jour dans l'année**, interprété dans l'**année courante**, **heure de Paris** (`245` = 2 septembre). | utilisateur |
 | D5 | Message positions **526→636 : données inutilisées, ignorées**. Le **template fait foi** pour tout le reste. | utilisateur |
 | D6 | **Typage : le template est directeur.** Les `datatype` du descripteur `P60.xml` sont **dérivés du type de la colonne** `L_D_KAPE22` : colonne `int` → `datatype="int"`, sinon `"string"`. **P60 : 0 `datetime`** (Champs `DateEnfournementFourN` non utilisés, D14), 0 `decimal`, ~30 `int`, le reste `string`. Table figée Annexe A. | données `sys.columns` (Annexe C) |
-| D7 | **Pas de déduplication** de fichiers. Un fichier redéposé est **réimporté** (nouvelle ligne, `Id` identity). La sûreté de reprise vient du dossier **`processing/`** (FR‑12), pas d'une clé. | utilisateur |
+| D7 | **Pas de déduplication** de fichiers. Un fichier redéposé est **réimporté** (nouvelle ligne, `Id` identity). La sûreté de reprise vient du dossier **`processing/`** (FR‑12), pas d'une clé. Un Fichier qui porte un OF déjà présent en base **remplace** cet OF ou est refusé selon D34 (2026-10-02). | utilisateur |
 | D8 | **Journalisation double**, à chaque fichier : (a) `MQTTnetServices.dbo.Logs` — Serilog sink MSSqlServer, format `[Kape22Importer][<Event>] : <texte>`, comme les workers existants ; (b) `AscoLSI.dbo.L_D_LOG_COMMANDE` — 1 ligne : `Commande="P60"`, `Message` = `"<NumeroFichier> — OK"` ou `"<NumeroFichier> — REJETÉ : <résumé des erreurs de mapping>"`, `OF` = `OF` **brut** du bloc message, `User` = **`Import:InitiatingServer`** (serveur initiateur du traitement), `Date` = horodatage local, `NumLingot=0`, `Trace=1`. Écrite **seulement si l'`OF` est lisible** (D15). Depuis l'Épic 6 (FR-24), la ligne `L_D_LOG_COMMANDE` est écrite par `IFichierJournal` (D31) hors de la transaction AD-1. | utilisateur + schémas réels (Annexe C) |
 | D9 | Le worker s'intègre au **`Launcher` existant** (`MicroServices.sln`) comme classe in‑process `Client : Publisher` : **une ligne** dans `Launcher/WorkerRegistry.cs` (`Factories`, enveloppée dans `WorkerAdapter<Client>`) + une entrée `Launcher/workers.json` (`{Name, Type, ConfigPath}`). La table `MQTTnetServices.dbo.WorkerSettings` (`WorkerName`, `IsActive`) est **détenue par le Launcher** (il l'auto‑crée, lit `IsActive` au démarrage, l'écrit sur bascule) ; **le worker n'y touche jamais**. Le `WorkerStatus` vu du dashboard est fourni par `WorkerAdapter` (`IsRunning = Client.IsConnected`), pas par le worker. | schéma réel + modèle `Launcher` (correction‑de‑cap 2026‑09‑09) |
 | D10 | **1 XSD statique, écrit à la main, par format** (`P60.xsd`), versionné, décrivant le **XML normalisé**. Le **DTO C# (`Kape22File`) est généré** de ce XSD (`xsd.exe /classes`). Le XML normalisé est **validé contre le XSD avant désérialisation**. **Pas** de méta‑schéma des descripteurs (`commande.xsd`) : chaque format a son propre XSD, ça suffit. | utilisateur |
@@ -125,6 +125,7 @@ part ailleurs.*
 | D31 | **Journal de Fichier = interface, LSI = une implémentation.** Un format n'écrit pas lui-même son journal applicatif : il appelle `IFichierJournal` (`src/FichierJournal`, sans dépendance). `src/AscoLsiJournal` est l'implémentation LSI (`L_D_LOG_COMMANDE`, règles D8/D15). D'autres applications auront d'autres implémentations. Le journal est le **résultat** de l'import : il s'écrit **hors de toute transaction métier**, y compris en cas d'échec de l'insertion des données. P89 l'utilise dès l'Épic 5 ; P60 y migre par l'Épic 6 (FR-24, sprint-change-proposal-2026-09-28.md). | utilisateur (2026‑09‑25) |
 | D32 | **Robustesse commune des workers.** La ré‑entrance du timer se corrige une fois dans `MicroService.Publisher` (tous les workers `Publisher`) : un tick ne démarre pas tant que le précédent tourne. Les défauts propres aux `Client` GPAO (`GpaoImportP60`, `GpaoConvertP89`) se corrigent dans les deux à l'identique (FR-25). Après un tick en échec, un worker GPAO ne publie pas de heartbeat. | utilisateur (2026‑09‑28) |
 | D33 | **Export XML par format.** Chaque format (P60, P89, formats futurs, en import comme en export) écrit le XML normalisé de **chaque** Fichier converti dans son **propre** dossier d'export, pour transmission à des tiers qui vérifient les données importées ou exportées. Nom `<nom>_<yyyyMMddHHmmss>.xml` (jamais d'écrasement). Ce dossier n'est **jamais purgé** par le worker ; son nettoyage relève de l'exploitation. Un Fichier que `TextToXml` ne sait pas convertir n'a pas de XML. P89 s'y conforme déjà (`P89:XmlPath`) ; P60 par l'Épic 6 (FR-26). | utilisateur (2026‑09‑28) |
+| D34 | **Renvoi d'un OF existant.** Si `L_D_ORDRE_FABRICATION` contient déjà l'OF : refus métier explicite, aucune écriture, si son `Etat` vaut ENC (1), EVC (2), ENFOURNE (3), LAMINAGE (5) ou LAMINE (8), ou si l'OF figure dans `L_D_PLANS_FOURS.[OF]`, `L_D_FOURS.OFEnCours` ou `L_D_PSO.[OF]`. Sinon l'OF est **remplacé** : ses lignes `L_D_ORDRE_FABRICATION`, `L_D_SECTIONCHARGE_*` (7 tables) et `L_D_CONSIGNES` sont supprimées puis réinsérées dans le même `SaveChanges()` (AC-FR21-1). `L_D_COULEE` et les lignes `L_D_KAPE22` antérieures sont conservées. Parité legacy `OrdreFabricationController.AddRange2` — sprint-change-proposal-2026-10-02.md. | utilisateur (2026-10-02) |
 
 ## 1. Vision
 
@@ -994,7 +995,14 @@ l'Ordre de Fabrication.
   Aucun contrôle de format sur la Coulée — sprint-change-proposal-2026-09-25.md.
 - `AC-FR20-4` : absence de consigne d'enfournement → rejet, cause explicite.
 - `AC-FR20-5` : Coulée froide introuvable en base → rejet, cause explicite,
-  aucune écriture.
+  aucune écriture. *(Précisé 2026-10-02, Story 6.9 :)* une Coulée est froide
+  quand le **premier caractère** de `CodeConsignePits` vaut `1` (TypeConsigne 12
+  de la Section de charge Pits, comme le legacy `GetConsignes("ConsignesEnfournementPits", 12)`) ;
+  vérifié sur les Fichiers réels `P60_847_682_407`, `408` et `430`.
+- `AC-FR20-6` : OF déjà présent et non remplaçable (D34 : `Etat` ENC/EVC/
+  ENFOURNE/LAMINAGE/LAMINE, ou OF présent dans `L_D_PLANS_FOURS`, `L_D_FOURS`
+  `OFEnCours` ou `L_D_PSO`) → rejet, cause explicite nommant l'OF et la raison
+  (état ou table), aucune écriture. Vérifié sur `P60_847_682_446`, `447`, `449`.
 
 #### FR-21 : Persistance transactionnelle étendue
 
@@ -1016,6 +1024,12 @@ test que FR-11, schéma étendu aux 10 tables)* :
 - `AC-FR21-5` : bout en bout, une fixture fautive (Coulée absente, répartition
   incohérente, échec SQL simulé) ne laisse **aucune** ligne dans **aucune**
   des 10 tables, cause lisible dans `L_D_LOG_COMMANDE` + `*.errors.json`.
+- `AC-FR21-6` : OF déjà présent et remplaçable (D34) → les lignes existantes de
+  l'OF dans `L_D_ORDRE_FABRICATION`, les 7 `L_D_SECTIONCHARGE_*` et
+  `L_D_CONSIGNES` sont supprimées et les nouvelles insérées dans le même
+  `SaveChanges()` ; `L_D_COULEE` et les `L_D_KAPE22` antérieures sont intactes ;
+  un échec SQL laisse l'ancien OF inchangé. Vérifié sur `P60_847_682_448`
+  (après `445`).
 
 **Feature‑specific NFRs :** hérite de la Reprise et de l'Observabilité de la
 §4.3 (le double journal `MQTTnetServices.Logs` + `L_D_LOG_COMMANDE` couvre

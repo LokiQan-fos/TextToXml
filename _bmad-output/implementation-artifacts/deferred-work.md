@@ -1454,3 +1454,4 @@ s'y trouver et rester à confirmer.
 - source_spec: `spec-6-8-flush-sink-logs-assertions-harnais-e2e.md` (W-1, low)
   summary: Without `-KeepArtifacts`, `scripts/e2e-worker-import.ps1` cleans up only `L_D_LOG_COMMANDE` and `L_D_KAPE22`, not `L_D_CONSIGNES` or the other downstream tables, so a second standalone run in a row leaves both Fichiers in `processing/` on a `PK_L_D_CONSIGNES` violation and times out.
   evidence: Story 6.8 implementation and verification runs 2026-10-02 (standalone run: "Fichier ... left in processing/ after a persistence failure"). Pre-existing since the downstream dispatch (Epic 4); runs through `dotnet test` are unaffected because `SqlServerIntegrationFixture` resets the database first.
+  disposition: PLANNED 2026-10-02 — Story 6.10 (D34: a re-sent OF in state GPAO is replaced, so a second run no longer hits `PK_L_D_CONSIGNES`; sprint-change-proposal-2026-10-02.md).

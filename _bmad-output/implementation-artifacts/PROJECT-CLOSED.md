@@ -2,13 +2,17 @@
 status: 'reopened'
 closed_date: '2026-10-01'
 previous_closed_date: '2026-09-25'
-reopened_date: '2026-10-01'
-reopened_reason: 'Epic 6 post-retro corrections — stories 6.6-6.8 (sprint-change-proposal-2026-10-01.md)'
-previous_reopened_date: '2026-09-28'
+reopened_date: '2026-10-02'
+reopened_reason: 'Legacy-rejected P60 Fichiers — stories 6.9-6.10 (sprint-change-proposal-2026-10-02.md)'
+previous_reopened_date: '2026-10-01'
 last_commit: 'bc9cf7d2c369eb0e284f5c83ffaf525be11b131f'
 ---
 
 # TextToXml / Kape22Importer — Project Closure
+
+> **Reopened 2026-10-02 for stories 6.9–6.10** (replay of the six P60 Fichiers the legacy rejected in
+> production, `P60/error/`: cold-Coulée check dead on real data, re-send of an existing OF unspecified)
+> — `sprint-change-proposal-2026-10-02.md`. Re-close at the user's go.
 
 > **Epic 6 done 2026-10-02, story 6.8; retrospective pending.** Stories 6.6–6.8 (post-retro
 > corrections) are all `done`; the second Epic 6 retrospective re-closes the project.
