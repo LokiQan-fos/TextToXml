@@ -23,6 +23,11 @@ namespace Kape22Importer.Persistence;
 // not hold it yet, and the Fichier comes back as an already-imported skip: AlreadyImported true, Success
 // true, InsertedId null, empty Errors (AC-FR11-6, AC-FR24-4). A cold Coulee whose L_D_COULEE row is
 // missing is rejected instead, with a failure entry citing the missing Coulee (AC-FR20-5).
+// Story 6.10 (D34): an OF already in L_D_ORDRE_FABRICATION is refused the same way when its Etat is ENC,
+// EVC, ENFOURNE, LAMINAGE or LAMINE or when L_D_FOURS, L_D_PLANS_FOURS or L_D_PSO names it (AC-FR20-6);
+// otherwise its rows in the 9 downstream tables are deleted and the new ones inserted in that same single
+// SaveChanges, L_D_COULEE and the earlier L_D_KAPE22 rows untouched (AC-FR21-6) - the only path that
+// deletes AscoLSI rows.
 // A same-bundle L_D_CONSIGNES natural-key collision (two sections sharing the same CodeOperation for
 // this OF) is rejected the same way, citing the colliding CodeOperation, before ConsignesRows.AddRange
 // is ever called (A-5, Epic 4 retro). A scaled decimal column whose value exceeds its DECIMAL(p,s)
@@ -52,6 +57,17 @@ public sealed class Kape22Persister(
     private const string CommandeKey = "Import:Commande";
 
     private const string DefaultCommande = "P60";
+
+    // D34: the legacy EtatOF values (Lsi.Net DALLevel3 EtatOF) under which an existing OF is never
+    // replaced - ENC, EVC, ENFOURNE, LAMINAGE, LAMINE. GPAO (0) and any other value allow the replace.
+    private static readonly Dictionary<int, string> ProtectedEtats = new()
+    {
+        [1] = "ENC",
+        [2] = "EVC",
+        [3] = "ENFOURNE",
+        [5] = "LAMINAGE",
+        [8] = "LAMINE",
+    };
 
     public ImportResult Persist(Kape22ImportBundle bundle)
     {
@@ -101,6 +117,26 @@ public sealed class Kape22Persister(
                 string couleeMessage = $"OF '{of}' : la coulée '{coulee}' est introuvable dans L_D_COULEE.";
                 ConversionError couleeError = new() { Block = Block.File, Code = ErrorCode.BusinessRuleViolation, Message = couleeMessage };
                 return Recorded(new ImportResult { Errors = [couleeError] }, Entry(numeroFichier, of, couleeMessage));
+            }
+
+            // AC-FR20-6 / AC-FR21-6 (Story 6.10, D34): an OF already in L_D_ORDRE_FABRICATION is refused
+            // once production has started on it (a protected Etat, or the OF named in L_D_FOURS,
+            // L_D_PLANS_FOURS or L_D_PSO) - same shape as the cold-Coulee rejection above, nothing written.
+            // Otherwise it is replaced: its rows in the 9 downstream tables are removed below, after the
+            // pre-checks, and the new ones added, all in the single SaveChanges. Downstream OF columns are
+            // zero-padded (DownstreamOf.Pad).
+            string paddedOf = DownstreamOf.Pad(of);
+            L_D_ORDRE_FABRICATION? existingOf = context.OrdreFabricationRows.SingleOrDefault(row => row.OF == paddedOf);
+            if (existingOf is not null)
+            {
+                List<string> refusalReasons = ResendRefusalReasons(existingOf.Etat, paddedOf);
+                if (refusalReasons.Count > 0)
+                {
+                    string resendMessage =
+                        $"OF '{of}' : l'OF existe déjà et ne peut pas être remplacé ({string.Join(" ; ", refusalReasons)}).";
+                    ConversionError resendError = new() { Block = Block.File, Code = ErrorCode.BusinessRuleViolation, Message = resendMessage };
+                    return Recorded(new ImportResult { Errors = [resendError] }, Entry(numeroFichier, of, resendMessage));
+                }
             }
 
             // A-5 (Epic 4 retro): a same-bundle L_D_CONSIGNES natural-key collision - two sections
@@ -172,6 +208,19 @@ public sealed class Kape22Persister(
                 return RejectWithBusinessRuleViolation(of, numeroFichier, businessRuleMessages);
             }
 
+            // D34 replace: the previous OF's rows are deleted in the same SaveChanges that inserts the new
+            // ones, so a SQL failure leaves the previous OF intact (AC-FR21-6, AC-FR21-2). L_D_COULEE and
+            // the earlier L_D_KAPE22 rows are kept.
+            // EF Core merges the Deleted + Added pair sharing a key into an UPDATE, so the
+            // L_D_ORDRE_FABRICATION row is never actually deleted. That is what keeps production's foreign
+            // keys to L_D_ORDRE_FABRICATION satisfied (the 7 L_D_SECTIONCHARGE_*, L_D_OF_SUIVI, L_D_REBUT,
+            // L_D_PLANS_FOURS, L_D_PSO; absent from the test mirror schema): switching to a real DELETE +
+            // INSERT would break the replace in production whenever an L_D_OF_SUIVI row exists.
+            if (existingOf is not null)
+            {
+                RemoveDownstreamRows(existingOf, paddedOf);
+            }
+
             context.Kape22Rows.Add(entity);
             context.OrdreFabricationRows.Add(bundle.OrdreFabrication!);
             if (!couleeAlreadyExists)
@@ -229,9 +278,9 @@ public sealed class Kape22Persister(
             Entry(bundle.NumeroFichier, bundle.OF.Trim(), Summarize(bundle.Errors)));
     }
 
-    // Business note (Q-3, Épic 4 retro #3): an OF cannot be resubmitted today - a failed OF is reissued
-    // under a new OF number rather than retried under the same NumeroFichier/OF pair, so a Fichier whose
-    // pair already sits in L_D_KAPE22 is never imported twice.
+    // Business note (Q-3, Épic 4 retro #3, revised Story 6.10): the GPAO can re-send an OF under a new
+    // NumeroFichier - that is the D34 replace-or-refuse path in PersistMapped. The same NumeroFichier/OF
+    // pair, already in L_D_KAPE22, is never imported twice: it lands here.
     private ImportResult CompleteAlreadyImported(Kape22ImportBundle bundle, string numeroFichier, string of)
     {
         ImportResult skipped = new() { AlreadyImported = true, Warnings = bundle.Warnings };
@@ -261,6 +310,51 @@ public sealed class Kape22Persister(
         string message = $"OF '{of}' : " + string.Join(" ; ", messages);
         ConversionError error = new() { Block = Block.File, Code = ErrorCode.BusinessRuleViolation, Message = message };
         return Recorded(new ImportResult { Errors = [error] }, Entry(numeroFichier, of, message));
+    }
+
+    // D34: why an existing OF cannot be replaced, empty when it can - its Etat when protected, then each
+    // precondition table naming it, in that order. Legacy parity: OrdreFabricationController.AddRange2
+    // refuses the same 5 EtatOF values; the 3 tables are this importer's own addition.
+    private List<string> ResendRefusalReasons(int etat, string paddedOf)
+    {
+        List<string> reasons = [];
+        if (ProtectedEtats.TryGetValue(etat, out string? name))
+        {
+            reasons.Add($"état {name} ({etat})");
+        }
+
+        if (context.FoursRows.Any(row => row.OFEnCours == paddedOf))
+        {
+            reasons.Add("présent dans L_D_FOURS");
+        }
+
+        if (context.PlansFoursRows.Any(row => row.OF == paddedOf))
+        {
+            reasons.Add("présent dans L_D_PLANS_FOURS");
+        }
+
+        if (context.PsoRows.Any(row => row.OF == paddedOf))
+        {
+            reasons.Add("présent dans L_D_PSO");
+        }
+
+        return reasons;
+    }
+
+    // D34 replace: stages the removal of the previous OF's rows in the 9 downstream tables, on the same
+    // context the new rows are then added to. Never L_D_COULEE nor L_D_KAPE22, and none of the other tables
+    // the legacy DeleteOF also clears (L_D_OF_SUIVI, L_D_REBUT, ...).
+    private void RemoveDownstreamRows(L_D_ORDRE_FABRICATION existingOf, string paddedOf)
+    {
+        context.ConsignesRows.RemoveRange(context.ConsignesRows.Where(row => row.OF == paddedOf));
+        context.OrdreFabricationRows.Remove(existingOf);
+        context.SectionChargeChutageRows.RemoveRange(context.SectionChargeChutageRows.Where(row => row.OF == paddedOf));
+        context.SectionChargeDecoupeRows.RemoveRange(context.SectionChargeDecoupeRows.Where(row => row.OF == paddedOf));
+        context.SectionChargeLingotRows.RemoveRange(context.SectionChargeLingotRows.Where(row => row.OF == paddedOf));
+        context.SectionChargePitsRows.RemoveRange(context.SectionChargePitsRows.Where(row => row.OF == paddedOf));
+        context.SectionChargePoidsMetriqueRows.RemoveRange(context.SectionChargePoidsMetriqueRows.Where(row => row.OF == paddedOf));
+        context.SectionChargeRefroidissoirsRows.RemoveRange(context.SectionChargeRefroidissoirsRows.Where(row => row.OF == paddedOf));
+        context.SectionChargeSvtRows.RemoveRange(context.SectionChargeSvtRows.Where(row => row.OF == paddedOf));
     }
 
     // The journal entry for this Fichier; a null reason is a success (FichierJournalEntry: no reason means

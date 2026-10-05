@@ -16,9 +16,18 @@ public class AscoLsiDbContext(DbContextOptions<AscoLsiDbContext> options) : DbCo
 
     public DbSet<L_D_COULEE> CouleeRows => Set<L_D_COULEE>();
 
+    // Story 6.10 (D34): read-only precondition table, never written.
+    public DbSet<L_D_FOURS> FoursRows => Set<L_D_FOURS>();
+
     public DbSet<L_D_KAPE22> Kape22Rows => Set<L_D_KAPE22>();
 
     public DbSet<L_D_ORDRE_FABRICATION> OrdreFabricationRows => Set<L_D_ORDRE_FABRICATION>();
+
+    // Story 6.10 (D34): read-only precondition table, never written.
+    public DbSet<L_D_PLANS_FOURS> PlansFoursRows => Set<L_D_PLANS_FOURS>();
+
+    // Story 6.10 (D34): read-only precondition table, never written.
+    public DbSet<L_D_PSO> PsoRows => Set<L_D_PSO>();
 
     public DbSet<L_D_SECTIONCHARGE_CHUTAGE> SectionChargeChutageRows => Set<L_D_SECTIONCHARGE_CHUTAGE>();
 
@@ -128,6 +137,27 @@ public class AscoLsiDbContext(DbContextOptions<AscoLsiDbContext> options) : DbCo
             entity.ToTable("L_D_SECTIONCHARGE_SVT");
             entity.HasKey(row => new { row.OF, row.CodeOperation });
             ApplyDownstreamColumnLengths(entity);
+        });
+
+        // Story 6.10 (D34): the 3 read-only precondition tables a re-sent OF is checked against (AFV004-LSI
+        // sys.columns/sys.indexes, 2026-10-05). Minimal mappings, key + OF only; Kape22Persister only
+        // queries them.
+        modelBuilder.Entity<L_D_FOURS>(entity =>
+        {
+            entity.ToTable("L_D_FOURS");
+            entity.HasKey(row => row.Id);
+        });
+
+        modelBuilder.Entity<L_D_PLANS_FOURS>(entity =>
+        {
+            entity.ToTable("L_D_PLANS_FOURS");
+            entity.HasKey(row => new { row.FourId, row.Position });
+        });
+
+        modelBuilder.Entity<L_D_PSO>(entity =>
+        {
+            entity.ToTable("L_D_PSO");
+            entity.HasKey(row => new { row.NumeroLingot, row.Coulee });
         });
 
         // The real columns are legacy datetime, not datetime2. Pin the store type so EF stops emitting

@@ -103,6 +103,7 @@ internal static class SqlTableSchema
     private static Type ClrTypeFor(string sqlType) => sqlType.ToUpperInvariant() switch
     {
         "INT" => typeof(int),
+        "SMALLINT" => typeof(short),
         "BIGINT" => typeof(long),
         "BIT" => typeof(bool),
         "DATETIME" or "DATETIME2" or "DATE" => typeof(DateTime),

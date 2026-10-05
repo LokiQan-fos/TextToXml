@@ -88,7 +88,8 @@ public sealed class SqlServerIntegrationFixture
     // test that reuses the reference Fichier's OF (every downstream table but L_D_COULEE is keyed on it)
     // never collides with a row an earlier test left committed. Story 4.12: the 13 L_P_CONSIGNES_*
     // reference tables are emptied too, so reference rows a test seeds never leak into another test's
-    // ConsigneReferenceData snapshot.
+    // ConsigneReferenceData snapshot. Story 6.10: the 3 read-only D34 precondition tables (L_D_FOURS,
+    // L_D_PLANS_FOURS, L_D_PSO) are emptied too, so an OF a test places there never blocks another test.
     public void ResetData()
     {
         ExecuteNonQuery(
@@ -111,7 +112,10 @@ public sealed class SqlServerIntegrationFixture
             TRUNCATE TABLE dbo.L_D_LOG_COMMANDE;
             TRUNCATE TABLE dbo.L_D_CONSIGNES;
             TRUNCATE TABLE dbo.L_D_COULEE;
+            TRUNCATE TABLE dbo.L_D_FOURS;
             TRUNCATE TABLE dbo.L_D_ORDRE_FABRICATION;
+            TRUNCATE TABLE dbo.L_D_PLANS_FOURS;
+            TRUNCATE TABLE dbo.L_D_PSO;
             TRUNCATE TABLE dbo.L_D_SECTIONCHARGE_CHUTAGE;
             TRUNCATE TABLE dbo.L_D_SECTIONCHARGE_DECOUPE;
             TRUNCATE TABLE dbo.L_D_SECTIONCHARGE_LINGOT;

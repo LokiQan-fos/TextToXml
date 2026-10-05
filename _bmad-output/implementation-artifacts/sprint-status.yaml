@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 16:00
-last_updated: 10-02-2026 15:53
+last_updated: 10-05-2026 13:15
 project: TextToXml
 project_key: NOKEY
 tracking_system: file-system
@@ -103,7 +103,7 @@ development_status:
   6-7-plafond-reessai-par-fichier: done
   6-8-flush-sink-logs-assertions-harnais-e2e: done
   6-9-controle-coulee-froide-typeconsigne-12: done
-  6-10-renvoi-of-existant-remplacement-ou-refus: backlog
+  6-10-renvoi-of-existant-remplacement-ou-refus: review
   epic-6-retrospective: done
 action_items:
   - id: "story-4-6-decimal-scale-defect-story-4-3-bis"

@@ -1473,3 +1473,17 @@ s'y trouver et rester à confirmer.
 - source_spec: `reviews/story-6-9/aggregated-report.md` (F-4, low)
   summary: `ColdCouleeRealFichierTests.Counts()` (11-table list) and `Import()` (ImportOptions + processor wiring) duplicate `RejectionAtomicityIntegrationTests.AssertNoDispatchRows`, the inline lists in `TransactionalPersistenceTests` and other classes' `Processor()` helpers.
   evidence: blind-hunter lens, `tests/Kape22Importer.Tests/ColdCouleeRealFichierTests.cs`. Test-only cleanup outside Story 6.9 scope, no functional impact.
+
+## Deferred from: spec-6-10-renvoi-of-existant-remplacement-ou-refus.md (2026-10-05)
+
+- source_spec: `spec-6-10-renvoi-of-existant-remplacement-ou-refus.md` (D34 scope)
+  summary: The D34 replace path deletes the OF's rows from the 9 dispatch tables only; legacy `OrdreFabricationController.DeleteOF` also deletes `L_D_OF_SUIVI` (re-ranking `Rang`), `L_D_REBUT`, `L_D_PRODUITS_OUTIL` and `L_D_MAM_QUAL`, so a replaced GPAO-state OF can leave a stale `L_D_OF_SUIVI` row.
+  evidence: Story 6.10 planning (legacy read of `Desktop/kape22/OrdreFabricationController.cs:577-866`); D34 (user, 2026-10-02) limits the replace to the 9 tables, scope kept at the spec checkpoint 2026-10-05. Not blocking: the workers are not deployed yet.
+
+- source_spec: `spec-6-10-renvoi-of-existant-remplacement-ou-refus.md` (D-1, step-04 review)
+  summary: The D34 preconditions (`Etat`, `L_D_FOURS.OFEnCours`, `L_D_PLANS_FOURS`, `L_D_PSO`) are read without a lock before `SaveChanges()`, so an OF enfourné between the read and the commit can still be replaced.
+  evidence: edge-case-hunter and blind-hunter lenses on `Kape22Persister.cs` (2026-10-05). Same race in legacy `AddRange2`; narrow window (one Fichier, milliseconds), workers not deployed yet.
+
+- source_spec: `spec-6-10-renvoi-of-existant-remplacement-ou-refus.md` (D-2, step-04 review)
+  summary: `scripts/schema/01-ascolsi-tables.sql` mirrors none of production's foreign keys to `L_D_ORDRE_FABRICATION` (7 `L_D_SECTIONCHARGE_*`, `L_D_OF_SUIVI`, `L_D_REBUT`, `L_D_PLANS_FOURS`, `L_D_PSO`), so a regression of the D34 replace from EF's merged UPDATE to a real DELETE + INSERT would pass the suite and fail in production.
+  evidence: production `sys.foreign_keys` read 2026-10-05 during the Story 6.10 review; the replace currently relies on EF Core's shared-identity UPDATE (documented in `Kape22Persister`).

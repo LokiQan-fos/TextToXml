@@ -136,6 +136,34 @@ public class SchemaModelParityTests
             EntityType(typeof(L_D_SECTIONCHARGE_SVT)));
     }
 
+    // Story 6.10 (D34): the 3 read-only precondition tables, minimal mirrors (key + OF column only).
+    [Fact]
+    [Trait("AC", "6.10")]
+    public void L_D_FOURS_ModelMatchesGeneratedSchema()
+    {
+        AssertParity(
+            SqlTableSchema.Read("01-ascolsi-tables.sql", "L_D_FOURS"),
+            EntityType(typeof(L_D_FOURS)));
+    }
+
+    [Fact]
+    [Trait("AC", "6.10")]
+    public void L_D_PLANS_FOURS_ModelMatchesGeneratedSchema()
+    {
+        AssertParity(
+            SqlTableSchema.Read("01-ascolsi-tables.sql", "L_D_PLANS_FOURS"),
+            EntityType(typeof(L_D_PLANS_FOURS)));
+    }
+
+    [Fact]
+    [Trait("AC", "6.10")]
+    public void L_D_PSO_ModelMatchesGeneratedSchema()
+    {
+        AssertParity(
+            SqlTableSchema.Read("01-ascolsi-tables.sql", "L_D_PSO"),
+            EntityType(typeof(L_D_PSO)));
+    }
+
     private static void AssertParity(IReadOnlyList<SqlColumn> schema, IEntityType entity)
     {
         Dictionary<string, IProperty> modelColumns = entity.GetProperties()

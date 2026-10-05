@@ -34,6 +34,14 @@ public class PersistenceSmokeTests(SqlServerIntegrationFixture fixture)
         "L_D_SECTIONCHARGE_SVT",
     ];
 
+    // The 3 read-only D34 precondition tables added in Story 6.10 (minimal mirrors, AFV004-LSI sys.columns, 2026-10-05).
+    private static readonly string[] PreconditionTables =
+    [
+        "L_D_FOURS",
+        "L_D_PLANS_FOURS",
+        "L_D_PSO",
+    ];
+
     // The 13 read-only L_P_CONSIGNES_* reference tables added in Story 4.12 (scripts/schema/03-ascolsi-reference-consignes.sql).
     private static readonly string[] ReferenceTables =
     [
@@ -67,13 +75,15 @@ public class PersistenceSmokeTests(SqlServerIntegrationFixture fixture)
         Assert.True(TableExists(fixture.MqttConnectionString, "Logs"));
 
         // Story 4.1: the 10 downstream dispatch tables (AFV004-LSI, sys.columns/sys.indexes, 2026-09-14),
-        // plus the Story 4.12 reference tables.
-        foreach (string table in DownstreamTables.Concat(ReferenceTables))
+        // plus the Story 4.12 reference tables and the Story 6.10 precondition tables.
+        foreach (string table in DownstreamTables.Concat(PreconditionTables).Concat(ReferenceTables))
         {
             Assert.True(TableExists(fixture.AscoLsiConnectionString, table), $"Missing table dbo.{table}.");
         }
 
-        Assert.Equal(2 + DownstreamTables.Length + ReferenceTables.Length, UserTableCount(fixture.AscoLsiConnectionString));
+        Assert.Equal(
+            2 + DownstreamTables.Length + PreconditionTables.Length + ReferenceTables.Length,
+            UserTableCount(fixture.AscoLsiConnectionString));
         Assert.Equal(1, UserTableCount(fixture.MqttConnectionString));
     }
 

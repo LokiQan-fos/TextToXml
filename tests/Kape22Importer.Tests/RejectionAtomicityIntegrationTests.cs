@@ -131,9 +131,10 @@ public class RejectionAtomicityIntegrationTests(SqlServerIntegrationFixture fixt
         AssertNoDispatchRows(verify);
     }
 
-    // AC-FR21-2 / AC-FR21-5 / AC-FR24-3: a genuine SQL failure on the one SaveChanges - an
-    // L_D_ORDRE_FABRICATION row already on file for this OF, with no L_D_KAPE22 row so the D22 guard lets
-    // the Fichier through - rolls back L_D_KAPE22 and every downstream entity; the cause is readable in
+    // AC-FR21-2 / AC-FR21-5 / AC-FR24-3: a genuine SQL failure on the one SaveChanges - an orphan
+    // L_D_CONSIGNES row already on file for this OF, with no L_D_KAPE22 row so the D22 guard lets the
+    // Fichier through and no L_D_ORDRE_FABRICATION row so the D34 replace (Story 6.10) does not apply -
+    // rolls back L_D_KAPE22 and every downstream entity; the cause is readable in
     // MQTTnetServices.Logs and, since Story 6.1, in a REJETÉ journal row written after the rollback and
     // naming the table. Before Epic 6 an over-long Commande forced this failure through the log row
     // itself; that row now lives outside the transaction (AC-FR24-5, TransactionalPersistenceTests).
@@ -148,7 +149,7 @@ public class RejectionAtomicityIntegrationTests(SqlServerIntegrationFixture fixt
         SeedCoulees(fixture.NewAscoLsiContext, ReferenceFichierName);
         using (AscoLsiDbContext seed = fixture.NewAscoLsiContext())
         {
-            seed.OrdreFabricationRows.Add(MapReferenceBundle().OrdreFabrication!);
+            seed.ConsignesRows.Add(MapReferenceBundle().Consignes[0]);
             seed.SaveChanges();
         }
 
@@ -163,12 +164,12 @@ public class RejectionAtomicityIntegrationTests(SqlServerIntegrationFixture fixt
 
         L_D_LOG_COMMANDE log = Assert.Single(fixture.LogRows());
         Assert.Contains("REJETÉ", log.Message);
-        Assert.Contains("L_D_ORDRE_FABRICATION", log.Message, StringComparison.Ordinal);
+        Assert.Contains("L_D_CONSIGNES", log.Message, StringComparison.Ordinal);
 
-        // Every dispatch table stays empty except L_D_ORDRE_FABRICATION, which keeps only the seeded row.
+        // Every dispatch table stays empty except L_D_CONSIGNES, which keeps only the seeded row.
         using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
         Assert.Empty(verify.Kape22Rows.AsNoTracking());
-        Assert.Single(verify.OrdreFabricationRows.AsNoTracking());
+        Assert.Empty(verify.OrdreFabricationRows.AsNoTracking());
 
         // Story 6.9: L_D_COULEE holds only the seeded reference Coulee, unmodified; the rolled-back
         // transaction added none.
@@ -180,7 +181,7 @@ public class RejectionAtomicityIntegrationTests(SqlServerIntegrationFixture fixt
         Assert.Empty(verify.SectionChargePoidsMetriqueRows.AsNoTracking());
         Assert.Empty(verify.SectionChargeRefroidissoirsRows.AsNoTracking());
         Assert.Empty(verify.SectionChargeSvtRows.AsNoTracking());
-        Assert.Empty(verify.ConsignesRows.AsNoTracking());
+        Assert.Single(verify.ConsignesRows.AsNoTracking());
     }
 
     // AC-FR20-3 removed 2026-09-22 (Kape22ImportBundleMapper.cs Design Notes): hot/cold and

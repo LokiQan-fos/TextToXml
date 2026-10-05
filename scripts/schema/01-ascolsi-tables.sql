@@ -443,3 +443,44 @@ BEGIN
     );
 END;
 GO
+
+-- Story 6.10 (D34) read-only precondition tables (AFV004-LSI sys.columns/sys.indexes, 2026-10-05).
+-- Minimal mirrors: only the key and the OF column Kape22Persister reads; the real tables carry more
+-- columns, never mapped and never written by the importer.
+-- Furnaces, one row per furnace; OFEnCours is the OF currently loaded.
+IF OBJECT_ID(N'dbo.L_D_FOURS', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.L_D_FOURS
+    (
+        [Id] NVARCHAR(3) NOT NULL,
+        [OFEnCours] NCHAR(12) NULL,
+        CONSTRAINT PK_L_D_FOURS PRIMARY KEY CLUSTERED ([Id])
+    );
+END;
+GO
+
+-- Furnace loading plans, one row per (FourId, Position).
+IF OBJECT_ID(N'dbo.L_D_PLANS_FOURS', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.L_D_PLANS_FOURS
+    (
+        [FourId] NVARCHAR(3) NOT NULL,
+        [Position] SMALLINT NOT NULL,
+        [OF] NCHAR(12) NULL,
+        CONSTRAINT PK_L_D_PLANS_FOURS PRIMARY KEY CLUSTERED ([FourId], [Position])
+    );
+END;
+GO
+
+-- Semi-finished products (PSO), one row per (Coulee, NumeroLingot).
+IF OBJECT_ID(N'dbo.L_D_PSO', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.L_D_PSO
+    (
+        [Coulee] NCHAR(6) NOT NULL,
+        [NumeroLingot] INT NOT NULL,
+        [OF] NCHAR(12) NULL,
+        CONSTRAINT PK_L_D_PSO PRIMARY KEY CLUSTERED ([NumeroLingot], [Coulee])
+    );
+END;
+GO

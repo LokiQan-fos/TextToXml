@@ -35,10 +35,12 @@ public class AcCoverageCompletenessTests
         // FR19-1..4 (Story 4.4) + FR19-5 (Story 4.12, LibelleConsigneResolverTests.cs)
         // + FR19-6 (Story 4.13, LibelleConsigneComposerTests.cs) = 6.
         [19] = 6,
-        [20] = 5,
+        // FR20-1..5 + FR20-6 (Story 6.10, OfResendIntegrationTests.cs) = 6.
+        [20] = 6,
         // FR21-1/2/3 (pre-existing) + FR21-4 (this story, EndToEndImportIntegrationTests.cs)
-        // + FR21-5 (this story, RejectionAtomicityIntegrationTests.cs) = 5.
-        [21] = 5,
+        // + FR21-5 (this story, RejectionAtomicityIntegrationTests.cs)
+        // + FR21-6 (Story 6.10, OfResendIntegrationTests.cs) = 6.
+        [21] = 6,
         // FR26-1..6 (Story 6.3, InboxScannerTests.cs); FR26-5 is a KnownException below.
         [26] = 6,
     };
