@@ -42,15 +42,17 @@ public class LegacyRejectionParityTests(SqlServerIntegrationFixture fixture, ITe
 
     private static readonly Regex FichierName = new(@"^P60_\d+_\d+_\d+$", RegexOptions.Compiled);
 
-    // Legacy reason fragment -> expected cause, matched in this order.
+    // Legacy reason fragment -> expected cause, matched in this order: the specific reasons first (in
+    // alphabetical order), the generic "nombre d'OF sauvés : 0" summary last, so a run that logs both a
+    // specific reason and the summary keeps the specific cause (review P-3).
     private static readonly (string Fragment, string Cause)[] LegacyReasons =
     [
         ("coulée froide", "AC-FR20-5"),
         ("different de la somme des lingots", "AC-FR20-2"),
         ("ne commance pas par le caractère '0'", Accepted),
-        ("nombre d'OF sauvés : 0", "AC-FR20-6"),
         ("pas de consignes pour la répartition", "AC-FR20-2"),
         ("sans consignes d'enfournement", "AC-FR20-4"),
+        ("nombre d'OF sauvés : 0", "AC-FR20-6"),
     ];
 
     // Rejection message fragment of the new pipeline -> obtained cause.

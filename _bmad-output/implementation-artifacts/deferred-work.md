@@ -1454,7 +1454,7 @@ s'y trouver et rester à confirmer.
 - source_spec: `spec-6-8-flush-sink-logs-assertions-harnais-e2e.md` (W-1, low)
   summary: Without `-KeepArtifacts`, `scripts/e2e-worker-import.ps1` cleans up only `L_D_LOG_COMMANDE` and `L_D_KAPE22`, not `L_D_CONSIGNES` or the other downstream tables, so a second standalone run in a row leaves both Fichiers in `processing/` on a `PK_L_D_CONSIGNES` violation and times out.
   evidence: Story 6.8 implementation and verification runs 2026-10-02 (standalone run: "Fichier ... left in processing/ after a persistence failure"). Pre-existing since the downstream dispatch (Epic 4); runs through `dotnet test` are unaffected because `SqlServerIntegrationFixture` resets the database first.
-  disposition: PLANNED 2026-10-02 — Story 6.10 (D34: a re-sent OF in state GPAO is replaced, so a second run no longer hits `PK_L_D_CONSIGNES`; sprint-change-proposal-2026-10-02.md).
+  disposition: RESOLVED 2026-10-05 by Story 6.10 (D34: a re-sent OF in state GPAO is replaced, so a second standalone run no longer hits `PK_L_D_CONSIGNES`; `OfResendIntegrationTests` REPLACE cases; to confirm on the next back-to-back standalone run of the E2E script) · PLANNED 2026-10-02 — sprint-change-proposal-2026-10-02.md.
 
 ## Deferred from: code review of spec-6-9-controle-coulee-froide-typeconsigne-12.md (2026-10-02)
 
@@ -1476,7 +1476,7 @@ s'y trouver et rester à confirmer.
 
 ## Deferred from: spec-6-10-renvoi-of-existant-remplacement-ou-refus.md (2026-10-05)
 
-- source_spec: `spec-6-10-renvoi-of-existant-remplacement-ou-refus.md` (D34 scope)
+- source_spec: **RESOLVED 2026-10-05 by the Story 6.10 review** (`reviews/story-6-10/aggregated-report.md` D-1 → P-9, user decision: keep the legacy DeleteOF + insert; the replace now deletes from `L_D_OF_SUIVI` with re-ranking, `L_D_MAM_QUAL`, `L_D_PRODUITS_OUTIL` and `L_D_REBUT` too) · `spec-6-10-renvoi-of-existant-remplacement-ou-refus.md` (D34 scope)
   summary: The D34 replace path deletes the OF's rows from the 9 dispatch tables only; legacy `OrdreFabricationController.DeleteOF` also deletes `L_D_OF_SUIVI` (re-ranking `Rang`), `L_D_REBUT`, `L_D_PRODUITS_OUTIL` and `L_D_MAM_QUAL`, so a replaced GPAO-state OF can leave a stale `L_D_OF_SUIVI` row.
   evidence: Story 6.10 planning (legacy read of `Desktop/kape22/OrdreFabricationController.cs:577-866`); D34 (user, 2026-10-02) limits the replace to the 9 tables, scope kept at the spec checkpoint 2026-10-05. Not blocking: the workers are not deployed yet.
 
@@ -1485,5 +1485,23 @@ s'y trouver et rester à confirmer.
   evidence: edge-case-hunter and blind-hunter lenses on `Kape22Persister.cs` (2026-10-05). Same race in legacy `AddRange2`; narrow window (one Fichier, milliseconds), workers not deployed yet.
 
 - source_spec: `spec-6-10-renvoi-of-existant-remplacement-ou-refus.md` (D-2, step-04 review)
-  summary: `scripts/schema/01-ascolsi-tables.sql` mirrors none of production's foreign keys to `L_D_ORDRE_FABRICATION` (7 `L_D_SECTIONCHARGE_*`, `L_D_OF_SUIVI`, `L_D_REBUT`, `L_D_PLANS_FOURS`, `L_D_PSO`), so a regression of the D34 replace from EF's merged UPDATE to a real DELETE + INSERT would pass the suite and fail in production.
-  evidence: production `sys.foreign_keys` read 2026-10-05 during the Story 6.10 review; the replace currently relies on EF Core's shared-identity UPDATE (documented in `Kape22Persister`).
+  summary: `scripts/schema/01-ascolsi-tables.sql` mirrors none of production's foreign keys to `L_D_ORDRE_FABRICATION` (7 `L_D_SECTIONCHARGE_*`, `L_D_OF_SUIVI`, `L_D_REBUT`, `L_D_PLANS_FOURS`, `L_D_PSO`), so a delete or insert order that breaks them would pass the suite and fail in production.
+  evidence: production `sys.foreign_keys` read 2026-10-05 during the Story 6.10 review. Revised 2026-10-05 (review P-9): the replace is now a real DELETE + INSERT; `Kape22Persister.DeleteOf` deletes the children explicitly before `L_D_ORDRE_FABRICATION`, so the delete order no longer depends on EF; the insert order still does (review F-1). Mirror FKs would also block the fixture's `TRUNCATE` reset. Second review pass 2026-10-05 (D-1, user decision option (c)): nothing in the suite guards the `DeleteOf` order either (moving the `L_D_ORDRE_FABRICATION` delete first keeps the tests green); the deferral is kept here and the first-pass P-9 clause "add the production FKs to the mirror" is formally dropped. Production evidence: the operator OF-delete script (`L_D_SECTIONCHARGE_LINGOT`, `_CHUTAGE`, `_DECOUPE`, `_REFROIDISSOIRS`, `_PITS`, `L_D_CONSIGNES`, then `L_D_ORDRE_FABRICATION`) works with the same children-first, OF-last order `DeleteOf` follows.
+
+## Deferred from: code review of story-6.10 (2026-10-05)
+
+- source_spec: `reviews/story-6-10/aggregated-report.prev.md` (first pass, F-1, medium, pre-existing)
+  summary: The model declares no relation (AD-7), so EF does not order the INSERT commands by production's foreign keys `L_D_SECTIONCHARGE_*` → `L_D_ORDRE_FABRICATION`; a child row could be sent before its OF and fail in production while the FK-less mirror stays green.
+  evidence: blind-hunter lens, `src/Kape22Importer/Persistence/AscoLsiDbContext.cs`. Pre-existing on the insert path since Story 4.6; same work item as D-2 above (mirror has no production FKs); workers never deployed.
+
+- source_spec: `reviews/story-6-10/aggregated-report.prev.md` (first pass, F-2, low)
+  summary: `LegacyRejectionParityTests` attributes legacy KAP22 reasons to a Fichier by `L_D_LOG_COMMANDE` `Id` range only, so lines of another Fichier processed in the same window would be counted as this one's.
+  evidence: blind-hunter + edge-case-hunter lenses, `tests/Kape22Importer.Tests/LegacyRejectionParityTests.cs:198-200`. The legacy processes Fichiers one at a time and the 6 reference cases are correct; add an OF filter if a real case contradicts it. Test code removed at cutover.
+
+- source_spec: `reviews/story-6-10/aggregated-report.md` (second pass, F-1, low)
+  summary: The existing OF's `Etat` and the 3 precondition tables are read before `BeginTransaction`, so an OF switched to ENC by the MCC in between is still deleted and replaced.
+  evidence: blind-hunter lens, `src/Kape22Importer/Persistence/Kape22Persister.cs:130-144` vs `:220`. Same window as legacy `AddRange2` (check before `DeleteOF`) and as the step-04 D-1 entry above; one Fichier at a time, workers never deployed. Fix: open the transaction before the read, with `UPDLOCK, HOLDLOCK`.
+
+- source_spec: `reviews/story-6-10/aggregated-report.md` (second pass, F-2, low)
+  summary: The legacy theory rebuilds the OF history with no lower bound (`Création d'un OF` / `ENC` lookups bound only `Id < @start`) and only as GPAO/ENC, so a recycled OF number counts as existing and an EVC (2) OF is rebuilt as 0 or 1.
+  evidence: blind-hunter lens, `tests/Kape22Importer.Tests/LegacyRejectionParityTests.cs:243-260`. The theory compares causes only and the 6 real cases are correct; ceiling declared by the `ponytail:` comment (`:30`). Bound on the OF's last deletion if a real case contradicts it. Test code removed at cutover.

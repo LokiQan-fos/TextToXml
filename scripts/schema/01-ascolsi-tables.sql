@@ -472,7 +472,7 @@ BEGIN
 END;
 GO
 
--- Semi-finished products (PSO), one row per (Coulee, NumeroLingot).
+-- Semi-finished products (PSO), one row per (NumeroLingot, Coulee).
 IF OBJECT_ID(N'dbo.L_D_PSO', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.L_D_PSO
@@ -481,6 +481,56 @@ BEGIN
         [NumeroLingot] INT NOT NULL,
         [OF] NCHAR(12) NULL,
         CONSTRAINT PK_L_D_PSO PRIMARY KEY CLUSTERED ([NumeroLingot], [Coulee])
+    );
+END;
+GO
+
+-- Story 6.10 review (D-1/P-9): the 4 extra tables the D34 replace deletes from, as the legacy DeleteOF
+-- does (AFV004-LSI sys.columns/sys.indexes, 2026-10-05). Minimal mirrors: only the key and the OF column
+-- Kape22Persister uses; the real tables carry more columns, never mapped.
+-- Per-OF quality summary, one row per OF.
+IF OBJECT_ID(N'dbo.L_D_MAM_QUAL', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.L_D_MAM_QUAL
+    (
+        [OF] NVARCHAR(12) NOT NULL,
+        CONSTRAINT PK_L_D_MAM_QUAL PRIMARY KEY CLUSTERED ([OF])
+    );
+END;
+GO
+
+-- OF progress order, one row per OF; Rang is the OF's position in the queue.
+IF OBJECT_ID(N'dbo.L_D_OF_SUIVI', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.L_D_OF_SUIVI
+    (
+        [OF] NCHAR(12) NOT NULL,
+        [Rang] INT NOT NULL,
+        CONSTRAINT PK_L_D_OF_SUIVI PRIMARY KEY CLUSTERED ([OF])
+    );
+END;
+GO
+
+-- Products on a tool, one row per (Zone, OF).
+IF OBJECT_ID(N'dbo.L_D_PRODUITS_OUTIL', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.L_D_PRODUITS_OUTIL
+    (
+        [Zone] NVARCHAR(20) NOT NULL,
+        [OF] NVARCHAR(12) NOT NULL,
+        CONSTRAINT PK_L_D_PRODUITS_OUTIL PRIMARY KEY CLUSTERED ([Zone], [OF])
+    );
+END;
+GO
+
+-- Scrap declarations, one row per declaration (identity Id).
+IF OBJECT_ID(N'dbo.L_D_REBUT', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.L_D_REBUT
+    (
+        [Id] INT IDENTITY(1,1) NOT NULL,
+        [OF] NCHAR(12) NOT NULL,
+        CONSTRAINT PK_L_D_REBUT PRIMARY KEY CLUSTERED ([Id])
     );
 END;
 GO

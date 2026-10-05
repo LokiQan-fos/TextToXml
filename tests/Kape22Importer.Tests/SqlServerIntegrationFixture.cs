@@ -89,7 +89,9 @@ public sealed class SqlServerIntegrationFixture
     // never collides with a row an earlier test left committed. Story 4.12: the 13 L_P_CONSIGNES_*
     // reference tables are emptied too, so reference rows a test seeds never leak into another test's
     // ConsigneReferenceData snapshot. Story 6.10: the 3 read-only D34 precondition tables (L_D_FOURS,
-    // L_D_PLANS_FOURS, L_D_PSO) are emptied too, so an OF a test places there never blocks another test.
+    // L_D_PLANS_FOURS, L_D_PSO) are emptied too, so an OF a test places there never blocks another test,
+    // and so are the 4 tables the D34 replace also deletes from (L_D_MAM_QUAL, L_D_OF_SUIVI,
+    // L_D_PRODUITS_OUTIL, L_D_REBUT; review P-9).
     public void ResetData()
     {
         ExecuteNonQuery(
@@ -113,9 +115,13 @@ public sealed class SqlServerIntegrationFixture
             TRUNCATE TABLE dbo.L_D_CONSIGNES;
             TRUNCATE TABLE dbo.L_D_COULEE;
             TRUNCATE TABLE dbo.L_D_FOURS;
+            TRUNCATE TABLE dbo.L_D_MAM_QUAL;
+            TRUNCATE TABLE dbo.L_D_OF_SUIVI;
             TRUNCATE TABLE dbo.L_D_ORDRE_FABRICATION;
             TRUNCATE TABLE dbo.L_D_PLANS_FOURS;
+            TRUNCATE TABLE dbo.L_D_PRODUITS_OUTIL;
             TRUNCATE TABLE dbo.L_D_PSO;
+            TRUNCATE TABLE dbo.L_D_REBUT;
             TRUNCATE TABLE dbo.L_D_SECTIONCHARGE_CHUTAGE;
             TRUNCATE TABLE dbo.L_D_SECTIONCHARGE_DECOUPE;
             TRUNCATE TABLE dbo.L_D_SECTIONCHARGE_LINGOT;

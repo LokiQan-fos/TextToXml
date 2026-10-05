@@ -164,6 +164,43 @@ public class SchemaModelParityTests
             EntityType(typeof(L_D_PSO)));
     }
 
+    // Story 6.10 review (P-9): the 4 tables the D34 replace also deletes from, minimal mirrors.
+    [Fact]
+    [Trait("AC", "6.10")]
+    public void L_D_MAM_QUAL_ModelMatchesGeneratedSchema()
+    {
+        AssertParity(
+            SqlTableSchema.Read("01-ascolsi-tables.sql", "L_D_MAM_QUAL"),
+            EntityType(typeof(L_D_MAM_QUAL)));
+    }
+
+    [Fact]
+    [Trait("AC", "6.10")]
+    public void L_D_OF_SUIVI_ModelMatchesGeneratedSchema()
+    {
+        AssertParity(
+            SqlTableSchema.Read("01-ascolsi-tables.sql", "L_D_OF_SUIVI"),
+            EntityType(typeof(L_D_OF_SUIVI)));
+    }
+
+    [Fact]
+    [Trait("AC", "6.10")]
+    public void L_D_PRODUITS_OUTIL_ModelMatchesGeneratedSchema()
+    {
+        AssertParity(
+            SqlTableSchema.Read("01-ascolsi-tables.sql", "L_D_PRODUITS_OUTIL"),
+            EntityType(typeof(L_D_PRODUITS_OUTIL)));
+    }
+
+    [Fact]
+    [Trait("AC", "6.10")]
+    public void L_D_REBUT_ModelMatchesGeneratedSchema()
+    {
+        AssertParity(
+            SqlTableSchema.Read("01-ascolsi-tables.sql", "L_D_REBUT"),
+            EntityType(typeof(L_D_REBUT)));
+    }
+
     private static void AssertParity(IReadOnlyList<SqlColumn> schema, IEntityType entity)
     {
         Dictionary<string, IProperty> modelColumns = entity.GetProperties()

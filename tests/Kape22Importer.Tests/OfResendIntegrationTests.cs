@@ -18,10 +18,10 @@ namespace Kape22Importer.Tests;
 
 // Story 6.10 (D34): a Fichier whose OF already sits in L_D_ORDRE_FABRICATION. The OF is refused - one
 // BusinessRuleViolation, no write, one REJETÉ entry - when its Etat is ENC/EVC/ENFOURNE/LAMINAGE/LAMINE or
-// when it appears in L_D_FOURS.OFEnCours, L_D_PLANS_FOURS or L_D_PSO (AC-FR20-6). Otherwise its rows in
-// the 9 downstream tables are replaced by the new ones in the same single SaveChanges, L_D_COULEE and the
-// earlier L_D_KAPE22 rows untouched, and a SQL failure leaves the previous OF intact (AC-FR21-6,
-// AC-FR21-2). The real cases come from P60/ and P60/error/ (443..449); the per-table cases re-send the
+// when it appears in L_D_FOURS.OFEnCours, L_D_PLANS_FOURS or L_D_PSO (AC-FR20-6). Otherwise its rows are
+// deleted the way the legacy DeleteOF does (13 tables, L_D_OF_SUIVI re-ranked) and the new ones inserted,
+// in one explicit transaction around the single SaveChanges, L_D_COULEE and the earlier L_D_KAPE22 rows
+// untouched, and a SQL failure leaves the previous OF intact (AC-FR21-6, AC-FR21-2). The real cases come from P60/ and P60/error/ (443..449); the per-table cases re-send the
 // reference Fichier under another NumeroFichier. Integration category (AR-12), commit + reset regime.
 [Collection(SqlServerIntegrationCollection.Name)]
 [Trait("Category", TestCategory.Integration)]
@@ -105,6 +105,72 @@ public class OfResendIntegrationTests(SqlServerIntegrationFixture fixture)
         AssertRefused(() => Persist(Resent()), reference.OF!, $"présent dans {table}");
     }
 
+    // Review P-2: every reason is named, the state first, then each precondition table in turn, joined by
+    // " ; ".
+    [SkippableFact]
+    [Trait("AC", "FR20-6")]
+    public void Persist_ExistingOfWithSeveralRefusalReasons_NamesThemAllInOrder_AcFr20_6()
+    {
+        Ready();
+        Kape22ImportBundle reference = MapReferenceBundle();
+        AssertAccepted(Persist(reference));
+        SetEtat(2, reference.OF!);
+        using (AscoLsiDbContext context = fixture.NewAscoLsiContext())
+        {
+            context.Database.ExecuteSqlRaw(
+                "INSERT INTO dbo.L_D_FOURS ([Id], [OFEnCours]) VALUES (N'21', {0}); " +
+                "INSERT INTO dbo.L_D_PSO ([Coulee], [NumeroLingot], [OF]) VALUES (N'065718', 1, {0});",
+                DownstreamOf.Pad(reference.OF!));
+        }
+
+        AssertRefused(
+            () => Persist(Resent()),
+            reference.OF!,
+            "état EVC (2) ; présent dans L_D_FOURS ; présent dans L_D_PSO");
+    }
+
+    // Review P-9 (D-1, legacy DeleteOF): the replace also deletes the OF's L_D_OF_SUIVI row, moving every
+    // later Rang up by one, and its L_D_MAM_QUAL, L_D_PRODUITS_OUTIL and L_D_REBUT rows; other OF keep
+    // theirs.
+    [SkippableFact]
+    [Trait("AC", "FR21-6")]
+    public void Persist_ExistingReplaceableOf_DeletesItsRowsInTheOtherLegacyDeleteOfTables_AcFr21_6()
+    {
+        Ready();
+        Kape22ImportBundle reference = MapReferenceBundle();
+        AssertAccepted(Persist(reference));
+        SeedLegacyDeleteOfRows(reference.OF!);
+
+        AssertAccepted(Persist(Resent()));
+
+        using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
+        Assert.Equal(
+            ["000000000001:1", "000000000003:2"],
+            verify.OfSuiviRows.AsNoTracking().OrderBy(row => row.Rang).Select(row => row.OF + ":" + row.Rang).ToList());
+        Assert.Equal(["000000000003"], verify.MamQualRows.AsNoTracking().Select(row => row.OF).ToList());
+        Assert.Equal(["000000000003"], verify.ProduitsOutilRows.AsNoTracking().Select(row => row.OF).ToList());
+        Assert.Equal(["000000000003"], verify.RebutRows.AsNoTracking().Select(row => row.OF).ToList());
+    }
+
+    // Review P-1: re-sent with fewer rows (2 sections and half the Consignes gone), the OF keeps none of its
+    // previous rows - the 9 tables hold exactly what the reduced Fichier produces on its own.
+    [SkippableFact]
+    [Trait("AC", "FR21-6")]
+    public void Persist_ResentOfWithFewerRows_LeavesNoStaleRow_AcFr21_6()
+    {
+        Ready();
+        AssertAccepted(Persist(Reduced()));
+        List<string> expected = DownstreamSnapshot();
+
+        Ready();
+        AssertAccepted(Persist(MapReferenceBundle()));
+        Assert.NotEqual(expected, DownstreamSnapshot());
+
+        AssertAccepted(Persist(Reduced()));
+
+        Assert.Equal(expected, DownstreamSnapshot());
+    }
+
     // REPLACE: 445 created OF 2040312 (state GPAO, in no precondition table); 448 re-sends it and is
     // accepted. The 9 downstream tables then hold exactly what 448 alone produces, 445's L_D_KAPE22 row
     // and the Coulee are unchanged, and 448 adds its own L_D_KAPE22 row.
@@ -138,14 +204,17 @@ public class OfResendIntegrationTests(SqlServerIntegrationFixture fixture)
     }
 
     // REPLACE_SQL_FAIL: the replace fails on SQL Server (over-long LibelleConsigneChutage, an L_D_KAPE22
-    // column no pre-check bounds) - PersistenceError, and the previous OF stays intact in every table.
+    // column no pre-check bounds) - PersistenceError, and the previous OF stays intact in every table,
+    // the 4 other tables the legacy DeleteOF clears too, L_D_OF_SUIVI's Rang included (review P-9).
     [SkippableFact]
     [Trait("AC", "FR21-2")]
     [Trait("AC", "FR21-6")]
     public void Persist_ReplaceThatFailsOnSqlServer_LeavesThePreviousOfIntact_AcFr21_6()
     {
         Ready();
-        AssertAccepted(Persist(MapReferenceBundle()));
+        Kape22ImportBundle reference = MapReferenceBundle();
+        AssertAccepted(Persist(reference));
+        SeedLegacyDeleteOfRows(reference.OF!);
         List<string> before = Snapshot();
         int logRowsBefore = fixture.LogRows().Count;
 
@@ -179,12 +248,31 @@ public class OfResendIntegrationTests(SqlServerIntegrationFixture fixture)
             mutate?.Invoke(d);
         });
 
-    // Every row of L_D_KAPE22, L_D_COULEE and the 9 downstream tables, one line per row.
+    // The reference Fichier re-sent with 2 of its sections and half of its Consignes gone.
+    private static Kape22ImportBundle Reduced()
+    {
+        Kape22ImportBundle resent = Resent();
+        Assert.NotNull(resent.SectionChargeChutage);
+        Assert.NotNull(resent.SectionChargeRefroidissoirs);
+        return resent with
+        {
+            Consignes = [.. resent.Consignes.Take(resent.Consignes.Count / 2)],
+            SectionChargeChutage = null,
+            SectionChargeRefroidissoirs = null,
+        };
+    }
+
+    // Every row of L_D_KAPE22, L_D_COULEE, the 9 downstream tables and the 4 other tables the D34 replace
+    // deletes from, one line per row.
     private List<string> Snapshot() =>
     [
         .. Rows(fixture.NewAscoLsiContext, context => context.CouleeRows),
         .. Rows(fixture.NewAscoLsiContext, context => context.Kape22Rows),
         .. DownstreamSnapshot(),
+        .. Rows(fixture.NewAscoLsiContext, context => context.MamQualRows),
+        .. Rows(fixture.NewAscoLsiContext, context => context.OfSuiviRows),
+        .. Rows(fixture.NewAscoLsiContext, context => context.ProduitsOutilRows),
+        .. Rows(fixture.NewAscoLsiContext, context => context.RebutRows),
     ];
 
     // Every row of the 9 downstream tables D34 replaces, one line per row.
@@ -281,6 +369,19 @@ public class OfResendIntegrationTests(SqlServerIntegrationFixture fixture)
     // Puts the Fichier's own Coulee in L_D_COULEE, the state a cold Coulee is in once AscoLSI tracks it.
     private void SeedCouleeOf(string relativePath) =>
         SeedCoulee(fixture.NewAscoLsiContext, MapFichier(Read(relativePath), Path.GetFileName(relativePath)));
+
+    // The OF in the middle of the L_D_OF_SUIVI queue (between 2 other OF), with one L_D_MAM_QUAL row, 2
+    // L_D_PRODUITS_OUTIL rows and 2 L_D_REBUT rows; another OF has one row in each of these 3 tables.
+    private void SeedLegacyDeleteOfRows(string of)
+    {
+        using AscoLsiDbContext context = fixture.NewAscoLsiContext();
+        context.Database.ExecuteSqlRaw(
+            "INSERT INTO dbo.L_D_OF_SUIVI ([OF], [Rang]) VALUES (N'000000000001', 1), ({0}, 2), (N'000000000003', 3); " +
+            "INSERT INTO dbo.L_D_MAM_QUAL ([OF]) VALUES ({0}), (N'000000000003'); " +
+            "INSERT INTO dbo.L_D_PRODUITS_OUTIL ([Zone], [OF]) VALUES (N'blooming', {0}), (N'scarfing', {0}), (N'blooming', N'000000000003'); " +
+            "INSERT INTO dbo.L_D_REBUT ([OF]) VALUES ({0}), ({0}), (N'000000000003');",
+            DownstreamOf.Pad(of));
+    }
 
     // Moves the named OF to the given Etat, the way the legacy screens do once production starts.
     private void SetEtat(int etat, params string[] ofs)

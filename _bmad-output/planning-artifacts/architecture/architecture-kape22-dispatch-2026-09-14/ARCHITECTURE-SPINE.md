@@ -72,6 +72,15 @@ flowchart LR
   `L_D_ORDRE_FABRICATION`, les 7 `L_D_SECTIONCHARGE_*` et `L_D_CONSIGNES`, puis
   insertion, dans ce même `SaveChanges()`. `L_D_PLANS_FOURS`, `L_D_FOURS` et
   `L_D_PSO` sont lues seulement (préconditions de refus), jamais écrites.
+- **Note (2026-10-05, D34, revue Story 6.10 D-1 → P-9, décision utilisateur) :**
+  remplace la mécanique de la note précédente (« ce même `SaveChanges()` »). Le
+  renvoi d'un OF remplaçable est un vrai `DeleteOF` legacy : `ExecuteDelete` des
+  tables filles d'abord — `L_D_OF_SUIVI` (les `Rang` suivants remontent d'un
+  cran), `L_D_CONSIGNES`, `L_D_MAM_QUAL`, `L_D_PRODUITS_OUTIL`, `L_D_REBUT`, les
+  7 `L_D_SECTIONCHARGE_*` — puis `L_D_ORDRE_FABRICATION`, avant l'insertion. Le
+  tout dans une transaction explicite que l'unique `SaveChanges()` rejoint : tout
+  ou rien sur les 13 tables. `L_D_COULEE` et les `L_D_KAPE22` antérieurs ne sont
+  jamais touchés.
 
 ### AD-2 — Mapping explicite, sans réflexion
 

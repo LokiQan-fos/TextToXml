@@ -2,7 +2,7 @@
 title: 'Story 6.10 — Re-sent existing OF: replacement or explicit refusal'
 type: 'feature'
 created: '2026-10-05'
-status: 'done'
+status: 'review'
 baseline_commit: 'f21953c5003602fcaec4f8285d4d222ceb0fc241'
 review_loop_iteration: 0
 context:
@@ -46,7 +46,7 @@ context:
 - `src/Kape22Importer/DownstreamOf.cs` -- `Pad` (reuse).
 - New entities (database-first, legacy `DALLevel3.edmx`): `L_D_FOURS` (PK `Id` nvarchar(3), `OFEnCours` nchar(12) null), `L_D_PLANS_FOURS` (PK `FourId` nvarchar(3) + `Position` smallint, `OF` nchar(12) null), `L_D_PSO` (PK `Coulee` nchar(6) + `NumeroLingot` int, `OF` nchar(12) null). Verify against `AFV004-LSI` `sys.columns` (SELECT) before freezing.
 - `scripts/schema/01-ascolsi-tables.sql:151,294` -- add the 3 minimal mirrors (same `IF OBJECT_ID … IS NULL` idiom).
-- `tests/Kape22Importer.Tests/SqlServerIntegrationFixture.cs:92-122` -- `ResetData` truncates the 3 new tables.
+- `tests/Kape22Importer.Tests/SqlServerIntegrationFixture.cs:92-122` -- `ResetData` truncates the 7 new tables (3 precondition + 4 legacy DeleteOF, review P-9).
 - `tests/Kape22Importer.Tests/TestSupport.cs:83-122` -- `MapFichier`, `SeedCoulees`, `SeedCoulee` (reuse).
 - `tests/Kape22Importer.Tests/TransactionalPersistenceTests.cs:203` -- SQL-failure pattern (over-long `LibelleConsigneChutage`).
 - `tests/Kape22Importer.Tests/Kape22ProductionDataParityTests.cs:78,104-112` -- production config + Skip pattern to mirror.
@@ -59,7 +59,7 @@ context:
 **Execution:**
 - [x] `tests/Kape22Importer.Tests/OfResendIntegrationTests.cs` -- new Integration class, `[Trait("AC","FR20-6")]` / `[Trait("AC","FR21-6")]`, one test per matrix row REFUSE_*/REPLACE*; red first -- AC-FR20-6, AC-FR21-6, AC-FR21-2.
 - [x] `src/Kape22Importer/Persistence/L_D_FOURS.cs`, `L_D_PLANS_FOURS.cs`, `L_D_PSO.cs` + `AscoLsiDbContext.cs` + `scripts/schema/01-ascolsi-tables.sql` + `SqlServerIntegrationFixture.ResetData` -- read-only entities and mirrors.
-- [x] `src/Kape22Importer/Persistence/Kape22Persister.cs` -- D34 branch; replace = load the OF's tracked rows in the 9 tables, `RemoveRange`, then the existing `Add` path, one `SaveChanges()`; update comments.
+- [x] `src/Kape22Importer/Persistence/Kape22Persister.cs` -- D34 branch; replace = `DeleteOf` (review P-9): `ExecuteDelete` over 13 tables, children first, `L_D_ORDRE_FABRICATION` last, `L_D_OF_SUIVI` re-ranked, inside an explicit transaction that the existing `Add` path's single `SaveChanges()` joins; update comments.
 - [x] `tests/Kape22Importer.Tests/LegacyRejectionParityTests.cs` -- `[SkippableTheory]` over `P60/error/*`, Integration, `[Trait("AC","FR20-6")]`, header comment "remove at the switchover to the new worker"; delete `ZzLegacyRejectionReplayTests.cs`.
 
 **Acceptance Criteria:**
@@ -67,9 +67,36 @@ context:
 - Given the 6 `P60/error/` Fichiers and production configured, when the theory runs, then 407/408/430 → AC-FR20-5 and 446/447/449 → AC-FR20-6, none skipped.
 - Given the D34 branch removed, when `OfResendIntegrationTests` runs, then REFUSE_* and REPLACE fail.
 
+### Review Findings
+
+- [x] [Review][Decision] D-1 Replace via EF UPDATE keeps unmapped production columns — resolved 2026-10-05 by the user: keep the legacy DeleteOF + insert, full scope (→ P-9)
+- [x] [Review][Patch] P-9 Full legacy DeleteOF + insert: real DELETE (children, then L_D_ORDRE_FABRICATION) incl. L_D_OF_SUIVI (re-rank), L_D_MAM_QUAL, L_D_PRODUITS_OUTIL and L_D_REBUT, explicit transaction; renegotiate the frozen Never in the Spec Change Log [src/Kape22Importer/Persistence/Kape22Persister.cs:211]
+- [x] [Review][Patch] P-1 Stale-row removal on replace untested (re-send with fewer sections/consignes) [tests/Kape22Importer.Tests/OfResendIntegrationTests.cs:113]
+- [x] [Review][Patch] P-2 Multi-reason refusal message (` ; ` join, state then tables) untested [src/Kape22Importer/Persistence/Kape22Persister.cs:318]
+- [x] [Review][Patch] P-3 Legacy theory matches the generic "nombre d'OF sauvés : 0" before specific reasons [tests/Kape22Importer.Tests/LegacyRejectionParityTests.cs:45]
+- [ ] [Review][Patch] P-4 CC-1: closure commit must attest AC-FR21-2 [git ae08655] — owed by /commit-review
+- [x] [Review][Patch] P-5 Header comment says "deleted" while L_D_ORDRE_FABRICATION is UPDATE-merged [src/Kape22Importer/Persistence/Kape22Persister.cs:28]
+- [x] [Review][Patch] P-6 L_D_PSO key order in comments is (NumeroLingot, Coulee) [src/Kape22Importer/Persistence/L_D_PSO.cs:4]
+- [x] [Review][Patch] P-7 Mark 6.8 W-1 resolved by 6.10 in the ledger [_bmad-output/implementation-artifacts/deferred-work.md:1457]
+- [x] [Review][Patch] P-8 Run and record the "D34 branch removed" mutation AC [spec Acceptance Criteria]
+- [x] [Review][Defer] F-1 EF command order unaware of production FKs [src/Kape22Importer/Persistence/AscoLsiDbContext.cs] — deferred, pre-existing (Story 4.6, with D-2)
+- [x] [Review][Defer] F-2 Legacy KAP22 reasons filtered by Id range only [tests/Kape22Importer.Tests/LegacyRejectionParityTests.cs:198] — deferred, legacy is sequential
+
+Second pass (2026-10-05, ae08655^ vs working tree):
+- [x] [Review][Decision] D-1 Delete order of the replace is unguarded against production FKs — resolved 2026-10-05 by the user: option (c), deferred under D-2; the operator OF-delete script (children first, L_D_ORDRE_FABRICATION last) proves the order in production; P-9's mirror-FK clause dropped (would break the TRUNCATE reset)
+- [x] [Review][Patch] P-1 CC-4: LegacyDeleteOfTables before PreconditionTables [tests/Kape22Importer.Tests/PersistenceSmokeTests.cs:38]
+- [x] [Review][Patch] P-2 Architecture spine AD-1 D34 note predates P-9 [_bmad-output/planning-artifacts/architecture/architecture-kape22-dispatch-2026-09-14/ARCHITECTURE-SPINE.md:70]
+- [x] [Review][Patch] P-3 Non-frozen spec sections still describe RemoveRange / EF UPDATE merge / 3 tables [spec:49,62,122,125,130,169]
+- [x] [Review][Patch] P-4 OfResendIntegrationTests header still says "9 tables … same single SaveChanges" [tests/Kape22Importer.Tests/OfResendIntegrationTests.cs:21]
+- [ ] [Review][Patch] P-5 CC-1: closure commit attests AC-FR21-2 and the P-1/P-2/P-9 tests [closure commit] — owed by /commit-review
+- [x] [Review][Defer] F-1 Existing-OF check read outside the replace transaction [src/Kape22Importer/Persistence/Kape22Persister.cs:130] — deferred, same window as legacy AddRange2
+- [x] [Review][Defer] F-2 Legacy theory OF history unbounded below, Etat rebuilt as GPAO/ENC only [tests/Kape22Importer.Tests/LegacyRejectionParityTests.cs:243] — deferred, test code removed at switchover
+- [x] [Review][Dismiss] F-3 NVARCHAR(12) OF in L_D_MAM_QUAL / L_D_PRODUITS_OUTIL — rejected 2026-10-05 by the user: these tables are fed after ENC, a replaceable OF never reached ENC, and orphan rows of a deleted OF are of no interest
+
 ## Spec Change Log
 
 - 2026-10-05, step-04 (acceptance-auditor + edge-case-hunter, user-arbitrated, patch-level, no loopback): (1) existing test `RejectionAtomicityIntegrationTests.Import_SimulatedSqlFailure_…_AcFr21_5` provoked its SQL failure by pre-seeding the OF's `L_D_ORDRE_FABRICATION` row, which D34 now turns into a replace; its seed became an orphan `L_D_CONSIGNES` row (still a real PK violation, AC-FR21-2/21-5/24-3 coverage kept). (2) EF Core merges the Deleted + Added pair with the same key into an UPDATE, so the `L_D_ORDRE_FABRICATION` row is never deleted; verified 2026-10-05 that production has foreign keys to it from the 7 `L_D_SECTIONCHARGE_*`, `L_D_OF_SUIVI`, `L_D_REBUT`, `L_D_PLANS_FOURS`, `L_D_PSO` (absent from the mirror schema), so this behaviour is load-bearing — documented in the persister; mirror FKs deferred (D-2). Also: precondition tables verified zero-padded in production; `L_D_PSO` PK order is `(NumeroLingot, Coulee)`. KEEP: D34 branch placement, refusal message shape, the 6 legacy-theory cases green.
+- 2026-10-05, code review (`reviews/story-6-10/aggregated-report.md`, D-1 → P-9, **user decision, renegotiates the frozen block**): the user chose to keep the legacy `DeleteOF` + insert, full scope. (1) Boundaries *Never* "deleting from tables outside the 9 (`L_D_OF_SUIVI`, `L_D_REBUT`, `L_D_PRODUITS_OUTIL`, `L_D_MAM_QUAL`, …)" is lifted for those 4 tables: the replace deletes the OF's rows there too, and moves every later `L_D_OF_SUIVI.Rang` up by one, as `OrdreFabricationController.DeleteOF:577-864` does. `L_D_PLANS_FOURS`, `L_D_PSO` (and its `L_D_SOUS_PRODUITS`) and `L_D_FOURS` stay untouched: an OF named there is refused before the replace. (2) *Ask First* "do not switch to `ExecuteDelete` or a second transaction silently" is approved by the user: `Kape22Persister.DeleteOf` runs `ExecuteDelete`/`ExecuteUpdate` statements, children first and `L_D_ORDRE_FABRICATION` last (production FKs), inside an explicit transaction that the single `SaveChanges()` joins, so a SQL failure still leaves the previous OF intact in all 13 tables (AC-FR21-2). (3) The step-04 KEEP "EF merged UPDATE, load-bearing" is revoked: no column of the old OF survives, mapped or not. New minimal entities and mirrors `L_D_MAM_QUAL`, `L_D_OF_SUIVI`, `L_D_PRODUITS_OUTIL`, `L_D_REBUT` (production `sys.columns`/`sys.indexes` read 2026-10-05, OF values zero-padded); production triggers `tu_l_d_of_suivi` / `tu_l_d_ordre_fabrication` are AFTER UPDATE, fired by the re-rank as with the legacy. (4) AC "Given the D34 branch removed" verified 2026-10-05 (P-8): with the existing-OF lookup forced to `null`, 14 of the 15 `OfResendIntegrationTests` cases fail (every REFUSE_*, REPLACE, ANNULEE, fewer-rows, several-reasons and legacy-DeleteOf case); REPLACE_SQL_FAIL stays green by design.
 
 ## Design Notes
 
@@ -101,17 +128,17 @@ Legacy reason → expected cause: `coulée froide` → FR20-5; `nombre d'OF sauv
 - Reasons accumulated: state first, then each precondition table holding the OF.
   [`Kape22Persister.cs:318`](../../src/Kape22Importer/Persistence/Kape22Persister.cs#L318)
 
-**Replace inside the single SaveChanges**
+**Replace: legacy DeleteOF + insert, one transaction**
 
-- Load-bearing: EF merges same-key Deleted+Added into UPDATE, keeping production FKs satisfied.
-  [`Kape22Persister.cs:214`](../../src/Kape22Importer/Persistence/Kape22Persister.cs#L214)
+- Explicit transaction opened only for a replace; the single SaveChanges joins it, all or nothing.
+  [`Kape22Persister.cs:220`](../../src/Kape22Importer/Persistence/Kape22Persister.cs#L220)
 
-- Tracked removal of the OF's rows in the 9 tables, before the existing Add path.
-  [`Kape22Persister.cs:347`](../../src/Kape22Importer/Persistence/Kape22Persister.cs#L347)
+- `DeleteOf`: 13 tables, children first, L_D_ORDRE_FABRICATION last, L_D_OF_SUIVI re-ranked.
+  [`Kape22Persister.cs:353`](../../src/Kape22Importer/Persistence/Kape22Persister.cs#L353)
 
-**Read-only precondition tables**
+**Precondition and legacy DeleteOF tables**
 
-- Three DbSets, key + OF columns only; PSO keyed in production order.
+- Seven DbSets, key + OF columns only (3 read-only, 4 only deleted from); PSO keyed in production order.
   [`AscoLsiDbContext.cs:157`](../../src/Kape22Importer/Persistence/AscoLsiDbContext.cs#L157)
 
 - Minimal mirrors in the versioned test schema.
@@ -150,5 +177,5 @@ Legacy reason → expected cause: `coulée froide` → FR20-5; `nombre d'OF sauv
 - Existing AC-FR21-5 test: SQL failure now from an orphan L_D_CONSIGNES row.
   [`RejectionAtomicityIntegrationTests.cs:152`](../../tests/Kape22Importer.Tests/RejectionAtomicityIntegrationTests.cs#L152)
 
-- ResetData truncates the 3 new tables.
-  [`SqlServerIntegrationFixture.cs:115`](../../tests/Kape22Importer.Tests/SqlServerIntegrationFixture.cs#L115)
+- ResetData truncates the 7 new tables.
+  [`SqlServerIntegrationFixture.cs:117`](../../tests/Kape22Importer.Tests/SqlServerIntegrationFixture.cs#L117)

@@ -6,6 +6,7 @@ using System.Linq;
 using System.Reflection;
 using FichierJournal;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Configuration;
 using TextToXml;
 
@@ -25,9 +26,10 @@ namespace Kape22Importer.Persistence;
 // missing is rejected instead, with a failure entry citing the missing Coulee (AC-FR20-5).
 // Story 6.10 (D34): an OF already in L_D_ORDRE_FABRICATION is refused the same way when its Etat is ENC,
 // EVC, ENFOURNE, LAMINAGE or LAMINE or when L_D_FOURS, L_D_PLANS_FOURS or L_D_PSO names it (AC-FR20-6);
-// otherwise its rows in the 9 downstream tables are deleted and the new ones inserted in that same single
-// SaveChanges, L_D_COULEE and the earlier L_D_KAPE22 rows untouched (AC-FR21-6) - the only path that
-// deletes AscoLSI rows.
+// otherwise it is deleted the way the legacy DeleteOF does (the 9 downstream tables, L_D_MAM_QUAL,
+// L_D_OF_SUIVI, L_D_PRODUITS_OUTIL and L_D_REBUT; review P-9) and the new rows inserted, in one explicit
+// transaction around the single SaveChanges, L_D_COULEE and the earlier L_D_KAPE22 rows untouched
+// (AC-FR21-6) - the only path that deletes AscoLSI rows.
 // A same-bundle L_D_CONSIGNES natural-key collision (two sections sharing the same CodeOperation for
 // this OF) is rejected the same way, citing the colliding CodeOperation, before ConsignesRows.AddRange
 // is ever called (A-5, Epic 4 retro). A scaled decimal column whose value exceeds its DECIMAL(p,s)
@@ -122,14 +124,16 @@ public sealed class Kape22Persister(
             // AC-FR20-6 / AC-FR21-6 (Story 6.10, D34): an OF already in L_D_ORDRE_FABRICATION is refused
             // once production has started on it (a protected Etat, or the OF named in L_D_FOURS,
             // L_D_PLANS_FOURS or L_D_PSO) - same shape as the cold-Coulee rejection above, nothing written.
-            // Otherwise it is replaced: its rows in the 9 downstream tables are removed below, after the
-            // pre-checks, and the new ones added, all in the single SaveChanges. Downstream OF columns are
-            // zero-padded (DownstreamOf.Pad).
+            // Otherwise it is replaced: deleted below, after the pre-checks, the way the legacy DeleteOF
+            // does, then inserted again. Downstream OF columns are zero-padded (DownstreamOf.Pad).
             string paddedOf = DownstreamOf.Pad(of);
-            L_D_ORDRE_FABRICATION? existingOf = context.OrdreFabricationRows.SingleOrDefault(row => row.OF == paddedOf);
-            if (existingOf is not null)
+            int? existingEtat = context.OrdreFabricationRows
+                .Where(row => row.OF == paddedOf)
+                .Select(row => (int?)row.Etat)
+                .SingleOrDefault();
+            if (existingEtat is not null)
             {
-                List<string> refusalReasons = ResendRefusalReasons(existingOf.Etat, paddedOf);
+                List<string> refusalReasons = ResendRefusalReasons(existingEtat.Value, paddedOf);
                 if (refusalReasons.Count > 0)
                 {
                     string resendMessage =
@@ -208,17 +212,15 @@ public sealed class Kape22Persister(
                 return RejectWithBusinessRuleViolation(of, numeroFichier, businessRuleMessages);
             }
 
-            // D34 replace: the previous OF's rows are deleted in the same SaveChanges that inserts the new
-            // ones, so a SQL failure leaves the previous OF intact (AC-FR21-6, AC-FR21-2). L_D_COULEE and
-            // the earlier L_D_KAPE22 rows are kept.
-            // EF Core merges the Deleted + Added pair sharing a key into an UPDATE, so the
-            // L_D_ORDRE_FABRICATION row is never actually deleted. That is what keeps production's foreign
-            // keys to L_D_ORDRE_FABRICATION satisfied (the 7 L_D_SECTIONCHARGE_*, L_D_OF_SUIVI, L_D_REBUT,
-            // L_D_PLANS_FOURS, L_D_PSO; absent from the test mirror schema): switching to a real DELETE +
-            // INSERT would break the replace in production whenever an L_D_OF_SUIVI row exists.
-            if (existingOf is not null)
+            // D34 replace (review D-1/P-9, user decision 2026-10-05): the previous OF is really deleted, as
+            // the legacy DeleteOF does, then inserted again, so no column of the old row survives - not even
+            // one the entities do not map. The deletes run as SQL statements inside an explicit transaction
+            // that the SaveChanges below joins: a SQL failure anywhere rolls all of it back and leaves the
+            // previous OF intact (AC-FR21-6, AC-FR21-2). L_D_COULEE and the earlier L_D_KAPE22 rows are kept.
+            using IDbContextTransaction? replace = existingEtat is null ? null : context.Database.BeginTransaction();
+            if (existingEtat is not null)
             {
-                RemoveDownstreamRows(existingOf, paddedOf);
+                DeleteOf(paddedOf);
             }
 
             context.Kape22Rows.Add(entity);
@@ -245,6 +247,7 @@ public sealed class Kape22Persister(
             // as many Consignes rows as the bundle carries - in one transaction, so either all of them land
             // or none does.
             context.SaveChanges();
+            replace?.Commit();
         }
         catch (Exception exception) when (exception is DbUpdateException or DbException)
         {
@@ -341,20 +344,35 @@ public sealed class Kape22Persister(
         return reasons;
     }
 
-    // D34 replace: stages the removal of the previous OF's rows in the 9 downstream tables, on the same
-    // context the new rows are then added to. Never L_D_COULEE nor L_D_KAPE22, and none of the other tables
-    // the legacy DeleteOF also clears (L_D_OF_SUIVI, L_D_REBUT, ...).
-    private void RemoveDownstreamRows(L_D_ORDRE_FABRICATION existingOf, string paddedOf)
+    // D34 replace, legacy parity with OrdreFabricationController.DeleteOF: deletes the previous OF from
+    // L_D_OF_SUIVI (every later Rang moves up by one), L_D_CONSIGNES, L_D_MAM_QUAL, L_D_PRODUITS_OUTIL,
+    // L_D_REBUT, the 7 L_D_SECTIONCHARGE_* and last L_D_ORDRE_FABRICATION, which production's foreign keys
+    // from L_D_OF_SUIVI, L_D_REBUT and the 7 sections reference. DeleteOF's L_D_PLANS_FOURS, L_D_PSO (with
+    // its L_D_SOUS_PRODUITS) and L_D_FOURS steps never apply here: an OF named there is refused above.
+    // Never L_D_COULEE nor L_D_KAPE22.
+    private void DeleteOf(string paddedOf)
     {
-        context.ConsignesRows.RemoveRange(context.ConsignesRows.Where(row => row.OF == paddedOf));
-        context.OrdreFabricationRows.Remove(existingOf);
-        context.SectionChargeChutageRows.RemoveRange(context.SectionChargeChutageRows.Where(row => row.OF == paddedOf));
-        context.SectionChargeDecoupeRows.RemoveRange(context.SectionChargeDecoupeRows.Where(row => row.OF == paddedOf));
-        context.SectionChargeLingotRows.RemoveRange(context.SectionChargeLingotRows.Where(row => row.OF == paddedOf));
-        context.SectionChargePitsRows.RemoveRange(context.SectionChargePitsRows.Where(row => row.OF == paddedOf));
-        context.SectionChargePoidsMetriqueRows.RemoveRange(context.SectionChargePoidsMetriqueRows.Where(row => row.OF == paddedOf));
-        context.SectionChargeRefroidissoirsRows.RemoveRange(context.SectionChargeRefroidissoirsRows.Where(row => row.OF == paddedOf));
-        context.SectionChargeSvtRows.RemoveRange(context.SectionChargeSvtRows.Where(row => row.OF == paddedOf));
+        int? rang = context.OfSuiviRows.Where(row => row.OF == paddedOf).Select(row => (int?)row.Rang).SingleOrDefault();
+        if (rang is not null)
+        {
+            context.OfSuiviRows.Where(row => row.OF == paddedOf).ExecuteDelete();
+            context.OfSuiviRows
+                .Where(row => row.Rang > rang.Value)
+                .ExecuteUpdate(setters => setters.SetProperty(row => row.Rang, row => row.Rang - 1));
+        }
+
+        context.ConsignesRows.Where(row => row.OF == paddedOf).ExecuteDelete();
+        context.MamQualRows.Where(row => row.OF == paddedOf).ExecuteDelete();
+        context.ProduitsOutilRows.Where(row => row.OF == paddedOf).ExecuteDelete();
+        context.RebutRows.Where(row => row.OF == paddedOf).ExecuteDelete();
+        context.SectionChargeChutageRows.Where(row => row.OF == paddedOf).ExecuteDelete();
+        context.SectionChargeDecoupeRows.Where(row => row.OF == paddedOf).ExecuteDelete();
+        context.SectionChargeLingotRows.Where(row => row.OF == paddedOf).ExecuteDelete();
+        context.SectionChargePitsRows.Where(row => row.OF == paddedOf).ExecuteDelete();
+        context.SectionChargePoidsMetriqueRows.Where(row => row.OF == paddedOf).ExecuteDelete();
+        context.SectionChargeRefroidissoirsRows.Where(row => row.OF == paddedOf).ExecuteDelete();
+        context.SectionChargeSvtRows.Where(row => row.OF == paddedOf).ExecuteDelete();
+        context.OrdreFabricationRows.Where(row => row.OF == paddedOf).ExecuteDelete();
     }
 
     // The journal entry for this Fichier; a null reason is a success (FichierJournalEntry: no reason means

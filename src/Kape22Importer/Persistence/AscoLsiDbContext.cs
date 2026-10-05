@@ -21,13 +21,25 @@ public class AscoLsiDbContext(DbContextOptions<AscoLsiDbContext> options) : DbCo
 
     public DbSet<L_D_KAPE22> Kape22Rows => Set<L_D_KAPE22>();
 
+    // Story 6.10 review (P-9): only deleted from, by the D34 replace.
+    public DbSet<L_D_MAM_QUAL> MamQualRows => Set<L_D_MAM_QUAL>();
+
+    // Story 6.10 review (P-9): only deleted from, by the D34 replace.
+    public DbSet<L_D_OF_SUIVI> OfSuiviRows => Set<L_D_OF_SUIVI>();
+
     public DbSet<L_D_ORDRE_FABRICATION> OrdreFabricationRows => Set<L_D_ORDRE_FABRICATION>();
 
     // Story 6.10 (D34): read-only precondition table, never written.
     public DbSet<L_D_PLANS_FOURS> PlansFoursRows => Set<L_D_PLANS_FOURS>();
 
+    // Story 6.10 review (P-9): only deleted from, by the D34 replace.
+    public DbSet<L_D_PRODUITS_OUTIL> ProduitsOutilRows => Set<L_D_PRODUITS_OUTIL>();
+
     // Story 6.10 (D34): read-only precondition table, never written.
     public DbSet<L_D_PSO> PsoRows => Set<L_D_PSO>();
+
+    // Story 6.10 review (P-9): only deleted from, by the D34 replace.
+    public DbSet<L_D_REBUT> RebutRows => Set<L_D_REBUT>();
 
     public DbSet<L_D_SECTIONCHARGE_CHUTAGE> SectionChargeChutageRows => Set<L_D_SECTIONCHARGE_CHUTAGE>();
 
@@ -158,6 +170,33 @@ public class AscoLsiDbContext(DbContextOptions<AscoLsiDbContext> options) : DbCo
         {
             entity.ToTable("L_D_PSO");
             entity.HasKey(row => new { row.NumeroLingot, row.Coulee });
+        });
+
+        // Story 6.10 review (D-1/P-9): the 4 tables outside the 9 that the D34 replace deletes from, as the
+        // legacy DeleteOF does (AFV004-LSI sys.columns/sys.indexes, 2026-10-05). Minimal mappings.
+        modelBuilder.Entity<L_D_MAM_QUAL>(entity =>
+        {
+            entity.ToTable("L_D_MAM_QUAL");
+            entity.HasKey(row => row.OF);
+        });
+
+        modelBuilder.Entity<L_D_OF_SUIVI>(entity =>
+        {
+            entity.ToTable("L_D_OF_SUIVI");
+            entity.HasKey(row => row.OF);
+        });
+
+        modelBuilder.Entity<L_D_PRODUITS_OUTIL>(entity =>
+        {
+            entity.ToTable("L_D_PRODUITS_OUTIL");
+            entity.HasKey(row => new { row.Zone, row.OF });
+        });
+
+        modelBuilder.Entity<L_D_REBUT>(entity =>
+        {
+            entity.ToTable("L_D_REBUT");
+            entity.HasKey(row => row.Id);
+            entity.Property(row => row.Id).ValueGeneratedOnAdd();
         });
 
         // The real columns are legacy datetime, not datetime2. Pin the store type so EF stops emitting
