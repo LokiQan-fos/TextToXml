@@ -156,6 +156,14 @@ flowchart LR
   propriétaire pour ses `L_D_CONSIGNES` associées). Les mappers assignent ces colonnes
   directement ; **aucune** propriété de navigation EF (`ICollection<T>`, référence
   paresseuse) n'est utilisée pour relier les entités du bundle entre elles.
+- **Note (2026-10-06, Story 6.11, AC-FR21-7) :** la production porte des FK que le
+  miroir de test n'a pas (`L_D_ORDRE_FABRICATION.Coulee` → `L_D_COULEE`,
+  `.ProfilProduit` → `L_P_PROFIL_PRODUIT` ; `OF` des 7 `L_D_SECTIONCHARGE_*`,
+  `L_D_OF_SUIVI`, `L_D_REBUT`, `L_D_PLANS_FOURS`, `L_D_PSO` →
+  `L_D_ORDRE_FABRICATION` ; `CodeOperation` des 7 sections → `L_P_TEXT_OPERATIONS`).
+  Sans navigation EF, l'ordre des INSERT relève du tri des commandes par EF Core et
+  `DeleteOf` supprime explicitement les enfants avant l'OF ; un test d'intégration
+  qui ajoute ces FK le temps du test garde les deux ordres. AD-7 est inchangé.
 
 ## Consistency Conventions
 

@@ -2,13 +2,18 @@
 status: 'reopened'
 closed_date: '2026-10-01'
 previous_closed_date: '2026-09-25'
-reopened_date: '2026-10-02'
-reopened_reason: 'Legacy-rejected P60 Fichiers — stories 6.9-6.10 (sprint-change-proposal-2026-10-02.md)'
-previous_reopened_date: '2026-10-01'
+reopened_date: '2026-10-06'
+reopened_reason: 'Pre-deployment GPAO — stories 6.11-6.12 (sprint-change-proposal-2026-10-06.md)'
+previous_reopened_date: '2026-10-02'
 last_commit: 'bc9cf7d2c369eb0e284f5c83ffaf525be11b131f'
 ---
 
 # TextToXml / Kape22Importer — Project Closure
+
+> **Reopened 2026-10-06 for stories 6.11–6.12** (pre-deployment GPAO gate, retro action
+> `epic-6-retro2-item-3`: production FK order guarded by a test, any per-Fichier exception counted
+> for the retry cap, blank `Import:Commande` refused at startup; existing-OF race accepted as D35)
+> — `sprint-change-proposal-2026-10-06.md`. Re-close at the user's go after 6.12 (retro A-1).
 
 > **Epic 6 done 2026-10-05, story 6.10; retrospective pending.** Stories 6.9 (cold-Coulée check on
 > real data) and 6.10 (re-sent existing OF replaced the legacy `DeleteOF` way or refused with a reason,

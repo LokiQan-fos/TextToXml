@@ -1427,7 +1427,7 @@ s'y trouver et rester à confirmer.
 
 ## Deferred from: code review of spec-6-6-validation-config-panne-partage-workers-gpao.md (2026-10-01)
 
-- source_spec: `spec-6-6-validation-config-panne-partage-workers-gpao.md` (D-1, low)
+- source_spec: **PLANNED 2026-10-06: Story 6.12** (AC-FR25-9 extended: present but blank → startup refused) — sprint-change-proposal-2026-10-06.md · `spec-6-6-validation-config-panne-partage-workers-gpao.md` (D-1, low)
   summary: An empty or whitespace `Import:Commande` passes `GpaoImportP60` startup; `Kape22Persister` only falls back to `P60` on a null value, so `L_D_LOG_COMMANDE` rows would carry a blank `Commande`.
   evidence: edge-case-hunter + blind-hunter lenses, `GPAO/ImportP60/Client.cs` `ReadConfig` and `src/Kape22Importer/Persistence/Kape22Persister.cs:269` (`configuration[CommandeKey] ?? DefaultCommande`). AC-FR25-9 only sets the > 50 chars rule; a blank-value rule is a product choice outside this story.
 
@@ -1437,7 +1437,7 @@ s'y trouver et rester à confirmer.
 
 ## Deferred from: code review of story-6.7 (2026-10-01)
 
-- source_spec: `spec-6-7-plafond-reessai-par-fichier.md` (implementation review, low)
+- source_spec: **PLANNED 2026-10-06: Story 6.12** (AC-FR25-8 extended: any per-Fichier exception is counted, the tick goes on) — sprint-change-proposal-2026-10-06.md · `spec-6-7-plafond-reessai-par-fichier.md` (implementation review, low)
   summary: A non-I/O exception escaping a Fichier's read or filing (P60 `InboxScanner.ProcessFromProcessing` around `fileSource.Read` / `Export` / `Archive` / `Reject`) or its conversion (P89 `P89FolderConverter.Process`, which only catches `IOException` / `UnauthorizedAccessException`) aborts the whole tick before the Fichier is counted, so the AC-FR25-8 retry cap never freezes it: `onError` fires and later Fichiers are starved every tick.
   evidence: edge-case-hunter lens, Story 6.7 review. Pre-existing escape path (the cap only adds a new place where it goes uncounted); no known trigger in production code, since `processor.Process` throws are already contained as `UnexpectedFailure`.
 
@@ -1480,17 +1480,17 @@ s'y trouver et rester à confirmer.
   summary: The D34 replace path deletes the OF's rows from the 9 dispatch tables only; legacy `OrdreFabricationController.DeleteOF` also deletes `L_D_OF_SUIVI` (re-ranking `Rang`), `L_D_REBUT`, `L_D_PRODUITS_OUTIL` and `L_D_MAM_QUAL`, so a replaced GPAO-state OF can leave a stale `L_D_OF_SUIVI` row.
   evidence: Story 6.10 planning (legacy read of `Desktop/kape22/OrdreFabricationController.cs:577-866`); D34 (user, 2026-10-02) limits the replace to the 9 tables, scope kept at the spec checkpoint 2026-10-05. Not blocking: the workers are not deployed yet.
 
-- source_spec: `spec-6-10-renvoi-of-existant-remplacement-ou-refus.md` (D-1, step-04 review)
+- source_spec: **ACCEPTED 2026-10-06 (D35)**: legacy AddRange2 parity; the PLANS_FOURS/PSO FKs roll back a replace racing an enfournement; a lock shared with the MCC would add a blocking risk — sprint-change-proposal-2026-10-06.md · `spec-6-10-renvoi-of-existant-remplacement-ou-refus.md` (D-1, step-04 review)
   summary: The D34 preconditions (`Etat`, `L_D_FOURS.OFEnCours`, `L_D_PLANS_FOURS`, `L_D_PSO`) are read without a lock before `SaveChanges()`, so an OF enfourné between the read and the commit can still be replaced.
   evidence: edge-case-hunter and blind-hunter lenses on `Kape22Persister.cs` (2026-10-05). Same race in legacy `AddRange2`; narrow window (one Fichier, milliseconds), workers not deployed yet.
 
-- source_spec: `spec-6-10-renvoi-of-existant-remplacement-ou-refus.md` (D-2, step-04 review)
+- source_spec: **PLANNED 2026-10-06: Story 6.11** (AC-FR21-7: production FKs added for the test's duration; list re-read 2026-10-06, see the correct-course entry below) — sprint-change-proposal-2026-10-06.md · `spec-6-10-renvoi-of-existant-remplacement-ou-refus.md` (D-2, step-04 review)
   summary: `scripts/schema/01-ascolsi-tables.sql` mirrors none of production's foreign keys to `L_D_ORDRE_FABRICATION` (7 `L_D_SECTIONCHARGE_*`, `L_D_OF_SUIVI`, `L_D_REBUT`, `L_D_PLANS_FOURS`, `L_D_PSO`), so a delete or insert order that breaks them would pass the suite and fail in production.
   evidence: production `sys.foreign_keys` read 2026-10-05 during the Story 6.10 review. Revised 2026-10-05 (review P-9): the replace is now a real DELETE + INSERT; `Kape22Persister.DeleteOf` deletes the children explicitly before `L_D_ORDRE_FABRICATION`, so the delete order no longer depends on EF; the insert order still does (review F-1). Mirror FKs would also block the fixture's `TRUNCATE` reset. Second review pass 2026-10-05 (D-1, user decision option (c)): nothing in the suite guards the `DeleteOf` order either (moving the `L_D_ORDRE_FABRICATION` delete first keeps the tests green); the deferral is kept here and the first-pass P-9 clause "add the production FKs to the mirror" is formally dropped. Production evidence: the operator OF-delete script (`L_D_SECTIONCHARGE_LINGOT`, `_CHUTAGE`, `_DECOUPE`, `_REFROIDISSOIRS`, `_PITS`, `L_D_CONSIGNES`, then `L_D_ORDRE_FABRICATION`) works with the same children-first, OF-last order `DeleteOf` follows.
 
 ## Deferred from: code review of story-6.10 (2026-10-05)
 
-- source_spec: `reviews/story-6-10/aggregated-report.prev.md` (first pass, F-1, medium, pre-existing)
+- source_spec: **PLANNED 2026-10-06: Story 6.11** (same AC-FR21-7 guard) — sprint-change-proposal-2026-10-06.md · `reviews/story-6-10/aggregated-report.prev.md` (first pass, F-1, medium, pre-existing)
   summary: The model declares no relation (AD-7), so EF does not order the INSERT commands by production's foreign keys `L_D_SECTIONCHARGE_*` → `L_D_ORDRE_FABRICATION`; a child row could be sent before its OF and fail in production while the FK-less mirror stays green.
   evidence: blind-hunter lens, `src/Kape22Importer/Persistence/AscoLsiDbContext.cs`. Pre-existing on the insert path since Story 4.6; same work item as D-2 above (mirror has no production FKs); workers never deployed.
 
@@ -1498,10 +1498,16 @@ s'y trouver et rester à confirmer.
   summary: `LegacyRejectionParityTests` attributes legacy KAP22 reasons to a Fichier by `L_D_LOG_COMMANDE` `Id` range only, so lines of another Fichier processed in the same window would be counted as this one's.
   evidence: blind-hunter + edge-case-hunter lenses, `tests/Kape22Importer.Tests/LegacyRejectionParityTests.cs:198-200`. The legacy processes Fichiers one at a time and the 6 reference cases are correct; add an OF filter if a real case contradicts it. Test code removed at cutover.
 
-- source_spec: `reviews/story-6-10/aggregated-report.md` (second pass, F-1, low)
+- source_spec: **ACCEPTED 2026-10-06 (D35)**, duplicate of the step-04 D-1 entry — sprint-change-proposal-2026-10-06.md · `reviews/story-6-10/aggregated-report.md` (second pass, F-1, low)
   summary: The existing OF's `Etat` and the 3 precondition tables are read before `BeginTransaction`, so an OF switched to ENC by the MCC in between is still deleted and replaced.
   evidence: blind-hunter lens, `src/Kape22Importer/Persistence/Kape22Persister.cs:130-144` vs `:220`. Same window as legacy `AddRange2` (check before `DeleteOF`) and as the step-04 D-1 entry above; one Fichier at a time, workers never deployed. Fix: open the transaction before the read, with `UPDLOCK, HOLDLOCK`.
 
 - source_spec: `reviews/story-6-10/aggregated-report.md` (second pass, F-2, low)
   summary: The legacy theory rebuilds the OF history with no lower bound (`Création d'un OF` / `ENC` lookups bound only `Id < @start`) and only as GPAO/ENC, so a recycled OF number counts as existing and an EVC (2) OF is rebuilt as 0 or 1.
   evidence: blind-hunter lens, `tests/Kape22Importer.Tests/LegacyRejectionParityTests.cs:243-260`. The theory compares causes only and the 6 real cases are correct; ceiling declared by the `ponytail:` comment (`:30`). Bound on the OF's last deletion if a real case contradicts it. Test code removed at cutover.
+
+## Deferred from: correct-course pre-deployment GPAO (2026-10-06)
+
+- source_spec: **ACCEPTED 2026-10-06** (user decision): never observed in production (0 FK message in legacy `L_D_LOG_COMMANDE` `KAP22`), the GPAO shares this referential, and the AC-FR25-8 cap bounds the retries with an `Error` carrying the SQL cause · sprint-change-proposal-2026-10-06.md (cluster e)
+  summary: `L_D_ORDRE_FABRICATION.ProfilProduit` → `L_P_PROFIL_PRODUIT` (4 rows) and `CodeOperation` of the 7 `L_D_SECTIONCHARGE_*` → `L_P_TEXT_OPERATIONS` (19 rows) are production FKs no pre-check covers; an unknown value fails `SaveChanges` as a `PersistenceError`, so the Fichier stays in `processing/` and is retried until the cap freezes it, instead of being rejected to `error/` on the first tick.
+  evidence: production `sys.foreign_keys` / `sys.foreign_key_columns` read 2026-10-06 (SELECT only). The FK-less mirror `scripts/schema/01-ascolsi-tables.sql` and the import code never check either value; Story 6.11 seeds both tables for its FK test only.

@@ -4,7 +4,7 @@
 
 ## Goal
 
-Pay down the debt shared by the P60 and P89 pipelines and give every format its own never-purged XML export folder. P60 (`Kape22Importer`) journals through `IFichierJournal` like P89, both formats wait for a stable Fichier, `MicroService.Publisher` no longer stacks ticks, and the two GPAO workers are hardened, validated at startup, retry-capped and covered by real-instance and E2E tests (6.1–6.8, done). The epic was reopened on 2026-10-02 after six P60 Fichiers rejected by the legacy in production (now versioned in `P60/error/`) were replayed against the worker: the cold-Coulée check never fired on real data (fixed by 6.9, done), and re-sending an existing OF was never specified, so it failed on a raw primary-key error instead of being replaced or refused with a reason (fixed by 6.10, done). The `TextToXml` library is not modified.
+Pay down the debt shared by the P60 and P89 pipelines and give every format its own never-purged XML export folder. P60 (`Kape22Importer`) journals through `IFichierJournal` like P89, both formats wait for a stable Fichier, `MicroService.Publisher` no longer stacks ticks, and the two GPAO workers are hardened, validated at startup, retry-capped and covered by real-instance and E2E tests (6.1–6.8, done). The epic was reopened on 2026-10-02 after six P60 Fichiers rejected by the legacy in production (now versioned in `P60/error/`) were replayed against the worker: the cold-Coulée check never fired on real data (fixed by 6.9, done), and re-sending an existing OF was never specified, so it failed on a raw primary-key error instead of being replaced or refused with a reason (fixed by 6.10, done). It was reopened again on 2026-10-06 for the pre-deployment gate (6.11–6.12): guard the production FK order with a test, and harden the retry cap and the `Import:Commande` startup check. The `TextToXml` library is not modified.
 
 ## Stories
 
@@ -19,8 +19,16 @@ Pay down the debt shared by the P60 and P89 pipelines and give every format its 
 - Story 6.8: Flush du sink Logs et assertions du harnais E2E
 - Story 6.9: Contrôle Coulée froide sur le TypeConsigne 12
 - Story 6.10: Renvoi d'un OF existant — remplacement ou refus explicite
+- Story 6.11: Ordre des FK de production gardé par les tests
+- Story 6.12: Toute exception sur un Fichier compte pour le plafond ; `Import:Commande` blanc refusé
 
 ## Requirements & Constraints
+
+**Pre-deployment GPAO (2026-10-06, sprint-change-proposal-2026-10-06.md) — Stories 6.11–6.12:**
+- **Production FK order (AC-FR21-7) — Story 6.11:** an Integration test adds the 13 production FKs touching the dispatch to `AscoLSI_Test` for its duration (`L_D_ORDRE_FABRICATION.Coulee` → `L_D_COULEE`, `.ProfilProduit` → `L_P_PROFIL_PRODUIT`; `OF` of the 7 `L_D_SECTIONCHARGE_*`, `L_D_OF_SUIVI`, `L_D_REBUT`, `L_D_PLANS_FOURS`, `L_D_PSO` → `L_D_ORDRE_FABRICATION`; `CodeOperation` of the 7 sections → `L_P_TEXT_OPERATIONS`; read from production `sys.foreign_keys` 2026-10-06), seeds the two `L_P_*` reference tables from production (`SELECT` only), and replays an OF creation then its D34 replace with no FK violation. A mutation deleting `L_D_ORDRE_FABRICATION` first in `DeleteOf` must fail it. The FKs are dropped at the end, even on failure; the schema mirror stays FK-less (the fixture's `TRUNCATE`). No production code change expected; AD-7 unchanged.
+- **Any per-Fichier exception counts for the retry cap (AC-FR25-8 extended) — Story 6.12:** an exception other than `IOException` / `UnauthorizedAccessException` raised while reading, exporting or filing a P60 Fichier (`InboxScanner`) or converting a P89 one (`P89FolderConverter`) is counted for that Fichier and the tick moves on to the next one; the faulty Fichier freezes at `MaxAttempts` with one `Error`. Same fix in both formats (D32). `src/` is Ask First.
+- **Blank `Import:Commande` refused (AC-FR25-9 extended) — Story 6.12:** present but empty or whitespace refuses `GpaoImportP60` startup with a message naming the key; absent keeps the `P60` fallback. SVN commit by the user.
+- **Accepted, not planned:** the existing-OF read/transaction race (D35, legacy parity, the `PLANS_FOURS`/`PSO` FKs roll back a concurrent enfournement); an unknown `ProfilProduit` / `CodeOperation` failing as a `PersistenceError` and freezing at the cap (never observed in production).
 
 **Re-sent OF (D34; AC-FR20-6, AC-FR21-6) — Story 6.10:**
 - When `L_D_ORDRE_FABRICATION` already holds the Fichier's OF, the Fichier is **refused** (explicit `BusinessRuleViolation`, no write at all) if the OF's `Etat` is ENC (1), EVC (2), ENFOURNE (3), LAMINAGE (5) or LAMINE (8), or if the OF appears in `L_D_PLANS_FOURS.[OF]`, `L_D_FOURS.OFEnCours` or `L_D_PSO.[OF]`. The message names the OF and the reason (the state, or the table). Own wording, same shape as the cold-Coulée rejection — not the legacy text.
@@ -55,3 +63,4 @@ Pay down the debt shared by the P60 and P89 pipelines and give every format its 
 - 6.10 resolves deferred W-1 of 6.8: a second run of the E2E script now replaces the OF instead of failing on `PK_L_D_CONSIGNES`.
 - 6.10's theory mirrors the skip/production-read pattern of `Kape22ProductionDataParityTests`.
 - Earlier order 6.1 → 6.5 → 6.6 → 6.7 → 6.8 is complete; the project stays open, re-closure at the user's decision.
+- Pre-deployment order 6.11 → 6.12 (independent; 6.11 first, its risk lands in production data). Both gate the first GPAO worker deployment. 6.11 builds on 6.10's `DeleteOf` and D34 replace; 6.12 builds on 6.7's retry cap and 6.6's startup validation.

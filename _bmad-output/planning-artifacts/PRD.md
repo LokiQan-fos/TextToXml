@@ -126,6 +126,7 @@ part ailleurs.*
 | D32 | **Robustesse commune des workers.** La ré‑entrance du timer se corrige une fois dans `MicroService.Publisher` (tous les workers `Publisher`) : un tick ne démarre pas tant que le précédent tourne. Les défauts propres aux `Client` GPAO (`GpaoImportP60`, `GpaoConvertP89`) se corrigent dans les deux à l'identique (FR-25). Après un tick en échec, un worker GPAO ne publie pas de heartbeat. | utilisateur (2026‑09‑28) |
 | D33 | **Export XML par format.** Chaque format (P60, P89, formats futurs, en import comme en export) écrit le XML normalisé de **chaque** Fichier converti dans son **propre** dossier d'export, pour transmission à des tiers qui vérifient les données importées ou exportées. Nom `<nom>_<yyyyMMddHHmmss>.xml` (jamais d'écrasement). Ce dossier n'est **jamais purgé** par le worker ; son nettoyage relève de l'exploitation. Un Fichier que `TextToXml` ne sait pas convertir n'a pas de XML. P89 s'y conforme déjà (`P89:XmlPath`) ; P60 par l'Épic 6 (FR-26). | utilisateur (2026‑09‑28) |
 | D34 | **Renvoi d'un OF existant.** Si `L_D_ORDRE_FABRICATION` contient déjà l'OF : refus métier explicite, aucune écriture, si son `Etat` vaut ENC (1), EVC (2), ENFOURNE (3), LAMINAGE (5) ou LAMINE (8), ou si l'OF figure dans `L_D_PLANS_FOURS.[OF]`, `L_D_FOURS.OFEnCours` ou `L_D_PSO.[OF]`. Sinon l'OF est **remplacé** : ses lignes `L_D_ORDRE_FABRICATION`, `L_D_SECTIONCHARGE_*` (7 tables) et `L_D_CONSIGNES` sont supprimées puis réinsérées dans le même `SaveChanges()` (AC-FR21-1). `L_D_COULEE` et les lignes `L_D_KAPE22` antérieures sont conservées. Parité legacy `OrdreFabricationController.AddRange2` — sprint-change-proposal-2026-10-02.md. | utilisateur (2026-10-02) |
+| D35 | **Course de renvoi d'un OF acceptée.** Les préconditions D34 (`Etat`, `L_D_FOURS.OFEnCours`, `L_D_PLANS_FOURS`, `L_D_PSO`) sont lues sans verrou, avant la transaction de remplacement : un OF passé ENC par le MCC dans cette fenêtre (quelques ms, un Fichier à la fois) peut encore être remplacé. Accepté : parité legacy `AddRange2` ; les FK de production `L_D_PLANS_FOURS` / `L_D_PSO` → `L_D_ORDRE_FABRICATION` font échouer puis annulent un remplacement concurrent d'un enfournement ; verrouiller (`UPDLOCK, HOLDLOCK`) des tables écrites par le MCC ajouterait un risque de blocage. — sprint-change-proposal-2026-10-06.md. | utilisateur (2026-10-06) |
 
 ## 1. Vision
 
@@ -1030,6 +1031,12 @@ test que FR-11, schéma étendu aux 10 tables)* :
   `SaveChanges()` ; `L_D_COULEE` et les `L_D_KAPE22` antérieures sont intactes ;
   un échec SQL laisse l'ancien OF inchangé. Vérifié sur `P60_847_682_448`
   (après `445`).
+- `AC-FR21-7` : avec les FK de production qui touchent le dispatch ajoutées à la
+  base de test (`→ L_D_COULEE`, `→ L_D_ORDRE_FABRICATION`, `→ L_P_PROFIL_PRODUIT`,
+  `→ L_P_TEXT_OPERATIONS`, relevé `sys.foreign_keys` du 2026-10-06), une création
+  d'OF puis son remplacement D34 réussissent sans violation : l'ordre des INSERT
+  et celui de `DeleteOf` sont gardés par un test, pas seulement par le miroir sans
+  FK. *(Ajouté 2026-10-06, sprint-change-proposal-2026-10-06.md.)*
 
 **Feature‑specific NFRs :** hérite de la Reprise et de l'Observabilité de la
 §4.3 (le double journal `MQTTnetServices.Logs` + `L_D_LOG_COMMANDE` couvre
@@ -1177,13 +1184,19 @@ corrigés à l'identique dans les deux (D32) ; la ré‑entrance, une fois dans
   aucune nouvelle ligne `Logs` ni `L_D_LOG_COMMANDE` pour lui. Ce plafond ne
   déplace jamais un Fichier en `error/` (`AC-FR15-3` inchangé). Le compteur vit
   en mémoire du worker et repart de zéro au redémarrage ou quand le Fichier
-  quitte `processing/`. *(Ajouté 2026-10-01, sprint-change-proposal-2026-10-01.md.)*
+  quitte `processing/`. Toute exception levée pour un Fichier (lecture, export,
+  classement, conversion P89), pas seulement une erreur d'E/S, est comptée pour ce
+  Fichier et n'empêche pas le traitement des Fichiers suivants dans le même tick.
+  *(Ajouté 2026-10-01, sprint-change-proposal-2026-10-01.md ; étendu 2026-10-06,
+  sprint-change-proposal-2026-10-06.md.)*
 - `AC-FR25-9` : le démarrage est refusé, avec un message nommant la clé, si :
   `ConnectionStrings:AscoLSI` ne nomme pas de base (`Initial Catalog` /
   `Database` absent) — les deux workers ; `Import:StabilityQuietPeriod` /
   `P89:StabilityQuietPeriod` est négatif ou dépasse 1 h — les deux workers ;
-  `Import:Commande` dépasse 50 caractères (`L_D_LOG_COMMANDE.Commande`) ou
-  `Import:RetentionDays` sort de 1..3650 — `GpaoImportP60`. *(Ajouté 2026-10-01.)*
+  `Import:Commande` est présente mais vide ou blanche, ou dépasse 50 caractères
+  (`L_D_LOG_COMMANDE.Commande`), ou `Import:RetentionDays` sort de 1..3650 —
+  `GpaoImportP60`. *(Ajouté 2026-10-01 ; clause « vide ou blanche » ajoutée le
+  2026-10-06, sprint-change-proposal-2026-10-06.md.)*
 - `AC-FR25-10` : un dossier de réception injoignable (P60 inbox, P89 source)
   fait échouer le tick, sans aucun heartbeat (`AC-FR25-5`) ; niveaux de log
   inchangés : `Warning` d'un listing en échec (`AC-FR15-2`), `Error` d'un dossier

@@ -311,7 +311,7 @@ microservices à UI et ne s'appliquent à aucune story v1.
 | FR-18 | Épic 4 — 4.3 | AC-FR18-1 … AC-FR18-4 |
 | FR-19 | Épic 4 — 4.4 (`AC-FR19-1..4`), 4.12 (`AC-FR19-5`, `LibelleConsigne`), 4.13 (`AC-FR19-6`, ligne `ConsigneGPAO=0`) | AC-FR19-1 … AC-FR19-6 |
 | FR-20 | Épic 4 — 4.5 (contrôles purs), 4.6 (`AC-FR20-5`, existence coulée) ; Épic 6 — 6.9 (`AC-FR20-5` précisé), 6.10 (`AC-FR20-6`) | AC-FR20-1 … AC-FR20-6 |
-| FR-21 | Épic 4 — 4.6 (persister), 4.7 (E2E) ; Épic 6 — 6.10 (`AC-FR21-6`) | AC-FR21-1 … AC-FR21-6 |
+| FR-21 | Épic 4 — 4.6 (persister), 4.7 (E2E) ; Épic 6 — 6.10 (`AC-FR21-6`), 6.11 (`AC-FR21-7`) | AC-FR21-1 … AC-FR21-7 |
 | FR-22 | Épic 5 — 5.1 (`AC-FR22-1..7`), 5.2 (`AC-FR22-8`) | AC-FR22-1 … AC-FR22-8 |
 | FR-23 | Épic 5 — 5.0 | AC-FR23-1 … AC-FR23-4 |
 | CTR-1/2/3 | Épic 1 — 1.8 | contrat `decimal`/`datetime`/`convert` + round‑trip typé |
@@ -436,7 +436,7 @@ stable, `MicroService.Publisher` n'empile plus les ticks, et les `Client`
 `GpaoImportP60` / `GpaoConvertP89` sont durcis et testés sur une vraie
 instance ; chaque format exporte son XML dans son propre dossier (D33). `AC-FR24-1..6`, `AC-FR25-1..7`, `AC-FR26-1..6`, `AC-FR16-5`, `AC-FR12-5` (révisé) et
 `AC-FR22-9` sont verts.
-**FRs couverts :** FR-24, FR-25, FR-26 (+ FR-11, FR-12, FR-14, FR-16, FR-22 révisés ; FR-20, FR-21 révisés par 6.9 et 6.10).
+**FRs couverts :** FR-24, FR-25, FR-26 (+ FR-11, FR-12, FR-14, FR-16, FR-22 révisés ; FR-20, FR-21 révisés par 6.9 et 6.10 ; FR-21, FR-25 révisés par 6.11 et 6.12).
 
 ---
 
@@ -2907,6 +2907,7 @@ Solder les 10 entrées « fix with P60 / fix once » de `deferred-work.md`
 
 **Séquencement :** 6.1 → 6.2 → 6.3 → 6.4 → 6.4-bis → 6.5 (6.4-bis ajoutée le 2026-09-29, bloquante avant 6.5)
 → 6.6 → 6.7 → 6.8 (ajoutées le 2026-10-01, sprint-change-proposal-2026-10-01.md).
+→ 6.11 → 6.12 (ajoutées le 2026-10-06, pré-déploiement GPAO, sprint-change-proposal-2026-10-06.md).
 
 ### Story 6.1 : Journal P60 via `IFichierJournal`
 
@@ -3288,4 +3289,104 @@ aucun refus legacy à comparer) — limite acceptée par l'utilisateur le 2026-1
 
 **Tests xUnit (TDD, CC-1) :** `Kape22Importer.Tests` (Integration),
 `[Trait("AC", "FR20-6")]`, `[Trait("AC", "FR21-6")]`.
+**Critères transverses :** CC-1, CC-2, CC-4, CC-7. Owner : Dev.
+
+## Corrections pré-déploiement GPAO (2026-10-06)
+
+Points de passage avant le premier déploiement d'un worker GPAO (rétro Épic 6 #2,
+F-4 / A-3 ; sprint-change-proposal-2026-10-06.md). Trois grappes planifiées
+ci-dessous ; la course lecture/transaction de l'OF existant est acceptée (D35).
+
+### Story 6.11 : Ordre des FK de production gardé par les tests
+
+As an exploitant,
+I want que l'ordre des INSERT et des DELETE du dispatch soit vérifié contre les
+clés étrangères de production,
+So that un import ou un remplacement D34 vert en test ne puisse pas échouer en
+production sur une FK que le miroir de schéma n'a pas.
+
+**Acceptance Criteria :** `AC-FR21-7`.
+
+**Given** `AscoLSI_Test` où les 13 FK de production qui touchent le dispatch sont
+ajoutées pour la durée du test — `L_D_ORDRE_FABRICATION.Coulee` → `L_D_COULEE`,
+`.ProfilProduit` → `L_P_PROFIL_PRODUIT` ; `OF` des 7 `L_D_SECTIONCHARGE_*`,
+`L_D_OF_SUIVI`, `L_D_REBUT`, `L_D_PLANS_FOURS`, `L_D_PSO` → `L_D_ORDRE_FABRICATION` ;
+`CodeOperation` des 7 `L_D_SECTIONCHARGE_*` → `L_P_TEXT_OPERATIONS` — avec les
+lignes de référence `L_P_PROFIL_PRODUIT` / `L_P_TEXT_OPERATIONS` copiées de
+production (SELECT seul)
+**When** un Fichier de référence crée un OF sur une Coulée nouvelle, puis un second
+Fichier le remplace (D34, OF en `Etat` GPAO, avec des lignes `L_D_OF_SUIVI` /
+`L_D_REBUT` existantes)
+**Then** les deux imports réussissent, sans violation de FK.
+
+**Given** le même montage et `DeleteOf` modifié pour supprimer
+`L_D_ORDRE_FABRICATION` en premier (mutation)
+**When** le remplacement s'exécute
+**Then** le test échoue (le garde est réel).
+
+**And** les FK sont retirées en fin de test, y compris en cas d'échec ; le
+`TRUNCATE` de `SqlServerIntegrationFixture` reste inchangé.
+
+**Notes dev :**
+- Liste des FK relue dans `sys.foreign_keys` de production le 2026-10-06
+  (sprint-change-proposal-2026-10-06.md § 1) ; elle remplace celle de
+  `deferred-work.md` 6.10 D-2, qui ignorait `→ L_D_COULEE` et les deux tables `L_P_*`.
+- `L_P_PROFIL_PRODUIT` / `L_P_TEXT_OPERATIONS` : miroir minimal (clé seule) dans
+  `scripts/schema/01-ascolsi-tables.sql` si absentes, sans FK.
+- Aucun changement de code de production attendu : `DeleteOf` suit déjà l'ordre
+  enfants puis OF ; l'ordre des INSERT tient aujourd'hui au tri des commandes
+  par EF Core, sans relation déclarée (AD-7 inchangé). Si le test révèle une
+  violation, la correction entre dans la story.
+- Miroir `scripts/schema/01-ascolsi-tables.sql` sans FK (elles y bloqueraient
+  le `TRUNCATE` du fixture).
+- Résout `deferred-work.md` 6.10 D-2 et 6.10 première passe F-1.
+
+**Tests xUnit (TDD, CC-1) :** `Kape22Importer.Tests` (Integration),
+`[Trait("AC", "FR21-7")]`.
+**Critères transverses :** CC-1, CC-2, CC-4, CC-7. Owner : Dev.
+
+### Story 6.12 : Toute exception sur un Fichier compte pour le plafond ; `Import:Commande` blanc refusé
+
+As an exploitant,
+I want qu'un Fichier qui fait lever une exception inattendue soit compté, signalé
+puis gelé comme tout Fichier en échec, et qu'un `Import:Commande` blanc empêche le
+démarrage,
+So that un seul Fichier toxique n'arrête pas toute la ligne P60 ou P89, et que
+`L_D_LOG_COMMANDE` ne reçoive jamais une `Commande` vide.
+
+**Acceptance Criteria :** `AC-FR25-8` (étendu), `AC-FR25-9` (étendu).
+
+**Given** un Fichier P60 dont la lecture, l'export ou le classement (`Archive`,
+`Reject`) lève une exception autre que `IOException` / `UnauthorizedAccessException`
+(source de Fichiers de test qui lève `InvalidOperationException`), et un second
+Fichier sain
+**When** les ticks s'enchaînent
+**Then** le Fichier fautif reste dans `processing/`, chaque tick le compte ; le
+second Fichier est traité dès le premier tick ; à `Import:MaxAttempts` le Fichier
+fautif est gelé avec **un** log `Error` nommant le Fichier et l'exception.
+
+**Given** le même cas côté P89 (`P89FolderConverter.Process`, conversion ou
+écriture)
+**Then** même comportement sous `P89:MaxAttempts` (D32).
+
+**Given** `Import:Commande` présente mais vide ou blanche
+**When** `GpaoImportP60` démarre
+**Then** le démarrage est refusé avec un message nommant la clé ; absente, elle
+garde son repli `P60`.
+
+**Notes dev :**
+- `src/Kape22Importer/InboxScanner.cs` (lecture `:269`, export/classement `:329`,
+  `:424`) et `src/P89Converter/P89FolderConverter.cs` (`:157`, `:220`) : les
+  filtres `IOException or UnauthorizedAccessException` restent pour la reprise
+  transitoire ; une autre exception est comptée pour ce Fichier et la boucle passe
+  au suivant au lieu d'interrompre le tick. Forme exacte au checkpoint spec.
+  `src/` = Ask First.
+- `GPAO/ImportP60/Client.cs` `ReadConfig` (`:139`) : `string.IsNullOrWhiteSpace`
+  sur une valeur non nulle. Grep de la clé (règle A-3). Commit SVN par
+  l'utilisateur.
+- Résout `deferred-work.md` 6.7 (exception non I/O, revue d'implémentation) et
+  6.6 D-1.
+
+**Tests xUnit (TDD, CC-1) :** `Kape22Importer.Tests`, `P89Converter.Tests`,
+`GPAO/ImportP60.Tests` ; `[Trait("AC", "FR25-8")]`, `[Trait("AC", "FR25-9")]`.
 **Critères transverses :** CC-1, CC-2, CC-4, CC-7. Owner : Dev.
