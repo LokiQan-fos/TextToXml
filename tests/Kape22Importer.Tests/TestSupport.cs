@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -9,7 +10,9 @@ using System.Xml.Linq;
 using AscoLsiJournal;
 using FichierJournal;
 using Kape22Importer.Persistence;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using TextToXml;
 using TextToXml.Tests;
 using Xunit;
@@ -205,6 +208,77 @@ internal static class TestSupport
     // every byte 1:1, so an ASCII substring swap keeps a fixed-width Fichier's layout intact.
     public static byte[] WithText(byte[] source, string find, string replacement) =>
         Encoding.Latin1.GetBytes(Encoding.Latin1.GetString(source).Replace(find, replacement));
+
+    // Opt-in production database (ConnectionStrings:AscoLSI_Production); empty when not configured, and
+    // the tests that need it skip or fall back. Read only, SELECT only (CC-7). Read on demand, so a malformed
+    // appsettings.Test.json fails only the tests that ask for it, not every test using TestSupport.
+    public static string ProductionConnectionString =>
+        new ConfigurationBuilder()
+            .SetBasePath(AppContext.BaseDirectory)
+            .AddJsonFile("appsettings.Test.json", optional: true)
+            .AddEnvironmentVariables("KAPE22_TEST_")
+            .Build()
+            .GetConnectionString("AscoLSI_Production") ?? string.Empty;
+
+    public const string NoProductionSkipReason =
+        "No production database configured. Set ConnectionStrings:AscoLSI_Production in " +
+        "tests/Kape22Importer.Tests/appsettings.Test.json or KAPE22_TEST_ConnectionStrings__AscoLSI_Production.";
+
+    // A connection to production with ApplicationIntent=ReadOnly forced, whatever the configured string says.
+    public static SqlConnection OpenProduction()
+    {
+        SqlConnection connection = new(new SqlConnectionStringBuilder(ProductionConnectionString)
+        {
+            ApplicationIntent = ApplicationIntent.ReadOnly,
+        }.ConnectionString);
+        connection.Open();
+        return connection;
+    }
+
+    // SELECT on production, then one parameterized INSERT per row of the test table's own columns. Plain
+    // INSERTs rather than SqlBulkCopy: the copied tables hold a few hundred rows at most, and a bulk insert
+    // can wait indefinitely for a memory grant on a memory-starved local instance.
+    public static void CopyFromProduction(string testConnectionString, string table, string where, params SqlParameter[] parameters)
+    {
+        using SqlConnection test = new(testConnectionString);
+        test.Open();
+        List<string> columns = [];
+        bool hasIdentity = false;
+        using (SqlCommand command = new(
+            "SELECT name, is_identity FROM sys.columns WHERE object_id = OBJECT_ID(@table) ORDER BY column_id;", test))
+        {
+            command.Parameters.AddWithValue("@table", $"dbo.{table}");
+            using SqlDataReader reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                columns.Add(reader.GetString(0));
+                hasIdentity |= reader.GetBoolean(1);
+            }
+        }
+
+        string columnList = string.Join(", ", columns.Select(column => $"[{column}]"));
+        DataTable rows = new();
+        using (SqlConnection production = OpenProduction())
+        using (SqlCommand select = new($"SELECT {columnList} FROM dbo.{table} WITH (NOLOCK) WHERE {where};", production))
+        {
+            select.Parameters.AddRange(parameters);
+            using SqlDataReader reader = select.ExecuteReader();
+            rows.Load(reader);
+        }
+
+        string identity = hasIdentity ? $"SET IDENTITY_INSERT dbo.{table} ON; " : string.Empty;
+        string values = string.Join(", ", columns.Select((_, index) => $"@p{index}"));
+        foreach (DataRow row in rows.Rows)
+        {
+            using SqlCommand insert = new($"{identity}INSERT INTO dbo.{table} ({columnList}) VALUES ({values});", test);
+            for (int index = 0; index < columns.Count; index++)
+            {
+                insert.Parameters.AddWithValue($"@p{index}", row[index]);
+            }
+
+            insert.ExecuteNonQuery();
+        }
+    }
 
     // The embedded P60 schema (Templates/P60.xsd), read the same way P60Deserializer reads it.
     public static string EmbeddedP60Xsd() => EmbeddedResource(EmbeddedP60XsdResourceName);

@@ -236,6 +236,9 @@ public sealed class SqlServerIntegrationFixture
     // never gets removed by the idempotent CREATE scripts, so a test instance that outlives a schema
     // change reports the wrong table count. Dropping every non-system table before each ApplySchema
     // guarantees the instance always matches exactly what scripts/schema/ currently describes.
+    // Story 6.11: every foreign key goes first - a run killed during ProductionForeignKeyOrderIntegrationTests
+    // leaves its production keys behind, and a referenced table cannot be dropped, which would turn the
+    // whole Integration suite into a silent skip.
     private static void DropExistingUserTables(string connectionString)
     {
         using SqlConnection connection = new(WithShortLoginTimeout(connectionString));
@@ -245,6 +248,9 @@ public sealed class SqlServerIntegrationFixture
         command.CommandText =
             """
             DECLARE @sql nvarchar(max) = N'';
+            SELECT @sql += N'ALTER TABLE ' + QUOTENAME(OBJECT_SCHEMA_NAME(fk.parent_object_id)) + N'.'
+                + QUOTENAME(OBJECT_NAME(fk.parent_object_id)) + N' DROP CONSTRAINT ' + QUOTENAME(fk.name) + N';'
+            FROM sys.foreign_keys fk;
             SELECT @sql += N'DROP TABLE ' + QUOTENAME(s.name) + N'.' + QUOTENAME(t.name) + N';'
             FROM sys.tables t
             JOIN sys.schemas s ON t.schema_id = s.schema_id

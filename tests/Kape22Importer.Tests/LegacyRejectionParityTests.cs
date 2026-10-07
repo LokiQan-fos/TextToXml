@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Data;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -12,6 +11,7 @@ using TextToXml;
 using TextToXml.Tests;
 using Xunit;
 using Xunit.Abstractions;
+using static Kape22Importer.Tests.TestSupport;
 
 namespace Kape22Importer.Tests;
 
@@ -64,14 +64,6 @@ public class LegacyRejectionParityTests(SqlServerIntegrationFixture fixture, ITe
         ("la répartition des lingots aux fours", "AC-FR20-2"),
     ];
 
-    private static readonly string ProductionConnectionString =
-        new ConfigurationBuilder()
-            .SetBasePath(AppContext.BaseDirectory)
-            .AddJsonFile("appsettings.Test.json", optional: true)
-            .AddEnvironmentVariables("KAPE22_TEST_")
-            .Build()
-            .GetConnectionString("AscoLSI_Production") ?? string.Empty;
-
     private static readonly string[] ReferenceTables =
     [
         "L_P_CONSIGNES_CHUTAGE",
@@ -115,10 +107,7 @@ public class LegacyRejectionParityTests(SqlServerIntegrationFixture fixture, ITe
     public void RejectedFichier_HasTheLegacyRejectionCause_AcFr20_6(string fichierName)
     {
         Skip.IfNot(fixture.Available, fixture.SkipReason ?? "SQL Server test instance unavailable.");
-        Skip.If(
-            string.IsNullOrWhiteSpace(ProductionConnectionString),
-            "No production database configured. Set ConnectionStrings:AscoLSI_Production in " +
-            "tests/Kape22Importer.Tests/appsettings.Test.json or KAPE22_TEST_ConnectionStrings__AscoLSI_Production.");
+        Skip.If(string.IsNullOrWhiteSpace(ProductionConnectionString), NoProductionSkipReason);
 
         LegacyTrace? trace = ReadLegacyTrace(fichierName);
         Skip.If(trace is null, $"{fichierName}: aucune trace legacy terminée en erreur dans L_D_LOG_COMMANDE.");
@@ -143,16 +132,6 @@ public class LegacyRejectionParityTests(SqlServerIntegrationFixture fixture, ITe
         {
             output.WriteLine($"{fichierName} : écart connu - refusé par le legacy (AC-FR20-3 retiré), accepté ici.");
         }
-    }
-
-    private static SqlConnection OpenProduction()
-    {
-        SqlConnection connection = new(new SqlConnectionStringBuilder(ProductionConnectionString)
-        {
-            ApplicationIntent = ApplicationIntent.ReadOnly,
-        }.ConnectionString);
-        connection.Open();
-        return connection;
     }
 
     // SELECT on production: the latest legacy run of this Fichier, or null when there is none or it did
@@ -221,13 +200,14 @@ public class LegacyRejectionParityTests(SqlServerIntegrationFixture fixture, ITe
         fixture.ResetData();
         foreach (string table in ReferenceTables)
         {
-            CopyFromProduction(table, "1 = 1");
+            CopyFromProduction(fixture.AscoLsiConnectionString, table, "1 = 1");
         }
 
         string? coulee = bundle.Coulee?.IdCoulee;
         if (coulee is not null)
         {
             CopyFromProduction(
+                fixture.AscoLsiConnectionString,
                 "L_D_COULEE",
                 "IdCoulee = @coulee AND DateReception < @instant",
                 new SqlParameter("@coulee", coulee),
@@ -261,51 +241,6 @@ public class LegacyRejectionParityTests(SqlServerIntegrationFixture fixture, ITe
         using AscoLsiDbContext context = fixture.NewAscoLsiContext();
         context.OrdreFabricationRows.Add(ordreFabrication);
         context.SaveChanges();
-    }
-
-    // SELECT on production, then one parameterized INSERT per row of the test table's own columns. Plain
-    // INSERTs rather than SqlBulkCopy: the copied tables hold a few hundred rows at most, and a bulk insert
-    // can wait indefinitely for a memory grant on a memory-starved local instance.
-    private void CopyFromProduction(string table, string where, params SqlParameter[] parameters)
-    {
-        using SqlConnection test = new(fixture.AscoLsiConnectionString);
-        test.Open();
-        List<string> columns = [];
-        bool hasIdentity = false;
-        using (SqlCommand command = new(
-            "SELECT name, is_identity FROM sys.columns WHERE object_id = OBJECT_ID(@table) ORDER BY column_id;", test))
-        {
-            command.Parameters.AddWithValue("@table", $"dbo.{table}");
-            using SqlDataReader reader = command.ExecuteReader();
-            while (reader.Read())
-            {
-                columns.Add(reader.GetString(0));
-                hasIdentity |= reader.GetBoolean(1);
-            }
-        }
-
-        string columnList = string.Join(", ", columns.Select(column => $"[{column}]"));
-        DataTable rows = new();
-        using (SqlConnection production = OpenProduction())
-        using (SqlCommand select = new($"SELECT {columnList} FROM dbo.{table} WITH (NOLOCK) WHERE {where};", production))
-        {
-            select.Parameters.AddRange(parameters);
-            using SqlDataReader reader = select.ExecuteReader();
-            rows.Load(reader);
-        }
-
-        string identity = hasIdentity ? $"SET IDENTITY_INSERT dbo.{table} ON; " : string.Empty;
-        string values = string.Join(", ", columns.Select((_, index) => $"@p{index}"));
-        foreach (DataRow row in rows.Rows)
-        {
-            using SqlCommand insert = new($"{identity}INSERT INTO dbo.{table} ({columnList}) VALUES ({values});", test);
-            for (int index = 0; index < columns.Count; index++)
-            {
-                insert.Parameters.AddWithValue($"@p{index}", row[index]);
-            }
-
-            insert.ExecuteNonQuery();
-        }
     }
 
     // The real processor on the test instance, its clock at the legacy run's instant.

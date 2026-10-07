@@ -9,7 +9,6 @@ using System.Transactions;
 using AscoLsiJournal;
 using Kape22Importer.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using TextToXml;
 using TextToXml.Tests;
 using Xunit;
@@ -69,14 +68,6 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
         nameof(L_D_KAPE22.Client),
     };
 
-    private static readonly string ProductionConnectionString =
-        new ConfigurationBuilder()
-            .SetBasePath(AppContext.BaseDirectory)
-            .AddJsonFile("appsettings.Test.json", optional: true)
-            .AddEnvironmentVariables("KAPE22_TEST_")
-            .Build()
-            .GetConnectionString("AscoLSI_Production") ?? string.Empty;
-
     private static string P60Directory => RepoLayout.ProjectFile("P60");
 
     // Every downstream mapper now zero-pads OF to 12 digits itself (DownstreamOf.Pad); this local alias
@@ -107,9 +98,8 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
     {
         Skip.IfNot(fixture.Available, fixture.SkipReason ?? "SQL Server test instance unavailable.");
         Skip.If(
-            string.IsNullOrWhiteSpace(ProductionConnectionString),
-            "No production database configured. Set ConnectionStrings:AscoLSI_Production in " +
-            "tests/Kape22Importer.Tests/appsettings.Test.json or KAPE22_TEST_ConnectionStrings__AscoLSI_Production.");
+            string.IsNullOrWhiteSpace(TestSupport.ProductionConnectionString),
+            TestSupport.NoProductionSkipReason);
 
         // 1. New pipeline: raw bytes -> normalized XML -> mapped entity.
         byte[] bytes = File.ReadAllBytes(Path.Combine(P60Directory, fichierName));
@@ -190,7 +180,7 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
     private static List<L_D_KAPE22> ReadProductionRows(string of, string numeroFichier)
     {
         DbContextOptions<AscoLsiDbContext> options = new DbContextOptionsBuilder<AscoLsiDbContext>()
-            .UseSqlServer(ProductionConnectionString)
+            .UseSqlServer(TestSupport.ProductionConnectionString)
             .Options;
 
         using AscoLsiDbContext production = new(options);
@@ -220,9 +210,8 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
     {
         Skip.IfNot(fixture.Available, fixture.SkipReason ?? "SQL Server test instance unavailable.");
         Skip.If(
-            string.IsNullOrWhiteSpace(ProductionConnectionString),
-            "No production database configured. Set ConnectionStrings:AscoLSI_Production in " +
-            "tests/Kape22Importer.Tests/appsettings.Test.json or KAPE22_TEST_ConnectionStrings__AscoLSI_Production.");
+            string.IsNullOrWhiteSpace(TestSupport.ProductionConnectionString),
+            TestSupport.NoProductionSkipReason);
 
         byte[] bytes = File.ReadAllBytes(Path.Combine(P60Directory, fichierName));
         ConversionResult conversion = Converter.Convert(bytes, EmbeddedDescriptor.Xml);
@@ -286,9 +275,8 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
     {
         Skip.IfNot(fixture.Available, fixture.SkipReason ?? "SQL Server test instance unavailable.");
         Skip.If(
-            string.IsNullOrWhiteSpace(ProductionConnectionString),
-            "No production database configured. Set ConnectionStrings:AscoLSI_Production in " +
-            "tests/Kape22Importer.Tests/appsettings.Test.json or KAPE22_TEST_ConnectionStrings__AscoLSI_Production.");
+            string.IsNullOrWhiteSpace(TestSupport.ProductionConnectionString),
+            TestSupport.NoProductionSkipReason);
 
         byte[] bytes = File.ReadAllBytes(Path.Combine(P60Directory, fichierName));
         ConversionResult conversion = Converter.Convert(bytes, EmbeddedDescriptor.Xml);
@@ -499,7 +487,7 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
     private static readonly Lazy<ConsigneReferenceData> ProductionReferenceData = new(() =>
     {
         DbContextOptions<AscoLsiDbContext> options = new DbContextOptionsBuilder<AscoLsiDbContext>()
-            .UseSqlServer(ProductionConnectionString)
+            .UseSqlServer(TestSupport.ProductionConnectionString)
             .Options;
 
         using AscoLsiDbContext production = new(options);
@@ -664,7 +652,7 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
         where TEntity : class
     {
         DbContextOptions<AscoLsiDbContext> options = new DbContextOptionsBuilder<AscoLsiDbContext>()
-            .UseSqlServer(ProductionConnectionString)
+            .UseSqlServer(TestSupport.ProductionConnectionString)
             .Options;
 
         using AscoLsiDbContext production = new(options);
@@ -677,7 +665,7 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
         where TEntity : class
     {
         DbContextOptions<AscoLsiDbContext> options = new DbContextOptionsBuilder<AscoLsiDbContext>()
-            .UseSqlServer(ProductionConnectionString)
+            .UseSqlServer(TestSupport.ProductionConnectionString)
             .Options;
 
         using AscoLsiDbContext production = new(options);
@@ -689,7 +677,7 @@ public class Kape22ProductionDataParityTests(SqlServerIntegrationFixture fixture
     private static List<string> ReadProductionOperatorChanges(string paddedOf)
     {
         DbContextOptions<AscoLsiJournalDbContext> options = new DbContextOptionsBuilder<AscoLsiJournalDbContext>()
-            .UseSqlServer(ProductionConnectionString)
+            .UseSqlServer(TestSupport.ProductionConnectionString)
             .Options;
 
         using AscoLsiJournalDbContext production = new(options);

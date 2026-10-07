@@ -534,3 +534,29 @@ BEGIN
     );
 END;
 GO
+
+-- Story 6.11 (AC-FR21-7): the 2 production reference tables the L_D_ORDRE_FABRICATION.ProfilProduit and
+-- L_D_SECTIONCHARGE_*.CodeOperation foreign keys point to (AFV004-LSI sys.columns/sys.indexes,
+-- 2026-10-06). Key-only mirrors: the real tables also carry an nvarchar(max) label, never read. Only
+-- ProductionForeignKeyOrderIntegrationTests fills them, and empties them again; no FK here, ever.
+-- Product profiles.
+IF OBJECT_ID(N'dbo.L_P_PROFIL_PRODUIT', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.L_P_PROFIL_PRODUIT
+    (
+        [ID] NCHAR(3) NOT NULL,
+        CONSTRAINT PK_L_P_PROFIL_PRODUIT PRIMARY KEY CLUSTERED ([ID])
+    );
+END;
+GO
+
+-- Rolling operation codes.
+IF OBJECT_ID(N'dbo.L_P_TEXT_OPERATIONS', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.L_P_TEXT_OPERATIONS
+    (
+        [CodeOperation] NCHAR(3) NOT NULL,
+        CONSTRAINT PK_L_P_TEXT_OPERATIONS PRIMARY KEY CLUSTERED ([CodeOperation])
+    );
+END;
+GO

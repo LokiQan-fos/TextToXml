@@ -34,6 +34,14 @@ public class PersistenceSmokeTests(SqlServerIntegrationFixture fixture)
         "L_D_SECTIONCHARGE_SVT",
     ];
 
+    // The 2 production reference tables the Story 6.11 foreign keys point to (key-only mirrors, AFV004-LSI
+    // sys.columns, 2026-10-06).
+    private static readonly string[] ForeignKeyParentTables =
+    [
+        "L_P_PROFIL_PRODUIT",
+        "L_P_TEXT_OPERATIONS",
+    ];
+
     // The 4 tables the D34 replace also deletes from, as the legacy DeleteOF does (Story 6.10 review P-9,
     // minimal mirrors, AFV004-LSI sys.columns, 2026-10-05).
     private static readonly string[] LegacyDeleteOfTables =
@@ -85,14 +93,17 @@ public class PersistenceSmokeTests(SqlServerIntegrationFixture fixture)
         Assert.True(TableExists(fixture.MqttConnectionString, "Logs"));
 
         // Story 4.1: the 10 downstream dispatch tables (AFV004-LSI, sys.columns/sys.indexes, 2026-09-14),
-        // plus the Story 4.12 reference tables and the Story 6.10 precondition and legacy DeleteOF tables.
-        foreach (string table in DownstreamTables.Concat(LegacyDeleteOfTables).Concat(PreconditionTables).Concat(ReferenceTables))
+        // plus the Story 4.12 reference tables, the Story 6.10 precondition and legacy DeleteOF tables and
+        // the Story 6.11 foreign key parent tables.
+        foreach (string table in DownstreamTables.Concat(ForeignKeyParentTables).Concat(LegacyDeleteOfTables)
+                     .Concat(PreconditionTables).Concat(ReferenceTables))
         {
             Assert.True(TableExists(fixture.AscoLsiConnectionString, table), $"Missing table dbo.{table}.");
         }
 
         Assert.Equal(
-            2 + DownstreamTables.Length + LegacyDeleteOfTables.Length + PreconditionTables.Length + ReferenceTables.Length,
+            2 + DownstreamTables.Length + ForeignKeyParentTables.Length + LegacyDeleteOfTables.Length
+                + PreconditionTables.Length + ReferenceTables.Length,
             UserTableCount(fixture.AscoLsiConnectionString));
         Assert.Equal(1, UserTableCount(fixture.MqttConnectionString));
     }
@@ -262,6 +273,43 @@ public class PersistenceSmokeTests(SqlServerIntegrationFixture fixture)
         Assert.False(
             afterRollback.Kape22Rows.Any(entity => entity.Id == newId),
             "The row must not survive the rolled-back TransactionScope.");
+    }
+
+    // Story 6.11 (AC-FR21-7): a run killed during ProductionForeignKeyOrderIntegrationTests leaves its
+    // production foreign keys behind. The next fixture must still drop every table and apply the schema,
+    // never turn the whole Integration suite into a silent skip. A fresh fixture re-applies the same
+    // schema, so the shared one stays usable.
+    [SkippableFact]
+    [Trait("AC", "FR21-7")]
+    public void SchemaApplies_OverAForeignKeyLeftByAKilledRun_DropsItAndStaysAvailable_AcFr21_7()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason ?? "SQL Server test instance unavailable.");
+        fixture.ResetData();
+        using (SqlConnection connection = new(fixture.AscoLsiConnectionString))
+        {
+            connection.Open();
+            using SqlCommand command = connection.CreateCommand();
+            command.CommandText =
+                "ALTER TABLE dbo.L_D_SECTIONCHARGE_SVT WITH CHECK ADD CONSTRAINT [FK_ConsignesSVTOrdreFabrication] " +
+                "FOREIGN KEY ([OF]) REFERENCES dbo.L_D_ORDRE_FABRICATION ([OF]);";
+            command.ExecuteNonQuery();
+        }
+
+        SqlServerIntegrationFixture fresh = new();
+
+        Assert.True(fresh.Available, fresh.SkipReason);
+        Assert.Equal(0, ForeignKeyCount(fixture.AscoLsiConnectionString));
+    }
+
+    private static int ForeignKeyCount(string connectionString)
+    {
+        using SqlConnection connection = new(connectionString);
+        connection.Open();
+
+        using SqlCommand command = connection.CreateCommand();
+        command.CommandText = "SELECT COUNT(*) FROM sys.foreign_keys;";
+
+        return (int)command.ExecuteScalar()!;
     }
 
     private static bool TableExists(string connectionString, string table)

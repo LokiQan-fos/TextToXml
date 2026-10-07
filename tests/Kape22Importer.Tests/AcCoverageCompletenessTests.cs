@@ -39,8 +39,9 @@ public class AcCoverageCompletenessTests
         [20] = 6,
         // FR21-1/2/3 (pre-existing) + FR21-4 (this story, EndToEndImportIntegrationTests.cs)
         // + FR21-5 (this story, RejectionAtomicityIntegrationTests.cs)
-        // + FR21-6 (Story 6.10, OfResendIntegrationTests.cs) = 6.
-        [21] = 6,
+        // + FR21-6 (Story 6.10, OfResendIntegrationTests.cs)
+        // + FR21-7 (Story 6.11, ProductionForeignKeyOrderIntegrationTests.cs) = 7.
+        [21] = 7,
         // FR26-1..6 (Story 6.3, InboxScannerTests.cs); FR26-5 is a KnownException below.
         [26] = 6,
     };

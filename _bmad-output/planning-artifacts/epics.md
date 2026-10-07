@@ -3307,13 +3307,14 @@ production sur une FK que le miroir de schéma n'a pas.
 
 **Acceptance Criteria :** `AC-FR21-7`.
 
-**Given** `AscoLSI_Test` où les 13 FK de production qui touchent le dispatch sont
+**Given** `AscoLSI_Test` où les 20 FK de production qui touchent le dispatch sont
 ajoutées pour la durée du test — `L_D_ORDRE_FABRICATION.Coulee` → `L_D_COULEE`,
 `.ProfilProduit` → `L_P_PROFIL_PRODUIT` ; `OF` des 7 `L_D_SECTIONCHARGE_*`,
 `L_D_OF_SUIVI`, `L_D_REBUT`, `L_D_PLANS_FOURS`, `L_D_PSO` → `L_D_ORDRE_FABRICATION` ;
 `CodeOperation` des 7 `L_D_SECTIONCHARGE_*` → `L_P_TEXT_OPERATIONS` — avec les
 lignes de référence `L_P_PROFIL_PRODUIT` / `L_P_TEXT_OPERATIONS` copiées de
-production (SELECT seul)
+production (SELECT seul) — ou, sans accès production (CI), les codes relus le
+2026-10-06 (décision utilisateur 2026-10-07, revue Story 6.11 D-1/D-2 : 20 FK et non 13)
 **When** un Fichier de référence crée un OF sur une Coulée nouvelle, puis un second
 Fichier le remplace (D34, OF en `Etat` GPAO, avec des lignes `L_D_OF_SUIVI` /
 `L_D_REBUT` existantes)
