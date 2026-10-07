@@ -3,7 +3,6 @@ using System.Linq;
 using Kape22Importer.Persistence;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using TextToXml.Tests;
 using Xunit;
 using static Kape22Importer.Tests.TestSupport;
@@ -31,10 +30,19 @@ public class ProductionForeignKeyOrderIntegrationTests(SqlServerIntegrationFixtu
         "VD2", "VD9", "XA1", "XA2", "XC1", "XP1", "XP9", "XV5", "XVP",
     ];
 
+    // The tables the dispatch inserts into (Kape22Persister) or deletes from (DeleteOf).
+    private static readonly string[] DispatchTables =
+    [
+        "L_D_CONSIGNES", "L_D_COULEE", "L_D_KAPE22", "L_D_MAM_QUAL", "L_D_OF_SUIVI", "L_D_ORDRE_FABRICATION",
+        "L_D_PRODUITS_OUTIL", "L_D_REBUT", "L_D_SECTIONCHARGE_CHUTAGE", "L_D_SECTIONCHARGE_DECOUPE",
+        "L_D_SECTIONCHARGE_LINGOT", "L_D_SECTIONCHARGE_PITS", "L_D_SECTIONCHARGE_POIDSMETRIQUE",
+        "L_D_SECTIONCHARGE_REFROIDISSOIRS", "L_D_SECTIONCHARGE_SVT",
+    ];
+
     // The production foreign keys touching the dispatch, exactly as read in AFV004-LSI sys.foreign_keys
     // on 2026-10-06 (all NO_ACTION, trusted, enabled), as (Name, Table, Column, ReferencedTable,
-    // ReferencedColumn). The L_D_PLANS_FOURS.IdCoulee, L_D_PSO.Coulee and L_D_REBUT.molding_id keys to
-    // L_D_COULEE are out of scope: those columns are not mirrored and the dispatch never writes them.
+    // ReferencedColumn). The keys from other tables to L_D_COULEE (L_D_ANOMALIES, L_D_PLANS_FOURS, L_D_PSO,
+    // L_D_REBUT.molding_id, L_D_STOCK_PSO) are out of scope: the dispatch only inserts L_D_COULEE rows.
     private static readonly (string Name, string Table, string Column, string ReferencedTable, string ReferencedColumn)[] ForeignKeys =
     [
         ("FK_ConsignesChutageOrdreFabrication", "L_D_SECTIONCHARGE_CHUTAGE", "OF", "L_D_ORDRE_FABRICATION", "OF"),
@@ -86,7 +94,7 @@ public class ProductionForeignKeyOrderIntegrationTests(SqlServerIntegrationFixtu
                 $"ALTER TABLE dbo.{key.Table} WITH CHECK ADD CONSTRAINT [{key.Name}] " +
                 $"FOREIGN KEY ([{key.Column}]) REFERENCES dbo.{key.ReferencedTable} ([{key.ReferencedColumn}]);")));
 
-            AssertAccepted(Persist(created));
+            AssertAccepted(Persist(fixture, created));
             string of = DownstreamOf.Pad(created.OF!);
 
             // REPLACE (D34, Etat GPAO): the OF now has an L_D_OF_SUIVI row and 2 L_D_REBUT rows, which
@@ -99,7 +107,7 @@ public class ProductionForeignKeyOrderIntegrationTests(SqlServerIntegrationFixtu
                     of);
             }
 
-            ImportResult replaced = Persist(Hot(numeroFichier: "999"));
+            ImportResult replaced = Persist(fixture, Hot(numeroFichier: "999"));
 
             AssertAccepted(replaced);
             Assert.False(replaced.AlreadyImported);
@@ -118,18 +126,64 @@ public class ProductionForeignKeyOrderIntegrationTests(SqlServerIntegrationFixtu
                 $"IF OBJECT_ID(N'dbo.{key.Name}', N'F') IS NOT NULL ALTER TABLE dbo.{key.Table} DROP CONSTRAINT [{key.Name}];")));
             Execute(string.Concat(ReferencedTables.Select(table => $"DELETE FROM dbo.{table};")));
         }
+
+        // Spec acceptance criterion 2: no key outlives the test.
+        Assert.Equal(0, ForeignKeyCount(fixture.AscoLsiConnectionString));
     }
 
-    private static void AssertAccepted(ImportResult result) =>
-        Assert.True(result.Success, string.Join("; ", result.Errors.Select(error => error.Message)));
+    // Drift guard for the hard-coded list: every production key with a dispatch table on either side is one
+    // of the 20, NO_ACTION, enabled and trusted - except the keys from another table to L_D_COULEE, which the
+    // dispatch only ever inserts, so none of its writes can break them. Needs the production database, read
+    // only (CC-7); the guard above runs without it.
+    [SkippableFact]
+    [Trait("AC", "FR21-7")]
+    public void ProductionForeignKeys_TouchingTheDispatch_AreExactlyTheGuardedList_AcFr21_7()
+    {
+        Skip.If(string.IsNullOrWhiteSpace(ProductionConnectionString), NoProductionSkipReason);
+
+        string tables = string.Join(", ", DispatchTables.Select(table => $"N'{table}'"));
+        List<string> actual = [];
+        using SqlConnection production = OpenProduction();
+        using SqlCommand command = new(
+            "SELECT fk.name, OBJECT_NAME(fk.parent_object_id), pc.name, OBJECT_NAME(fk.referenced_object_id), rc.name, " +
+            "fk.delete_referential_action_desc, fk.is_disabled, fk.is_not_trusted " +
+            "FROM sys.foreign_keys fk " +
+            "JOIN sys.foreign_key_columns fkc ON fkc.constraint_object_id = fk.object_id " +
+            "JOIN sys.columns pc ON pc.object_id = fkc.parent_object_id AND pc.column_id = fkc.parent_column_id " +
+            "JOIN sys.columns rc ON rc.object_id = fkc.referenced_object_id AND rc.column_id = fkc.referenced_column_id " +
+            $"WHERE (OBJECT_NAME(fk.parent_object_id) IN ({tables}) OR OBJECT_NAME(fk.referenced_object_id) IN ({tables})) " +
+            "AND NOT (OBJECT_NAME(fk.referenced_object_id) = N'L_D_COULEE' AND OBJECT_NAME(fk.parent_object_id) <> N'L_D_ORDRE_FABRICATION');",
+            production);
+        using (SqlDataReader reader = command.ExecuteReader())
+        {
+            while (reader.Read())
+            {
+                actual.Add($"{reader.GetString(0)}|{reader.GetString(1)}|{reader.GetString(2)}|{reader.GetString(3)}|{reader.GetString(4)}|" +
+                    $"{reader.GetString(5)}|{(reader.GetBoolean(6) ? 1 : 0)}{(reader.GetBoolean(7) ? 1 : 0)}");
+            }
+        }
+
+        Assert.Equal(
+            ForeignKeys
+                .Select(key => $"{key.Name}|{key.Table}|{key.Column}|{key.ReferencedTable}|{key.ReferencedColumn}|NO_ACTION|00")
+                .Order(StringComparer.OrdinalIgnoreCase),
+            actual.Order(StringComparer.OrdinalIgnoreCase));
+    }
 
     // The reference Fichier with a hot CodeConsignePits, so its absent Coulee "065718" is created, not
-    // refused; numeroFichier re-sends it under another NumeroFichier, past the D22 guard.
+    // refused, and its PoidsMetrique / SVT sections made applicable (codes from the 2026-10-06 list), so
+    // all 7 sections - and their 14 keys - are written by CREATE and deleted by REPLACE (GPAO no longer
+    // sends those 2 legacy sections, but the mapper still writes them if it does); numeroFichier
+    // re-sends it under another NumeroFichier, past the D22 guard.
     private static Kape22ImportBundle Hot(string? numeroFichier = null) =>
         MapMutatedBundle(d =>
         {
             SetChamp(d, "message", "CodeConsignePits", "3 148 00 740");
+            SetChamp(d, "message", "CodeOpePoidMetrique", "XP9");
+            SetChamp(d, "message", "CodeOpeSVT", "XVP");
             SetChamp(d, "message", "Coulee", "065718");
+            SetChamp(d, "message", "RangOpePoidMetrique", "160");
+            SetChamp(d, "message", "RangOpeSVT", "170");
             if (numeroFichier is not null)
             {
                 SetChamp(d, "header", "NumeroFichier", numeroFichier);
@@ -154,11 +208,14 @@ public class ProductionForeignKeyOrderIntegrationTests(SqlServerIntegrationFixtu
             bundle.SectionChargeSvt?.CodeOperation,
         ];
 
+        // A null section would leave its 2 keys unexercised while the test stays green.
+        Assert.All(codeOperations, code => Assert.NotNull(code));
+
         string profil = bundle.OrdreFabrication!.ProfilProduit;
         Assert.True(
             profils.Contains(profil),
             $"Spec Ask First (reference data, not an FK order bug): ProfilProduit '{profil}' is missing from L_P_PROFIL_PRODUIT.");
-        foreach (string code in codeOperations.OfType<string>())
+        foreach (string code in codeOperations.Cast<string>())
         {
             Assert.True(
                 operations.Contains(code),
@@ -192,14 +249,5 @@ public class ProductionForeignKeyOrderIntegrationTests(SqlServerIntegrationFixtu
         Execute(
             string.Concat(ProfilProduits.Select(code => $"INSERT INTO dbo.L_P_PROFIL_PRODUIT ([ID]) VALUES (N'{code}');")) +
             string.Concat(CodeOperations.Select(code => $"INSERT INTO dbo.L_P_TEXT_OPERATIONS ([CodeOperation]) VALUES (N'{code}');")));
-    }
-
-    private ImportResult Persist(Kape22ImportBundle bundle)
-    {
-        using AscoLsiDbContext context = fixture.NewAscoLsiContext();
-        IConfiguration configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?> { ["Import:Commande"] = "P60" })
-            .Build();
-        return new Kape22Persister(context, configuration, fixture.NewJournal(), ReferenceFichierName, WinterClock()).Persist(bundle);
     }
 }

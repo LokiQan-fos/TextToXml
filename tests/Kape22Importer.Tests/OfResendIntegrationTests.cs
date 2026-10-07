@@ -58,10 +58,10 @@ public class OfResendIntegrationTests(SqlServerIntegrationFixture fixture)
     {
         Ready();
         Kape22ImportBundle reference = MapReferenceBundle();
-        AssertAccepted(Persist(reference));
+        AssertAccepted(Persist(fixture, reference));
         SetEtat(etat, reference.OF!);
 
-        AssertRefused(() => Persist(Resent()), reference.OF!, $"état {name} ({etat})");
+        AssertRefused(() => Persist(fixture, Resent()), reference.OF!, $"état {name} ({etat})");
     }
 
     // A non-protected state other than GPAO (4, ANNULEE): the existing OF is replaced, not refused.
@@ -71,10 +71,10 @@ public class OfResendIntegrationTests(SqlServerIntegrationFixture fixture)
     {
         Ready();
         Kape22ImportBundle reference = MapReferenceBundle();
-        AssertAccepted(Persist(reference));
+        AssertAccepted(Persist(fixture, reference));
         SetEtat(4, reference.OF!);
 
-        ImportResult result = Persist(Resent());
+        ImportResult result = Persist(fixture, Resent());
 
         AssertAccepted(result);
         Assert.False(result.AlreadyImported);
@@ -96,13 +96,13 @@ public class OfResendIntegrationTests(SqlServerIntegrationFixture fixture)
     {
         Ready();
         Kape22ImportBundle reference = MapReferenceBundle();
-        AssertAccepted(Persist(reference));
+        AssertAccepted(Persist(fixture, reference));
         using (AscoLsiDbContext context = fixture.NewAscoLsiContext())
         {
             context.Database.ExecuteSqlRaw(insert, DownstreamOf.Pad(reference.OF!));
         }
 
-        AssertRefused(() => Persist(Resent()), reference.OF!, $"présent dans {table}");
+        AssertRefused(() => Persist(fixture, Resent()), reference.OF!, $"présent dans {table}");
     }
 
     // Review P-2: every reason is named, the state first, then each precondition table in turn, joined by
@@ -113,7 +113,7 @@ public class OfResendIntegrationTests(SqlServerIntegrationFixture fixture)
     {
         Ready();
         Kape22ImportBundle reference = MapReferenceBundle();
-        AssertAccepted(Persist(reference));
+        AssertAccepted(Persist(fixture, reference));
         SetEtat(2, reference.OF!);
         using (AscoLsiDbContext context = fixture.NewAscoLsiContext())
         {
@@ -124,7 +124,7 @@ public class OfResendIntegrationTests(SqlServerIntegrationFixture fixture)
         }
 
         AssertRefused(
-            () => Persist(Resent()),
+            () => Persist(fixture, Resent()),
             reference.OF!,
             "état EVC (2) ; présent dans L_D_FOURS ; présent dans L_D_PSO");
     }
@@ -138,10 +138,10 @@ public class OfResendIntegrationTests(SqlServerIntegrationFixture fixture)
     {
         Ready();
         Kape22ImportBundle reference = MapReferenceBundle();
-        AssertAccepted(Persist(reference));
+        AssertAccepted(Persist(fixture, reference));
         SeedLegacyDeleteOfRows(reference.OF!);
 
-        AssertAccepted(Persist(Resent()));
+        AssertAccepted(Persist(fixture, Resent()));
 
         using AscoLsiDbContext verify = fixture.NewAscoLsiContext();
         Assert.Equal(
@@ -159,14 +159,14 @@ public class OfResendIntegrationTests(SqlServerIntegrationFixture fixture)
     public void Persist_ResentOfWithFewerRows_LeavesNoStaleRow_AcFr21_6()
     {
         Ready();
-        AssertAccepted(Persist(Reduced()));
+        AssertAccepted(Persist(fixture, Reduced()));
         List<string> expected = DownstreamSnapshot();
 
         Ready();
-        AssertAccepted(Persist(MapReferenceBundle()));
+        AssertAccepted(Persist(fixture, MapReferenceBundle()));
         Assert.NotEqual(expected, DownstreamSnapshot());
 
-        AssertAccepted(Persist(Reduced()));
+        AssertAccepted(Persist(fixture, Reduced()));
 
         Assert.Equal(expected, DownstreamSnapshot());
     }
@@ -213,12 +213,12 @@ public class OfResendIntegrationTests(SqlServerIntegrationFixture fixture)
     {
         Ready();
         Kape22ImportBundle reference = MapReferenceBundle();
-        AssertAccepted(Persist(reference));
+        AssertAccepted(Persist(fixture, reference));
         SeedLegacyDeleteOfRows(reference.OF!);
         List<string> before = Snapshot();
         int logRowsBefore = fixture.LogRows().Count;
 
-        ImportResult result = Persist(Resent(d => SetChamp(d, "message", "LibelleConsigneChutage", new string('A', 50))));
+        ImportResult result = Persist(fixture, Resent(d => SetChamp(d, "message", "LibelleConsigneChutage", new string('A', 50))));
 
         ConversionError error = Assert.Single(result.Errors);
         Assert.Equal(ErrorCode.PersistenceError, error.Code);
@@ -227,9 +227,6 @@ public class OfResendIntegrationTests(SqlServerIntegrationFixture fixture)
         Assert.Equal(logRowsBefore + 1, logRows.Count);
         Assert.Contains("REJETÉ", logRows[^1].Message, StringComparison.Ordinal);
     }
-
-    private static void AssertAccepted(ImportResult result) =>
-        Assert.True(result.Success, string.Join("; ", result.Errors.Select(error => error.Message)));
 
     private static byte[] Read(string relativePath) =>
         File.ReadAllBytes(RepoLayout.ProjectFile($"P60/{relativePath}"));
@@ -345,15 +342,6 @@ public class OfResendIntegrationTests(SqlServerIntegrationFixture fixture)
                 Clock(),
                 NullLogger<Kape22FichierProcessor>.Instance)
             .Import(Path.GetFileName(relativePath), Read(relativePath));
-
-    private ImportResult Persist(Kape22ImportBundle bundle)
-    {
-        using AscoLsiDbContext context = fixture.NewAscoLsiContext();
-        IConfiguration configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?> { ["Import:Commande"] = "P60" })
-            .Build();
-        return new Kape22Persister(context, configuration, fixture.NewJournal(), ReferenceFichierName, WinterClock()).Persist(bundle);
-    }
 
     // The reference Fichier is cold, so its Coulee ("065718") is on file unless the test seeds its own.
     private void Ready(bool seedReferenceCoulee = true)

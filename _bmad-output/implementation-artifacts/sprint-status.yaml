@@ -104,7 +104,7 @@ development_status:
   6-8-flush-sink-logs-assertions-harnais-e2e: done
   6-9-controle-coulee-froide-typeconsigne-12: done
   6-10-renvoi-of-existant-remplacement-ou-refus: done
-  6-11-ordre-fk-production-garde-par-tests: review
+  6-11-ordre-fk-production-garde-par-tests: done
   6-12-exception-fichier-plafond-commande-blanche: backlog
   epic-6-retrospective: done
 action_items:

@@ -238,7 +238,8 @@ public sealed class SqlServerIntegrationFixture
     // guarantees the instance always matches exactly what scripts/schema/ currently describes.
     // Story 6.11: every foreign key goes first - a run killed during ProductionForeignKeyOrderIntegrationTests
     // leaves its production keys behind, and a referenced table cannot be dropped, which would turn the
-    // whole Integration suite into a silent skip.
+    // whole Integration suite into a silent skip. The tables are dropped in name order: sys.tables lists them
+    // in an order that shifts on every rebuild, which made the leftover-FK smoke test red only on some runs.
     private static void DropExistingUserTables(string connectionString)
     {
         using SqlConnection connection = new(WithShortLoginTimeout(connectionString));
@@ -251,7 +252,8 @@ public sealed class SqlServerIntegrationFixture
             SELECT @sql += N'ALTER TABLE ' + QUOTENAME(OBJECT_SCHEMA_NAME(fk.parent_object_id)) + N'.'
                 + QUOTENAME(OBJECT_NAME(fk.parent_object_id)) + N' DROP CONSTRAINT ' + QUOTENAME(fk.name) + N';'
             FROM sys.foreign_keys fk;
-            SELECT @sql += N'DROP TABLE ' + QUOTENAME(s.name) + N'.' + QUOTENAME(t.name) + N';'
+            SELECT @sql += STRING_AGG(CAST(N'DROP TABLE ' + QUOTENAME(s.name) + N'.' + QUOTENAME(t.name) + N';' AS nvarchar(max)), N'')
+                WITHIN GROUP (ORDER BY s.name, t.name)
             FROM sys.tables t
             JOIN sys.schemas s ON t.schema_id = s.schema_id
             WHERE t.is_ms_shipped = 0;

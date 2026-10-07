@@ -295,21 +295,25 @@ public class PersistenceSmokeTests(SqlServerIntegrationFixture fixture)
             command.ExecuteNonQuery();
         }
 
-        SqlServerIntegrationFixture fresh = new();
+        try
+        {
+            SqlServerIntegrationFixture fresh = new();
 
-        Assert.True(fresh.Available, fresh.SkipReason);
-        Assert.Equal(0, ForeignKeyCount(fixture.AscoLsiConnectionString));
-    }
-
-    private static int ForeignKeyCount(string connectionString)
-    {
-        using SqlConnection connection = new(connectionString);
-        connection.Open();
-
-        using SqlCommand command = connection.CreateCommand();
-        command.CommandText = "SELECT COUNT(*) FROM sys.foreign_keys;";
-
-        return (int)command.ExecuteScalar()!;
+            Assert.True(fresh.Available, fresh.SkipReason);
+            Assert.Equal(0, TestSupport.ForeignKeyCount(fixture.AscoLsiConnectionString));
+        }
+        finally
+        {
+            // A fixture that failed before its drop would leave the key, and every later ResetData's
+            // TRUNCATE in the collection would fail on it.
+            using SqlConnection connection = new(fixture.AscoLsiConnectionString);
+            connection.Open();
+            using SqlCommand command = connection.CreateCommand();
+            command.CommandText =
+                "IF OBJECT_ID(N'dbo.FK_ConsignesSVTOrdreFabrication', N'F') IS NOT NULL " +
+                "ALTER TABLE dbo.L_D_SECTIONCHARGE_SVT DROP CONSTRAINT [FK_ConsignesSVTOrdreFabrication];";
+            command.ExecuteNonQuery();
+        }
     }
 
     private static bool TableExists(string connectionString, string table)

@@ -280,6 +280,34 @@ internal static class TestSupport
         }
     }
 
+    // Asserts a Persist / Import result is a success, naming its errors otherwise.
+    public static void AssertAccepted(ImportResult result) =>
+        Assert.True(result.Success, string.Join("; ", result.Errors.Select(error => error.Message)));
+
+    // The number of foreign keys left in a database: the test instance must carry none outside the
+    // Story 6.11 guard's own duration.
+    public static int ForeignKeyCount(string connectionString)
+    {
+        using SqlConnection connection = new(connectionString);
+        connection.Open();
+
+        using SqlCommand command = connection.CreateCommand();
+        command.CommandText = "SELECT COUNT(*) FROM sys.foreign_keys;";
+
+        return (int)command.ExecuteScalar()!;
+    }
+
+    // Kape22Persister.Persist on a fresh context of the Integration fixture, as the P60 command, on the
+    // WinterClock.
+    public static ImportResult Persist(SqlServerIntegrationFixture fixture, Kape22ImportBundle bundle)
+    {
+        using AscoLsiDbContext context = fixture.NewAscoLsiContext();
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Import:Commande"] = "P60" })
+            .Build();
+        return new Kape22Persister(context, configuration, fixture.NewJournal(), ReferenceFichierName, WinterClock()).Persist(bundle);
+    }
+
     // The embedded P60 schema (Templates/P60.xsd), read the same way P60Deserializer reads it.
     public static string EmbeddedP60Xsd() => EmbeddedResource(EmbeddedP60XsdResourceName);
 
