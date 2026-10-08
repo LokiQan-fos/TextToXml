@@ -576,7 +576,9 @@ public sealed class InboxScannerTests : IDisposable
 
     // AC-FR26-6: when the export cannot be deleted after a failed filing (a third party holds it open), the
     // cleanup failure is logged at Warning naming the export and never unwinds the tick: the Fichier stays
-    // in processing/ and the next Fichier is still filed.
+    // in processing/ and the next Fichier is still filed. The held-open export is simulated through the
+    // DeleteExport seam: a real open handle blocks the delete on Windows only, so the test would pass there
+    // and fail on the Linux CI runner.
     [Fact]
     [Trait("AC", "FR26-6")]
     public void Tick_ExportUndeletableAfterAFailedFiling_WarnsAndFilesTheNextFichier_AcFr26_6()
@@ -585,25 +587,20 @@ public sealed class InboxScannerTests : IDisposable
         source.Add("processing", "P60_847_682_001", Bytes("payload"), Now.AddMinutes(-1));
         source.Add("processing", "P60_847_682_002", Bytes("payload"), Now.AddMinutes(-1));
         string lockedExport = Path.Combine(this.exportFolder, $"P60_847_682_001_{NowSuffix}.xml");
-        FileStream? exportLock = null;
         source.MoveHook = (_, name) =>
         {
             if (name == "P60_847_682_001")
             {
-                exportLock = File.Open(lockedExport, FileMode.Open, FileAccess.Read, FileShare.None);
                 throw new IOException("archive unreachable");
             }
         };
         RecordingLogger<InboxScanner> logger = new();
+        InboxScanner scanner = new(source, AlwaysSucceeds(), this.ExportOptions(), new FixedClock(Now), logger)
+        {
+            DeleteExport = path => throw new IOException($"The process cannot access the file '{path}' because it is being used by another process."),
+        };
 
-        try
-        {
-            Scanner(source, AlwaysSucceeds(), this.ExportOptions(), logger).RunTick();
-        }
-        finally
-        {
-            exportLock?.Dispose();
-        }
+        scanner.RunTick();
 
         Assert.True(source.Exists("processing", "P60_847_682_001"), "the Fichier must stay in processing/.");
         Assert.True(source.Exists(ArchiveDateFolder, "P60_847_682_002"));
