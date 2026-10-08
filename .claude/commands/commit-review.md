@@ -88,6 +88,10 @@ source_spec / summary / evidence).
 Exécute successivement le build strict, les tests unitaires et les tests
 d'intégration de la section « Commandes » du profil. Arrête-toi à la
 première erreur. Note les comptes de tests : ils servent aux ÉTAPES 6 à 8.
+Regarde aussi le dernier run CI de la branche, si le dépôt a une CI et que
+gh est disponible (gh run list --branch <branche> --limit 1). S'il est
+rouge, note l'étape et le test en échec (gh run view <id> --log-failed) :
+cela ne bloque pas la clôture, mais doit figurer dans le résumé final.
 
 ÉTAPE 6 — Clôture d'épic (seulement si cette story est la dernière).
 Si, après l'ÉTAPE 4, toutes les stories de l'épic <N> sont done, passe
@@ -143,7 +147,7 @@ Après le commit, rends :
 - le hash du commit,
 - la sortie de git log --oneline -5,
 - un résumé : patchs appliqués, décisions tranchées, defers tracés, nouvel
-  état de la story,
+  état de la story, statut CI noté à l'ÉTAPE 5,
 - la commande suivante : /build-story <story suivante>, ou /retro-epic <N>
   si l'épic est passé à done.
 

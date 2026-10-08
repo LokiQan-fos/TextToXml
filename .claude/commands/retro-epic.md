@@ -67,6 +67,14 @@ section manque, demande les commandes. Note les totaux exacts et l'état
 de chaque suite (passed / skipped / failed) : ce sont les chiffres de la
 section vérification du rapport.
 
+Vérifie aussi la CI : si le dépôt en a une (par exemple .github/workflows/)
+et que gh est disponible, cite le dernier run de la branche
+(gh run list --branch <branche> --limit 1). S'il est rouge, c'est un
+finding : nomme l'étape et le test en échec (gh run view <id>
+--log-failed). Des suites vertes en local ne prouvent pas une CI verte :
+autre système, autres étapes. Si la CI n'a pas pu être vérifiée, dis-le
+dans le rapport.
+
 INVOCATION DU SKILL.
 
 Invoque le skill bmad-retrospective en mode headless : -H <N>. Passe-lui :
