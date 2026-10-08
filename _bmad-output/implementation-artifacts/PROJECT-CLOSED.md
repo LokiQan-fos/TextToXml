@@ -13,9 +13,10 @@ last_commit: '624407f59dc44cedb0aa1cda20c0cbe058364faf'
 > **Re-closed 2026-10-08 at Epic 6 closure** (third retro `epic-6-retro-2026-10-08.md`,
 > `accepted-with-open-items`, commit `624407f`). `last_commit` is the retro commit; this re-close ships
 > on top of it and closes `epic-6-retro2-item-1`, `-item-2` and `epic-6-retro3-item-3`. Stories 6.6–6.12
-> are covered by the second and third retros. No Epic 7 is planned. One process item stays open:
-> `epic-6-retro3-item-1` (project-profile rule: a behavior-changing step-04 review patch ships with a
-> red-run test).
+> are covered by the second and third retros. No Epic 7 is planned. Every `sprint-status.yaml` action item is
+> `done`; the last one, `epic-6-retro3-item-1` (a behavior-changing step-04 review patch ships with a
+> red-run test), landed after the re-close in `.claude/commands/build-story.md`, not in the project
+> profile, so the rule travels with the reusable command (user decision 2026-10-08).
 
 > **Epic 6 done 2026-10-08, story 6.12; retrospective pending.** Stories 6.11 (production FK order
 > guarded by test) and 6.12 (any per-Fichier exception counted for the retry cap, blank
@@ -72,7 +73,7 @@ banner).
 | **Epic 3** | Structural repositioning as a library, inbox scanning/file lifecycle, per-file orchestration, double journalization, worker loop + graceful shutdown, loop robustness, E2E coverage harness (3.0–3.6) | 7/7 done | `accepted-with-open-items` (`epic-3-retro-2026-09-11.md`) — action items done, 1 reconciled at closure (see §3) |
 | **Epic 4** | Downstream-table dispatch: 10 `L_D_*` entities, mapping annex, OF/Coulée + Consignes mappers, bundle orchestrator, single-transaction persister, 10-table E2E suite, plus 5 post-retro hardening stories (4.1–4.7, 4.2-bis, 4.3-bis, 4.9, 4.10, 4.11), then 4 production-parity stories (4.4-bis, 4.12, 4.13, 4.14) | 11/11 base + 5/5 hardening + 4/4 parity = done | `accepted-with-open-items`, 4 retro passes (`epic-4-retro-2026-09-17.md`, `-18.md`, `-21.md`, `-25.md`) — every routed action item done as of this closure (see §3) |
 | **Epic 5** | P89 Step 1: `IFichierJournal` + LSI implementation, `P89Converter` (raw P89 folder → timestamped normalized XML + XSD), worker `GpaoConvertP89` under the Launcher (5.0–5.2) | 3/3 done | `accepted-with-open-items` (`epic-5-retro-2026-09-28.md`) — A-1, A-3 done 2026-09-28; A-2, A-4 done 2026-10-01 |
-| **Epic 6** | P60 journal via `IFichierJournal` (D22 guard on `L_D_KAPE22`), stability gate for P60 + P89, P60 XML export to a dedicated never-purged folder, shared hardening of the two GPAO workers + `MicroService.Publisher`, E2E harness realignment, real-`Client` integration test (6.1–6.5, 6.4-bis), then 3 post-retro stories: worker config validation + share outage, per-Fichier retry cap, Logs sink flush + E2E assertions (6.6–6.8), then 2 legacy-rejected-Fichier stories: cold-Coulée check on `TypeConsigne` 12, re-sent existing OF replaced or refused (D34) (6.9–6.10), then 2 pre-deployment gate stories: production FK order guarded by test (AC-FR21-7), any per-Fichier exception counted for the retry cap + blank `Import:Commande` refused (6.11–6.12) | 6/6 base + 3/3 post-retro + 2/2 legacy-rejected + 2/2 pre-deployment = done | `accepted-with-open-items`, 3 retro passes: third pass (`epic-6-retro-2026-10-08.md`, commit `624407f`) — A-2 done `d931bd3`, A-3 done at this re-close, A-1 open; second pass (`epic-6-retro-2026-10-06.md`, commit `37a5cd2`) — A-1, A-2 done at this re-close, A-3 done by the 2026-10-06 correct-course (6.11–6.12); first pass `accepted-with-open-items` (`epic-6-retro-2026-10-01.md`) — A-1, A-3 done 2026-10-01; A-2 done by the 2026-10-01 correct-course (6.6–6.8) |
+| **Epic 6** | P60 journal via `IFichierJournal` (D22 guard on `L_D_KAPE22`), stability gate for P60 + P89, P60 XML export to a dedicated never-purged folder, shared hardening of the two GPAO workers + `MicroService.Publisher`, E2E harness realignment, real-`Client` integration test (6.1–6.5, 6.4-bis), then 3 post-retro stories: worker config validation + share outage, per-Fichier retry cap, Logs sink flush + E2E assertions (6.6–6.8), then 2 legacy-rejected-Fichier stories: cold-Coulée check on `TypeConsigne` 12, re-sent existing OF replaced or refused (D34) (6.9–6.10), then 2 pre-deployment gate stories: production FK order guarded by test (AC-FR21-7), any per-Fichier exception counted for the retry cap + blank `Import:Commande` refused (6.11–6.12) | 6/6 base + 3/3 post-retro + 2/2 legacy-rejected + 2/2 pre-deployment = done | `accepted-with-open-items`, 3 retro passes: third pass (`epic-6-retro-2026-10-08.md`, commit `624407f`) — A-2 done `d931bd3`, A-3 done at this re-close, A-1 done in `build-story.md` (user decision: command, not profile); second pass (`epic-6-retro-2026-10-06.md`, commit `37a5cd2`) — A-1, A-2 done at this re-close, A-3 done by the 2026-10-06 correct-course (6.11–6.12); first pass `accepted-with-open-items` (`epic-6-retro-2026-10-01.md`) — A-1, A-3 done 2026-10-01; A-2 done by the 2026-10-01 correct-course (6.6–6.8) |
 
 Every epic closed with the same verdict shape: **accepted-with-open-items**, never a hard rejection.
 Each round of open items was either fixed by a dedicated follow-up story or explicitly accepted as a
@@ -172,8 +173,8 @@ re-close), `epic-6-retro-item-3` (project-profile rule), `epic-5-retro-item-2` (
 document and `epic-<N>-context.md` in its closure commit — the prevention for this document going
 stale at three epic closures).
 
-At the 2026-10-08 re-close, one `sprint-status.yaml` action item is not `done`:
-`epic-6-retro3-item-1` (project-profile rule, see top banner). Done at this re-close:
+At the 2026-10-08 re-close, every `sprint-status.yaml` action item is `done`. Done right after it:
+`epic-6-retro3-item-1` (rule in `.claude/commands/build-story.md`, see top banner). Done at this re-close:
 `epic-6-retro2-item-1` (this document), `epic-6-retro2-item-2` (spec 6.10 `done` with P-4/P-5 ticked
 against `dd6dc7b`; `deferred-work.md` 6.8 W-1 confirmed and 6.9 F-3 RESOLVED r550; the duplicate OF
 race entries were already both ACCEPTED as D35 by `832572c`) and `epic-6-retro3-item-3` (this scope

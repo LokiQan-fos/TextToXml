@@ -47,6 +47,14 @@ Laisse bmad-build dérouler ses cinq étapes. Les checkpoints humains
 restent obligatoires : step-02 (approbation du spec), step-04 (triage des
 findings), step-05 (commit). Ne saute aucun.
 
+Au step-04, un patch qui change un comportement est livré avec son test,
+et le rouge observé avant le patch est consigné dans le Spec Change Log.
+Si aucun test n'est possible (pas de seam, par exemple), la spec le
+justifie au regard de la discipline TDD du profil projet. Au checkpoint
+de triage, signale tout patch de comportement sans test ni justification
+comme une non-conformité avant le commit du step-05 : les lentilles ont
+relu le code d'avant les patches, personne ne relit les patches eux-mêmes.
+
 Si step-01 choisit quand même la route one-shot malgré cette instruction,
 arrête immédiatement et signale-le — ne laisse pas le workflow continuer
 sur la mauvaise route.
