@@ -15,8 +15,11 @@ last_commit: '624407f59dc44cedb0aa1cda20c0cbe058364faf'
 > on top of it and closes `epic-6-retro2-item-1`, `-item-2` and `epic-6-retro3-item-3`. Stories 6.6–6.12
 > are covered by the second and third retros. No Epic 7 is planned. Every `sprint-status.yaml` action item is
 > `done`; the last one, `epic-6-retro3-item-1` (a behavior-changing step-04 review patch ships with a
-> red-run test), landed after the re-close in `.claude/commands/build-story.md`, not in the project
-> profile, so the rule travels with the reusable command (user decision 2026-10-08).
+> red-run test), landed after the re-close in the `build-story` command, not in the project
+> profile, so the rule travels with the reusable command (user decision 2026-10-08). The four
+> workflow commands moved the same day from `.claude/commands/` to the `bmad-kit` Claude Code plugin
+> (private repository `laurentkieliszak-glitch/bmad-kit`); they now run as `/bmad-kit:build-story`,
+> `/bmad-kit:run-review`, `/bmad-kit:commit-review` and `/bmad-kit:retro-epic`.
 
 > **Epic 6 done 2026-10-08, story 6.12; retrospective pending.** Stories 6.11 (production FK order
 > guarded by test) and 6.12 (any per-Fichier exception counted for the retry cap, blank
@@ -174,7 +177,7 @@ document and `epic-<N>-context.md` in its closure commit — the prevention for 
 stale at three epic closures).
 
 At the 2026-10-08 re-close, every `sprint-status.yaml` action item is `done`. Done right after it:
-`epic-6-retro3-item-1` (rule in `.claude/commands/build-story.md`, see top banner). Done at this re-close:
+`epic-6-retro3-item-1` (rule in the `build-story` command, now in the `bmad-kit` plugin, see top banner). Done at this re-close:
 `epic-6-retro2-item-1` (this document), `epic-6-retro2-item-2` (spec 6.10 `done` with P-4/P-5 ticked
 against `dd6dc7b`; `deferred-work.md` 6.8 W-1 confirmed and 6.9 F-3 RESOLVED r550; the duplicate OF
 race entries were already both ACCEPTED as D35 by `832572c`) and `epic-6-retro3-item-3` (this scope

@@ -148,11 +148,11 @@ Format d'entrée (un bloc par item déféré) :
 
 Fichier : `_bmad-output/implementation-artifacts/PROJECT-CLOSED.md`.
 
-- **Fin d'épic** (`/commit-review`, clôture de la dernière story) : bandeau en tête
+- **Fin d'épic** (`/bmad-kit:commit-review`, clôture de la dernière story) : bandeau en tête
   « Epic N done <date>, story N.M; retrospective pending », ligne de l'épic dans le tableau
   §1 (périmètre, stories x/x done, verdict « retro pending »), chiffres de test en §5. Le
   frontmatter ne change pas.
-- **Re-clôture** (`/retro-epic`, dans le commit de la rétro) : frontmatter `status: 'closed'`,
+- **Re-clôture** (`/bmad-kit:retro-epic`, dans le commit de la rétro) : frontmatter `status: 'closed'`,
   `closed_date` du jour, l'ancienne date en `previous_closed_date`, `last_commit` = HEAD avant
   le commit de la rétro ; bandeau « Re-closed <date> at Epic N closure » qui cite la rétro et
   son verdict ; ligne de l'épic en §1 (stories, rétros, actions) ; actions encore ouvertes en

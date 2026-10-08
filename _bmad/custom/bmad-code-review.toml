@@ -5,8 +5,8 @@
 [workflow]
 
 # No activation_steps_prepend: the story / range / spec resolution lives only in
-# .claude/commands/run-review.md, so it travels with the command and a plain
-# bmad-code-review run (e.g. on uncommitted changes) is not hijacked.
+# the bmad-kit plugin's run-review command, so it travels with the command and
+# a plain bmad-code-review run (e.g. on uncommitted changes) is not hijacked.
 
 persistent_facts = [
   "file:{project-root}/_bmad-output/project-profile.md",
