@@ -1,5 +1,7 @@
 ---
 description: Lance la rétrospective d'un épic selon BMAD
+argument-hint: "[N]"
+disable-model-invocation: true
 ---
 
 Argument reçu : $ARGUMENTS — numéro d'épic (ex. 4). Peut être vide.

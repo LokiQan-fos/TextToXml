@@ -1,5 +1,7 @@
 ---
 description: Commit de clôture post-review — applique patches, defers, sprint-status, puis commit
+argument-hint: "[N.M]"
+disable-model-invocation: true
 ---
 
 Tu appliques les findings d'une revue de code sur une story, puis tu commites

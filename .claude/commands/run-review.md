@@ -1,5 +1,6 @@
 ---
 description: Lance une revue BMAD sur une story (par défaut celle en review), sans question
+argument-hint: "[N.M]"
 ---
 
 Argument reçu : $ARGUMENTS

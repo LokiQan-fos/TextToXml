@@ -1,5 +1,7 @@
 ---
 description: Lance bmad-build sur une story avec route plan-code-review forcée
+argument-hint: "[N.M]"
+disable-model-invocation: true
 ---
 
 Argument reçu : $ARGUMENTS
