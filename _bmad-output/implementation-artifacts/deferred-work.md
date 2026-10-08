@@ -1521,3 +1521,7 @@ s'y trouver et rester à confirmer.
 - source_spec: `spec-6-12-exception-fichier-plafond-commande-blanche.md` (D-2, low)
   summary: An `Import:Commande` with leading or trailing whitespace (e.g. `" P60 "`) passes `GpaoImportP60` startup and is written as-is to `L_D_LOG_COMMANDE.Commande`.
   evidence: edge-case-hunter + blind-hunter lenses, `MicroServices/GPAO/ImportP60/Client.cs` `ReadConfig`. AC-FR25-9 only refuses empty or whitespace-only values; a padding rule is a product choice outside the story.
+
+- source_spec: `reviews/story-6-12/aggregated-report.md` (F-1, medium)
+  summary: No test makes P89 `Accept` throw after the XML is created (`new FileStream(xmlPath, FileMode.CreateNew)`), so narrowing its bare `catch` or dropping `TryDelete(xmlPath)` would stay green and a retried Fichier would leave one orphan XML per attempt, up to `P89:MaxAttempts`.
+  evidence: verification-gap lens, `src/P89Converter/P89FolderConverter.cs:195-201` vs `tests/P89Converter.Tests/P89FolderConverterTests.cs`; P60 pins the same case (`RunTick_UnexpectedFilingException_CountsTheFichierAndFilesTheNext_AcFr25_8`). Pre-existing since Story 5.x; closing it needs a write-or-move seam after the XML, outside the 6.12 Code Map (Ask First). Candidate for a test-hardening story.

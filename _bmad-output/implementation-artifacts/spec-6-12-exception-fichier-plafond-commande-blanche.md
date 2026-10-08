@@ -70,6 +70,7 @@ context:
 ## Spec Change Log
 
 - 2026-10-08, step-04 review (blind-hunter, edge-case-hunter, verification-gap, acceptance-auditor; acceptance-auditor: no finding), no loopback, triage approved by the user. Patches P-1..P-7: (P-1) the read and filing Warnings carry the exception for a non-I/O cause only, so a transient I/O fault logs exactly as before (Always "I/O keeps today's behavior"); (P-2) `TryDelete` catches any exception, since it runs inside the widened filing catch; (P-3) I/O cause text pinned (P60 theory `DoesNotContain(nameof(IOException))`, P89 `RunTick_SourceUnreadable_DefersWithoutEntry` exact `Fichier : <message>`); (P-4) P89 test asserts the tick-1 Deferred reason, no journal entry / XML for the faulty Fichier, the healthy one in done; (P-5) the blank-`Commande` refusal names the `P60` default; (P-6) `ProcessFromProcessing` comments no longer imply an I/O-only read catch; (P-7) `deferred-work.md` RESOLVED lines reformatted; `ConvertP89.Tests` run (68 green). Deferred: D-1 P89 `Reject` double journal on a failed move (pre-existing, now any exception type), D-2 padded `Import:Commande`. P-1 and P-2 have no test (the recording logger drops the exception object; `File.Delete` has no seam).
+- 2026-10-08, /run-review (`reviews/story-6-12/aggregated-report.md`), verdict REFUSÉ on D-1 (CC-1: P-1 and P-2 above shipped without a test), settled by the user as option 2. Patches: (P-1) P89 `Accept` catch comment says any exception; (P-2) P89 `TryDelete` catches any exception, as on P60 (D32) - no test, `File.Delete` has no seam on P89 either; (P-3) the blank-`Commande` test asserts the `'P60'` default (red shown by removing it from the message); (P-4) `processor.Process` catch comment disambiguated; (P-5) `ConvertP89.Tests` added to Verification; (P-6) `RecordingLogger` keeps the exception and the AC-FR25-8 theory asserts it on read and filing Warnings, null for I/O, the fault itself otherwise (red shown by inverting the ternary); (P-7) `InboxScanner.DeleteExport` internal seam and `RunTick_ExportDeleteThrowsAfterAFailedFiling_CountsTheFichierAndLogsTheExport_AcFr25_8` (red shown by narrowing `TryDelete` back to I/O). Deferred: F-1 P89 `Accept` XML cleanup after the write is unreached by any test. Unit 1265, Integration 1429 (20 skipped), `ImportP60.Tests` 72, `ConvertP89.Tests` 68 green.
 
 ## Design Notes
 
@@ -82,6 +83,7 @@ One widened catch per site rather than a second non-I/O clause: both clauses wou
 - `dotnet test TextToXml.sln --filter Category=Unit` -- expected: 0 failures
 - `dotnet test TextToXml.sln --filter Category=Integration -m:1 --blame-hang-timeout 2m` -- expected: 0 failures
 - `dotnet test ../MicroServices/GPAO/ImportP60.Tests` -- expected: 0 failures
+- `dotnet test ../MicroServices/GPAO/ConvertP89.Tests` -- expected: 0 failures (the `P89FolderConverter` internal constructor changed)
 
 ## Suggested Review Order
 

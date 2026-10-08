@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 16:00
-last_updated: 10-08-2026 09:32
+last_updated: 10-08-2026 11:00
 project: TextToXml
 project_key: NOKEY
 tracking_system: file-system
@@ -92,7 +92,7 @@ development_status:
   5-2-worker-gpaoconvertp89-launcher: done
   epic-5-retrospective: done
 
-  epic-6: in-progress
+  epic-6: done
   6-1-journal-p60-via-ifichierjournal: done
   6-2-garde-stabilite-fichiers-p60-p89: done
   6-3-export-xml-p60-dossier-dedie: done
@@ -105,7 +105,7 @@ development_status:
   6-9-controle-coulee-froide-typeconsigne-12: done
   6-10-renvoi-of-existant-remplacement-ou-refus: done
   6-11-ordre-fk-production-garde-par-tests: done
-  6-12-exception-fichier-plafond-commande-blanche: review
+  6-12-exception-fichier-plafond-commande-blanche: done
   epic-6-retrospective: done
 action_items:
   - id: "story-4-6-decimal-scale-defect-story-4-3-bis"

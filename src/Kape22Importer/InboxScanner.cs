@@ -51,6 +51,9 @@ public sealed class InboxScanner(
         WriteIndented = true,
     };
 
+    // Deletes an export this attempt created; a seam so a test can make the cleanup throw (Story 6.12).
+    internal Action<string> DeleteExport { get; init; } = File.Delete;
+
     // Processes every Fichier stranded in processing/ by a killed worker (AC-FR12-6), then every stable
     // Fichier in the inbox, oldest first (AC-FR12-1), each moved to processing/ before it is read
     // (AC-FR12-2). An empty inbox is a no-op (AC-FR12-7). A cancelled token stops the tick between two
@@ -285,7 +288,7 @@ public sealed class InboxScanner(
         {
             // AC-FR13-4 / AC-FR15-1: one Fichier's unexpected throw (a deployment fault surfacing from
             // the mapper, an EF error that escapes Kape22Persister, a bug - an IOException raised inside
-            // the pipeline included, since that is a defect, unlike a read fault, handled above)
+            // the pipeline included, since that is a defect, unlike a read fault, which is handled above)
             // must not unwind the tick and strand every later Fichier. It is logged at Error and, as an
             // UnexpectedFailure result, quarantined in error/ by the shared outcome path below - a code
             // distinct from a persistence failure, so it is never mistaken for one and left to retry
@@ -436,7 +439,7 @@ public sealed class InboxScanner(
     {
         try
         {
-            File.Delete(path);
+            DeleteExport(path);
         }
         catch (Exception exception)
         {

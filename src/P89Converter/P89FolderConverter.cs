@@ -148,14 +148,15 @@ public sealed class P89FolderConverter
     private static string TargetExists(string targetPath) => $"Fichier : {targetPath} existe déjà";
 
     // Best-effort cleanup: a failed delete (locked XML) must not replace the reason the Fichier is deferred
-    // for. The XML is then left behind; the retry writes its own under a new suffix.
+    // for. Any exception is caught (Story 6.12, as on P60). The XML is then left behind; the retry writes its
+    // own under a new suffix.
     private static void TryDelete(string path)
     {
         try
         {
             File.Delete(path);
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        catch (Exception)
         {
         }
     }
@@ -195,7 +196,7 @@ public sealed class P89FolderConverter
         }
         catch
         {
-            // Process turns the rethrown file-system fault into a Deferred outcome.
+            // Process turns the rethrown exception, of any type since Story 6.12, into a Deferred outcome.
             stream.Dispose();
             TryDelete(xmlPath);
             throw;

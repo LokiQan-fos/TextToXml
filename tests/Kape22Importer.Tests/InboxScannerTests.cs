@@ -743,8 +743,19 @@ public sealed class InboxScannerTests : IDisposable
         for (int tick = 1; tick < 3; tick++)
         {
             RecordingLogger<InboxScanner> early = Tick(source, processor, CappedOptions(), attempts);
-            Assert.Single(early.AtLevel(LogLevel.Warning));
+            Exception? logged = Assert.Single(early.AtLevel(LogLevel.Warning)).Exception;
             Assert.Empty(early.AtLevel(LogLevel.Error));
+
+            // A read or filing Warning carries its exception for a non-I/O cause only, so a transient I/O
+            // fault logs without a stack trace, as before Story 6.12.
+            if (unexpected)
+            {
+                Assert.Same(fault, logged);
+            }
+            else if (cause != "persistence")
+            {
+                Assert.Null(logged);
+            }
         }
 
         RecordingLogger<InboxScanner> last = Tick(source, processor, CappedOptions(), attempts);
@@ -798,6 +809,34 @@ public sealed class InboxScannerTests : IDisposable
         Assert.Equal([$"P60_847_682_002_{NowSuffix}.xml"], this.ExportNames());
         Assert.Empty(source.Names("error"));
         Assert.Contains(logger.AtLevel(LogLevel.Warning), entry => entry.Message.Contains(Stuck, StringComparison.Ordinal));
+    }
+
+    // AC-FR25-8 (Story 6.12): a non-I/O exception deleting the export after a failed filing does not escape
+    // the filing catch - the Fichier stays in processing/ and is counted, and the export left behind is
+    // logged.
+    [Fact]
+    [Trait("AC", "FR25-8")]
+    public void RunTick_ExportDeleteThrowsAfterAFailedFiling_CountsTheFichierAndLogsTheExport_AcFr25_8()
+    {
+        InMemoryFileSource source = new();
+        source.Add("processing", Stuck, Bytes("payload"), Now.AddMinutes(-1));
+        source.MoveFault = new InvalidOperationException("filing went wrong");
+        Dictionary<string, int> attempts = new(StringComparer.OrdinalIgnoreCase);
+        RecordingLogger<InboxScanner> logger = new();
+        InboxScanner scanner = new(
+            source, AlwaysSucceeds(), this.ExportOptions(), new FixedClock(Now), logger, attempts)
+        {
+            DeleteExport = _ => throw new InvalidOperationException("delete went wrong"),
+        };
+
+        scanner.RunTick();
+
+        Assert.True(source.Exists("processing", Stuck));
+        Assert.Equal(1, attempts[Stuck]);
+        Assert.Equal([$"{Stuck}_{NowSuffix}.xml"], this.ExportNames());
+        Assert.Contains(
+            logger.AtLevel(LogLevel.Warning),
+            entry => entry.Message.Contains("delete went wrong", StringComparison.Ordinal));
     }
 
     // AC-FR25-8: from tick N+1, a frozen Fichier still in processing/ is not processed and logs nothing.
