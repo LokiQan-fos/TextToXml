@@ -1427,7 +1427,7 @@ s'y trouver et rester à confirmer.
 
 ## Deferred from: code review of spec-6-6-validation-config-panne-partage-workers-gpao.md (2026-10-01)
 
-- source_spec: **PLANNED 2026-10-06: Story 6.12** (AC-FR25-9 extended: present but blank → startup refused) — sprint-change-proposal-2026-10-06.md · `spec-6-6-validation-config-panne-partage-workers-gpao.md` (D-1, low)
+- source_spec: **RESOLVED 2026-10-07 by Story 6.12** (AC-FR25-9: `GpaoImportP60` `ReadConfig` refuses a present but blank `Import:Commande`, naming the key; absent keeps the `P60` fallback; test `ReadConfig_CommandeBlank_ThrowsNamingTheKey_AcFr25_9`) · **PLANNED 2026-10-06: Story 6.12** (AC-FR25-9 extended: present but blank → startup refused) — sprint-change-proposal-2026-10-06.md · `spec-6-6-validation-config-panne-partage-workers-gpao.md` (D-1, low)
   summary: An empty or whitespace `Import:Commande` passes `GpaoImportP60` startup; `Kape22Persister` only falls back to `P60` on a null value, so `L_D_LOG_COMMANDE` rows would carry a blank `Commande`.
   evidence: edge-case-hunter + blind-hunter lenses, `GPAO/ImportP60/Client.cs` `ReadConfig` and `src/Kape22Importer/Persistence/Kape22Persister.cs:269` (`configuration[CommandeKey] ?? DefaultCommande`). AC-FR25-9 only sets the > 50 chars rule; a blank-value rule is a product choice outside this story.
 
@@ -1437,7 +1437,7 @@ s'y trouver et rester à confirmer.
 
 ## Deferred from: code review of story-6.7 (2026-10-01)
 
-- source_spec: **PLANNED 2026-10-06: Story 6.12** (AC-FR25-8 extended: any per-Fichier exception is counted, the tick goes on) — sprint-change-proposal-2026-10-06.md · `spec-6-7-plafond-reessai-par-fichier.md` (implementation review, low)
+- source_spec: **RESOLVED 2026-10-07 by Story 6.12** (AC-FR25-8: `InboxScanner` read and filing catches and `P89FolderConverter.Process` contain any exception as a retained attempt / `Deferred`, the tick goes on and the cap freezes the Fichier with one Error, which names the exception type for a non-I/O cause only (an I/O cause keeps its bare message); tests `RunTick_UnexpectedFilingException_CountsTheFichierAndFilesTheNext_AcFr25_8`, `RunTick_UnexpectedConversionException_DefersTheFichierAndConvertsTheNext_AcFr25_8`) · **PLANNED 2026-10-06: Story 6.12** (AC-FR25-8 extended: any per-Fichier exception is counted, the tick goes on) — sprint-change-proposal-2026-10-06.md · `spec-6-7-plafond-reessai-par-fichier.md` (implementation review, low)
   summary: A non-I/O exception escaping a Fichier's read or filing (P60 `InboxScanner.ProcessFromProcessing` around `fileSource.Read` / `Export` / `Archive` / `Reject`) or its conversion (P89 `P89FolderConverter.Process`, which only catches `IOException` / `UnauthorizedAccessException`) aborts the whole tick before the Fichier is counted, so the AC-FR25-8 retry cap never freezes it: `onError` fires and later Fichiers are starved every tick.
   evidence: edge-case-hunter lens, Story 6.7 review. Pre-existing escape path (the cap only adds a new place where it goes uncounted); no known trigger in production code, since `processor.Process` throws are already contained as `UnexpectedFailure`.
 
@@ -1511,3 +1511,13 @@ s'y trouver et rester à confirmer.
 - source_spec: **ACCEPTED 2026-10-06** (user decision): never observed in production (0 FK message in legacy `L_D_LOG_COMMANDE` `KAP22`), the GPAO shares this referential, and the AC-FR25-8 cap bounds the retries with an `Error` carrying the SQL cause · sprint-change-proposal-2026-10-06.md (cluster e)
   summary: `L_D_ORDRE_FABRICATION.ProfilProduit` → `L_P_PROFIL_PRODUIT` (4 rows) and `CodeOperation` of the 7 `L_D_SECTIONCHARGE_*` → `L_P_TEXT_OPERATIONS` (19 rows) are production FKs no pre-check covers; an unknown value fails `SaveChanges` as a `PersistenceError`, so the Fichier stays in `processing/` and is retried until the cap freezes it, instead of being rejected to `error/` on the first tick.
   evidence: production `sys.foreign_keys` / `sys.foreign_key_columns` read 2026-10-06 (SELECT only). The FK-less mirror `scripts/schema/01-ascolsi-tables.sql` and the import code never check either value; Story 6.11 seeds both tables for its FK test only.
+
+## Deferred from: code review of spec-6-12-exception-fichier-plafond-commande-blanche.md (2026-10-08)
+
+- source_spec: `spec-6-12-exception-fichier-plafond-commande-blanche.md` (D-1, low)
+  summary: P89 `Reject` records the journal entry before `File.Move` to the error folder; a move that throws (now any exception type, not only I/O) defers the Fichier and the next tick records a second entry for it.
+  evidence: blind-hunter lens, `src/P89Converter/P89FolderConverter.cs` `Reject`. Pre-existing for I/O faults since Story 5.1 (entry-then-move order, D15); Story 6.12 only widens the triggering exception types. Bounded by the AC-FR25-8 cap.
+
+- source_spec: `spec-6-12-exception-fichier-plafond-commande-blanche.md` (D-2, low)
+  summary: An `Import:Commande` with leading or trailing whitespace (e.g. `" P60 "`) passes `GpaoImportP60` startup and is written as-is to `L_D_LOG_COMMANDE.Commande`.
+  evidence: edge-case-hunter + blind-hunter lenses, `MicroServices/GPAO/ImportP60/Client.cs` `ReadConfig`. AC-FR25-9 only refuses empty or whitespace-only values; a padding rule is a product choice outside the story.

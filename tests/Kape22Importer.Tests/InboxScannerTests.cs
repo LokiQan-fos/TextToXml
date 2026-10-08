@@ -710,23 +710,28 @@ public sealed class InboxScannerTests : IDisposable
 
     // AC-FR25-8: a Fichier left in processing/ (persistence failure, read fault, filing failure) logs only
     // its usual Warning on ticks 1..N-1; tick N adds one Error naming the Fichier and the last cause. It is
-    // never moved to error/ (AC-FR15-3).
+    // never moved to error/ (AC-FR15-3). Story 6.12: a non-I/O read or filing exception is counted the same
+    // way, and its Error also names the exception type.
     [Theory]
-    [InlineData("persistence", "AscoLSI unreachable.")]
-    [InlineData("read", "locked by another process")]
-    [InlineData("filing", "archive unreachable")]
+    [InlineData("persistence", false, "AscoLSI unreachable.")]
+    [InlineData("read", false, "locked by another process")]
+    [InlineData("read", true, "read went wrong")]
+    [InlineData("filing", false, "archive unreachable")]
+    [InlineData("filing", true, "filing went wrong")]
     [Trait("AC", "FR25-8")]
-    public void RunTick_FichierLeftInProcessingForMaxAttemptsTicks_LogsOneErrorOnTheLast_AcFr25_8(string cause, string reason)
+    public void RunTick_FichierLeftInProcessingForMaxAttemptsTicks_LogsOneErrorOnTheLast_AcFr25_8(
+        string cause, bool unexpected, string reason)
     {
         InMemoryFileSource source = new();
         source.Add("processing", Stuck, Bytes("payload"), Now.AddMinutes(-1));
+        Exception fault = unexpected ? new InvalidOperationException(reason) : new IOException(reason);
         switch (cause)
         {
             case "read":
-                source.ReadFault = new IOException(reason);
+                source.ReadFault = fault;
                 break;
             case "filing":
-                source.MoveFault = new IOException(reason);
+                source.MoveFault = fault;
                 break;
         }
 
@@ -748,8 +753,51 @@ public sealed class InboxScannerTests : IDisposable
         string error = Assert.Single(last.AtLevel(LogLevel.Error)).Message;
         Assert.Contains(Stuck, error);
         Assert.Contains(reason, error);
+        if (unexpected)
+        {
+            Assert.Contains(nameof(InvalidOperationException), error);
+        }
+        else if (cause != "persistence")
+        {
+            // An I/O cause keeps its bare message, unchanged by Story 6.12.
+            Assert.DoesNotContain(nameof(IOException), error);
+        }
+
         Assert.True(source.Exists("processing", Stuck));
         Assert.Empty(source.Names("error"));
+
+        // Tick N+1: the frozen Fichier is not touched.
+        Assert.Empty(Tick(source, processor, CappedOptions(), attempts).Entries);
+    }
+
+    // AC-FR25-8 (Story 6.12): a non-I/O exception filing one Fichier is contained to that Fichier - it stays
+    // in processing/, is counted and its export is deleted (AC-FR26-6) - and the next Fichier is archived on
+    // the same tick.
+    [Fact]
+    [Trait("AC", "FR25-8")]
+    public void RunTick_UnexpectedFilingException_CountsTheFichierAndFilesTheNext_AcFr25_8()
+    {
+        InMemoryFileSource source = new();
+        source.Add("processing", Stuck, Bytes("payload"), Now.AddMinutes(-2));
+        source.Add("processing", "P60_847_682_002", Bytes("payload"), Now.AddMinutes(-1));
+        source.MoveHook = (_, name) =>
+        {
+            if (name == Stuck)
+            {
+                throw new InvalidOperationException("filing went wrong");
+            }
+        };
+        Dictionary<string, int> attempts = new(StringComparer.OrdinalIgnoreCase);
+        RecordingLogger<InboxScanner> logger = new();
+
+        Scanner(source, AlwaysSucceeds(), this.ExportOptions(), logger, attempts: attempts).RunTick();
+
+        Assert.True(source.Exists("processing", Stuck));
+        Assert.Equal(1, attempts[Stuck]);
+        Assert.True(source.Exists(ArchiveDateFolder, "P60_847_682_002"));
+        Assert.Equal([$"P60_847_682_002_{NowSuffix}.xml"], this.ExportNames());
+        Assert.Empty(source.Names("error"));
+        Assert.Contains(logger.AtLevel(LogLevel.Warning), entry => entry.Message.Contains(Stuck, StringComparison.Ordinal));
     }
 
     // AC-FR25-8: from tick N+1, a frozen Fichier still in processing/ is not processed and logs nothing.

@@ -5,7 +5,6 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
-using System.Xml.Schema;
 using FichierJournal;
 
 namespace P89Converter;
@@ -16,10 +15,11 @@ namespace P89Converter;
 // concern, D15), and the Fichier is moved to the done folder, or to the error folder when it failed, under
 // the same suffix. The suffix comes from one clock reading per tick, so the index rotation 999 -> 001
 // never collides with an earlier conversion, and nothing is ever overwritten. A done or error target that
-// already exists defers the Fichier before anything is written or recorded. A journal failure or a
-// file-system fault defers it too: the XML this tick wrote is deleted, the Fichier stays in the source
-// folder and is retried at the next tick. Story 6.7 (AC-FR25-8): the P89:MaxAttempts-th consecutive deferral
-// is reported once as Frozen, and the Fichier is then skipped until the worker restarts.
+// already exists defers the Fichier before anything is written or recorded. A journal failure, a
+// file-system fault or, since Story 6.12, any other exception processing the Fichier defers it too: the XML
+// this tick wrote is deleted, the Fichier stays in the source folder and is retried at the next tick.
+// Story 6.7 (AC-FR25-8): the P89:MaxAttempts-th consecutive deferral is reported once as Frozen, and the
+// Fichier is then skipped until the worker restarts.
 public sealed class P89FolderConverter
 {
     private const string Commande = "P89";
@@ -30,23 +30,24 @@ public sealed class P89FolderConverter
     // lives as long as the worker, so a restart starts every count afresh.
     private readonly Dictionary<string, int> attempts = new(StringComparer.OrdinalIgnoreCase);
 
+    private readonly Func<byte[], P89Conversion> convert;
     private readonly IFichierJournal journal;
     private readonly P89Options options;
-    private readonly XmlSchemaSet? schemas;
     private readonly TimeProvider timeProvider;
 
     public P89FolderConverter(P89Options options, IFichierJournal journal, TimeProvider timeProvider)
-        : this(options, journal, timeProvider, null)
+        : this(options, journal, timeProvider, P89FichierConverter.Convert)
     {
     }
 
-    // The schema is a seam so a test can stand in for a schema error no raw Fichier can produce.
+    // The conversion is a seam so a test can stand in for a schema error no raw Fichier can produce, or make
+    // one Fichier throw (Story 6.12).
     internal P89FolderConverter(
-        P89Options options, IFichierJournal journal, TimeProvider timeProvider, XmlSchemaSet? schemas)
+        P89Options options, IFichierJournal journal, TimeProvider timeProvider, Func<byte[], P89Conversion> convert)
     {
+        this.convert = convert;
         this.journal = journal;
         this.options = options;
-        this.schemas = schemas;
         this.timeProvider = timeProvider;
     }
 
@@ -209,17 +210,20 @@ public sealed class P89FolderConverter
         try
         {
             byte[] content = File.ReadAllBytes(path);
-            P89Conversion conversion = this.schemas is null
-                ? P89FichierConverter.Convert(content)
-                : P89FichierConverter.Convert(content, this.schemas);
+            P89Conversion conversion = this.convert(content);
 
             return conversion.Success
                 ? this.Accept(path, targetName, conversion, now)
                 : this.Reject(path, targetName, conversion, now);
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        catch (Exception exception)
         {
-            return Outcome(fichierName, P89FichierStatus.Deferred, targetName, [$"Fichier : {exception.Message}"]);
+            // Story 6.12 (AC-FR25-8): any exception defers this one Fichier, so the tick moves on and the
+            // retry cap bounds it; a non-I/O one also names its type.
+            string reason = exception is IOException or UnauthorizedAccessException
+                ? $"Fichier : {exception.Message}"
+                : $"Fichier : {exception.GetType().Name} : {exception.Message}";
+            return Outcome(fichierName, P89FichierStatus.Deferred, targetName, [reason]);
         }
     }
 
@@ -281,7 +285,8 @@ public enum P89FichierStatus
     // Written to the xml folder, recorded in the journal and moved to the done folder.
     Converted,
 
-    // Left in the source folder, retried at the next tick (journal failure, file-system fault).
+    // Left in the source folder, retried at the next tick (journal failure, file-system fault, any other
+    // exception processing the Fichier - Story 6.12).
     Deferred,
 
     // Deferred for the P89:MaxAttempts-th consecutive tick (AC-FR25-8): left in the source folder, with the

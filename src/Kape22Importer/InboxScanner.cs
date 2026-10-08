@@ -58,8 +58,8 @@ public sealed class InboxScanner(
     // leaves a Fichier half-inserted (AC-FR14-6); the token is never passed into processor.Process.
     // AC-FR15-2: a reception folder that cannot be listed or moved into for this tick (a dead share, a
     // locked-down ACL) is logged once at Warning and the tick is abandoned - nothing is lost, the next
-    // tick retries. A transient I/O fault touching one Fichier is contained inside ProcessFromProcessing
-    // and never abandons the tick.
+    // tick retries. Any fault reading or filing one Fichier (Story 6.12: not only a transient I/O one) is
+    // contained inside ProcessFromProcessing and never abandons the tick.
     // AC-FR25-10: returns false when a reception folder (processing/ or the inbox) could not be listed, so the
     // worker counts the tick as failed and publishes no heartbeat; true otherwise, a cancelled tick and a
     // failed move into processing/ included (one locked Fichier is not an unreachable folder).
@@ -256,23 +256,24 @@ public sealed class InboxScanner(
     // persistence failure message(s) or the filing failure; null when the Fichier was filed.
     private string? ProcessFromProcessing(string fichierName)
     {
-        // The read is guarded on its own: a transient I/O fault reading this one Fichier (a file lock, a
-        // Fichier removed between the listing and the read, a full disk) leaves it in processing/ for the
-        // next tick and the loop moves straight on to the next Fichier. Only IOException and
-        // UnauthorizedAccessException count as transient here; anything the read throws otherwise falls
-        // through to the unexpected-failure path below.
+        // The read is guarded on its own: a fault reading this one Fichier leaves it in processing/ for the
+        // next tick and the loop moves straight on to the next Fichier. A transient I/O fault (a file lock, a
+        // Fichier removed between the listing and the read, a full disk) is retried as before; since Story
+        // 6.12 (AC-FR25-8) any other exception is contained the same way and bounded by the retry cap.
         byte[] content;
         try
         {
             content = fileSource.Read(options.ProcessingFolder, fichierName);
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        catch (Exception exception)
         {
+            string cause = Cause(exception);
             logger.LogWarning(
+                IsTransient(exception) ? null : exception,
                 "Fichier {Fichier} could not be read ({Reason}); left in processing/, will retry.",
                 fichierName,
-                exception.Message);
-            return exception.Message;
+                cause);
+            return cause;
         }
 
         FichierProcessingResult result;
@@ -284,7 +285,7 @@ public sealed class InboxScanner(
         {
             // AC-FR13-4 / AC-FR15-1: one Fichier's unexpected throw (a deployment fault surfacing from
             // the mapper, an EF error that escapes Kape22Persister, a bug - an IOException raised inside
-            // the pipeline included, since that is a defect, not the transient read fault handled above)
+            // the pipeline included, since that is a defect, unlike a read fault, handled above)
             // must not unwind the tick and strand every later Fichier. It is logged at Error and, as an
             // UnexpectedFailure result, quarantined in error/ by the shared outcome path below - a code
             // distinct from a persistence failure, so it is never mistaken for one and left to retry
@@ -326,7 +327,7 @@ public sealed class InboxScanner(
                 Reject(fichierName, result);
             }
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        catch (Exception exception)
         {
             // The outcome could not be filed - the export or a sidecar write failed, or the Fichier could
             // not be moved out of processing/ because archive/ or error/ is unreachable or the Fichier is
@@ -335,22 +336,37 @@ public sealed class InboxScanner(
             // outcome, a committed success is recognised by the D22 guard so no second row is inserted,
             // and a rejection is re-evaluated. Any sidecar already written is overwritten on the retry;
             // the export this attempt created is deleted, so the retry leaves a single one (AC-FR26-6).
+            // Story 6.12 (AC-FR25-8): any exception lands here, so a non-I/O one is bounded by the retry cap
+            // instead of escaping the tick; it is never quarantined to error/ (AC-FR15-3).
             if (exportPath is not null)
             {
                 TryDelete(exportPath);
             }
 
+            string cause = Cause(exception);
             logger.LogWarning(
+                IsTransient(exception) ? null : exception,
                 "Fichier {Fichier} outcome could not be filed ({Reason}); left in processing/ for retry.",
                 fichierName,
-                exception.Message);
-            return exception.Message;
+                cause);
+            return cause;
         }
 
         logger.LogInformation(
             "Fichier {Fichier} processed: {Outcome}.", fichierName, result.Success ? "archived" : "rejected");
         return null;
     }
+
+    // The retained cause of a read or filing fault (AC-FR25-8): the bare message for a transient I/O fault,
+    // as before Story 6.12; "<Type>: <Message>" otherwise, so the cap's Error names the exception.
+    private static string Cause(Exception exception) =>
+        IsTransient(exception)
+            ? exception.Message
+            : $"{exception.GetType().Name}: {exception.Message}";
+
+    // A transient I/O fault: retried without a stack trace in its Warning, its message alone as the cause.
+    private static bool IsTransient(Exception exception) =>
+        exception is IOException or UnauthorizedAccessException;
 
     // The result stand-in for a Fichier whose processing threw: a single File-level UnexpectedFailure
     // error so the shared outcome path quarantines it to error/ with a readable .errors.json. The
@@ -413,15 +429,16 @@ public sealed class InboxScanner(
     }
 
     // Best-effort cleanup of an export this attempt created: a failed delete (a locked file) must not hide
-    // the reason the outcome could not be filed. The export is then left behind next to the retry's own,
-    // so it is logged: the folder goes to third parties.
+    // the reason the outcome could not be filed. Any exception is caught (Story 6.12): this runs inside the
+    // filing catch, so an escaping one would abort the tick. The export is then left behind next to the
+    // retry's own, so it is logged: the folder goes to third parties.
     private void TryDelete(string path)
     {
         try
         {
             File.Delete(path);
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        catch (Exception exception)
         {
             logger.LogWarning(
                 "Export {Path} could not be deleted after a failed filing ({Reason}); it stays in the export folder and the retry will write a second one - remove it manually.",

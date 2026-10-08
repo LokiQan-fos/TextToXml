@@ -226,7 +226,10 @@ public sealed class P89FolderConverterTests : IDisposable
         this.folders.Drop(AccentedFichierName, ReadFixture(AccentedFichierName));
 
         P89FolderConverter converter = new(
-            this.Options(), this.journal, new FixedClock(Instant), P89FichierConverterTests.StricterSchema());
+            this.Options(),
+            this.journal,
+            new FixedClock(Instant),
+            content => P89FichierConverter.Convert(content, P89FichierConverterTests.StricterSchema()));
         P89FichierOutcome outcome = Assert.Single(converter.RunTick());
 
         Assert.Equal(P89FichierStatus.Rejected, outcome.Status);
@@ -309,7 +312,7 @@ public sealed class P89FolderConverterTests : IDisposable
             this.Options(),
             new RecordingJournal(new InvalidOperationException("unreachable")),
             new FixedClock(Instant),
-            P89FichierConverterTests.StricterSchema());
+            content => P89FichierConverter.Convert(content, P89FichierConverterTests.StricterSchema()));
         P89FichierOutcome outcome = Assert.Single(converter.RunTick());
 
         Assert.Equal(P89FichierStatus.Deferred, outcome.Status);
@@ -390,7 +393,8 @@ public sealed class P89FolderConverterTests : IDisposable
         Assert.Equal(TimeSpan.FromSeconds(10), new P89Options().StabilityQuietPeriod);
     }
 
-    // A file-system fault (source locked, unreadable) defers the Fichier without any entry.
+    // A file-system fault (source locked, unreadable) defers the Fichier without any entry. Its reason is the
+    // bare I/O message, unchanged by Story 6.12: no exception type name.
     [Fact]
     public void RunTick_SourceUnreadable_DefersWithoutEntry()
     {
@@ -398,12 +402,16 @@ public sealed class P89FolderConverterTests : IDisposable
         this.folders.Drop(name, ReadFixture(name));
 
         P89FichierOutcome outcome;
+        string message;
         using (new FileStream(Path.Combine(this.folders.Source, name), FileMode.Open, FileAccess.Read, FileShare.None))
         {
+            message = Assert.Throws<IOException>(() => File.ReadAllBytes(Path.Combine(this.folders.Source, name))).Message;
             outcome = Assert.Single(this.Converter(Instant).RunTick());
         }
 
         Assert.Equal(P89FichierStatus.Deferred, outcome.Status);
+        Assert.Equal("Fichier : " + message, Assert.Single(outcome.Reasons));
+        Assert.DoesNotContain(nameof(IOException), outcome.Reasons[0], StringComparison.Ordinal);
         Assert.Equal([name], this.folders.Names(this.folders.Source));
         Assert.Empty(this.folders.Names(this.folders.Xml));
         Assert.Empty(this.journal.Entries);
@@ -454,6 +462,50 @@ public sealed class P89FolderConverterTests : IDisposable
         Assert.Equal([name], this.folders.Names(this.folders.Source));
         Assert.Empty(this.folders.Names(this.folders.Error));
         Assert.Empty(this.folders.Names(this.folders.Xml));
+    }
+
+    // AC-FR25-8 (Story 6.12, D32): a non-I/O exception converting one Fichier is a Deferred outcome naming the
+    // exception type and message, so the next Fichier is converted on the same tick and the faulty one
+    // freezes at the cap, never leaving the source folder.
+    [Fact]
+    [Trait("AC", "FR25-8")]
+    public void RunTick_UnexpectedConversionException_DefersTheFichierAndConvertsTheNext_AcFr25_8()
+    {
+        string faulty = ReferenceFichierNames[0];
+        string healthy = ReferenceFichierNames[1];
+        byte[] faultyContent = ReadFixture(faulty);
+        this.folders.Drop(faulty, faultyContent);
+        this.folders.Drop(healthy, ReadFixture(healthy));
+        P89Options options = this.Options();
+        options.MaxAttempts = 3;
+        P89FolderConverter converter = new(
+            options,
+            this.journal,
+            new FixedClock(Instant),
+            content => content.AsSpan().SequenceEqual(faultyContent)
+                ? throw new InvalidOperationException("conversion went wrong")
+                : P89FichierConverter.Convert(content));
+
+        P89FichierOutcome[] first = [.. converter.RunTick()];
+        converter.RunTick();
+        P89FichierOutcome third = Assert.Single(converter.RunTick());
+
+        P89FichierOutcome deferred = first.Single(outcome => outcome.FichierName == faulty);
+        Assert.Equal(P89FichierStatus.Deferred, deferred.Status);
+        string firstReason = Assert.Single(deferred.Reasons);
+        Assert.Contains(nameof(InvalidOperationException), firstReason, StringComparison.Ordinal);
+        Assert.Contains("conversion went wrong", firstReason, StringComparison.Ordinal);
+        Assert.Equal(P89FichierStatus.Converted, first.Single(outcome => outcome.FichierName == healthy).Status);
+        Assert.Equal(P89FichierStatus.Frozen, third.Status);
+        Assert.Equal(faulty, third.FichierName);
+        string reason = Assert.Single(third.Reasons);
+        Assert.Contains(nameof(InvalidOperationException), reason, StringComparison.Ordinal);
+        Assert.Contains("conversion went wrong", reason, StringComparison.Ordinal);
+        Assert.Equal([faulty], this.folders.Names(this.folders.Source));
+        Assert.Empty(this.folders.Names(this.folders.Error));
+        Assert.Equal([healthy], this.journal.Entries.Select(entry => entry.FichierName));
+        Assert.Equal([$"{healthy}_{InstantSuffix}.xml"], this.folders.Names(this.folders.Xml));
+        Assert.Equal([$"{healthy}_{InstantSuffix}"], this.folders.Names(this.folders.Done));
     }
 
     // AC-FR25-8: from tick N+1 a frozen Fichier still in the source folder gets no outcome and no journal call.
