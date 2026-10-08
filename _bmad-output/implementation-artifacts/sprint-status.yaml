@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 16:00
-last_updated: 10-08-2026 11:17
+last_updated: 10-08-2026 11:22
 project: TextToXml
 project_key: NOKEY
 tracking_system: file-system
@@ -696,7 +696,7 @@ action_items:
     action: "Align .claude/commands/run-review.md steps 1-2 with the profile commit
       types: match (chore|feat|fix|refactor)(story-N.M) instead of chore(story-N.M)."
     owner: "SM"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-6-retro-2026-10-08.md"
   - id: "epic-6-retro3-item-3-reclose-scope-6-11-6-12"
     epic: 6

@@ -9,7 +9,8 @@ ou de poser une question, exécute ces trois étapes.
 ÉTAPE 1 — Story key.
 Exécute la commande git log --format='%H %s' -100 et parcours la sortie
 du plus récent au plus ancien. Le story key est le N-M du premier sujet
-matchant chore(story-N.M). Ignore les sujets purement administratifs
+matchant (chore|feat|fix|refactor)(story-N.M) — les types de commit du
+profil projet. Ignore les sujets purement administratifs
 (mark done, close review) s'il existe un commit non administratif pour
 le même key dans la fenêtre.
 
@@ -32,7 +33,7 @@ Va directement au CHECKPOINT de step-01 avec :
 
 NE POSE AUCUNE QUESTION sur le scope, le spec ou le mode. Le CHECKPOINT
 step-01 reste la seule confirmation utilisateur. Si une des 3 étapes
-échoue (aucun commit chore(story-*) trouvé, aucun spec), signale-le et
+échoue (aucun commit (chore|feat|fix|refactor)(story-*) trouvé, aucun spec), signale-le et
 arrête — n'invente pas de valeur, ne tombe pas dans la cascade standard.
 
 APRÈS LE CHECKPOINT — À la fin de la revue.
