@@ -203,7 +203,7 @@ Vérifications après application :
 - D-1 → tranché (option 2 : P-6 + P-7 testent les deux comportements), appliqué.
 - P-1 → appliqué (commentaire du catch de `Accept` P89).
 - P-2 → appliqué (`P89FolderConverter.TryDelete` catch toute exception ; sans test, pas de point d'injection sur `File.Delete` côté P89, consigné au Spec Change Log).
-- P-3 → appliqué côté SVN (`ClientConfigurationTests` vérifie `'P60'`) ; **commit SVN à faire par l'utilisateur**.
+- P-3 → appliqué côté SVN (`ClientConfigurationTests` vérifie `'P60'`) ; commit SVN fait en r552 (2026-10-08, `svn info`, constaté par `epic-6-retro-2026-10-08.md` F-2).
 - P-4 → appliqué (commentaire du catch `processor.Process`).
 - P-5 → appliqué (Verification de la spec : `ConvertP89.Tests`).
 - P-6 → appliqué (`RecordingLogger` garde l'exception ; theory AC-FR25-8 vérifie null pour I/O, `fault` sinon).

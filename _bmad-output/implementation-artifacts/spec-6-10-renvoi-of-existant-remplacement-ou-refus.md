@@ -2,7 +2,7 @@
 title: 'Story 6.10 — Re-sent existing OF: replacement or explicit refusal'
 type: 'feature'
 created: '2026-10-05'
-status: 'review'
+status: 'done'
 baseline_commit: 'f21953c5003602fcaec4f8285d4d222ceb0fc241'
 review_loop_iteration: 0
 context:
@@ -74,7 +74,7 @@ context:
 - [x] [Review][Patch] P-1 Stale-row removal on replace untested (re-send with fewer sections/consignes) [tests/Kape22Importer.Tests/OfResendIntegrationTests.cs:113]
 - [x] [Review][Patch] P-2 Multi-reason refusal message (` ; ` join, state then tables) untested [src/Kape22Importer/Persistence/Kape22Persister.cs:318]
 - [x] [Review][Patch] P-3 Legacy theory matches the generic "nombre d'OF sauvés : 0" before specific reasons [tests/Kape22Importer.Tests/LegacyRejectionParityTests.cs:45]
-- [ ] [Review][Patch] P-4 CC-1: closure commit must attest AC-FR21-2 [git ae08655] — owed by /commit-review
+- [x] [Review][Patch] P-4 CC-1: closure commit must attest AC-FR21-2 [git ae08655] — done in the closure commit dd6dc7b (CC-1 attestation)
 - [x] [Review][Patch] P-5 Header comment says "deleted" while L_D_ORDRE_FABRICATION is UPDATE-merged [src/Kape22Importer/Persistence/Kape22Persister.cs:28]
 - [x] [Review][Patch] P-6 L_D_PSO key order in comments is (NumeroLingot, Coulee) [src/Kape22Importer/Persistence/L_D_PSO.cs:4]
 - [x] [Review][Patch] P-7 Mark 6.8 W-1 resolved by 6.10 in the ledger [_bmad-output/implementation-artifacts/deferred-work.md:1457]
@@ -88,7 +88,7 @@ Second pass (2026-10-05, ae08655^ vs working tree):
 - [x] [Review][Patch] P-2 Architecture spine AD-1 D34 note predates P-9 [_bmad-output/planning-artifacts/architecture/architecture-kape22-dispatch-2026-09-14/ARCHITECTURE-SPINE.md:70]
 - [x] [Review][Patch] P-3 Non-frozen spec sections still describe RemoveRange / EF UPDATE merge / 3 tables [spec:49,62,122,125,130,169]
 - [x] [Review][Patch] P-4 OfResendIntegrationTests header still says "9 tables … same single SaveChanges" [tests/Kape22Importer.Tests/OfResendIntegrationTests.cs:21]
-- [ ] [Review][Patch] P-5 CC-1: closure commit attests AC-FR21-2 and the P-1/P-2/P-9 tests [closure commit] — owed by /commit-review
+- [x] [Review][Patch] P-5 CC-1: closure commit attests AC-FR21-2 and the P-1/P-2/P-9 tests [closure commit] — done in dd6dc7b (CC-1 attestation)
 - [x] [Review][Defer] F-1 Existing-OF check read outside the replace transaction [src/Kape22Importer/Persistence/Kape22Persister.cs:130] — deferred, same window as legacy AddRange2
 - [x] [Review][Defer] F-2 Legacy theory OF history unbounded below, Etat rebuilt as GPAO/ENC only [tests/Kape22Importer.Tests/LegacyRejectionParityTests.cs:243] — deferred, test code removed at switchover
 - [x] [Review][Dismiss] F-3 NVARCHAR(12) OF in L_D_MAM_QUAL / L_D_PRODUITS_OUTIL — rejected 2026-10-05 by the user: these tables are fed after ENC, a replaceable OF never reached ENC, and orphan rows of a deleted OF are of no interest

@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 16:00
-last_updated: 10-08-2026 11:22
+last_updated: 10-08-2026 11:24
 project: TextToXml
 project_key: NOKEY
 tracking_system: file-system
@@ -661,7 +661,7 @@ action_items:
       = this retro commit, Epic 6 line with 6.6-6.10 and this retro, current test
       totals"
     owner: "SM"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-6-retro-2026-10-06.md"
   - id: "epic-6-retro2-item-2-refresh-stale-artifacts"
     epic: 6
@@ -670,7 +670,7 @@ action_items:
       3 back-to-back E2E runs 2026-10-06; merge the two duplicate OF read/transaction
       race entries"
     owner: "SM"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-6-retro-2026-10-06.md"
   - id: "epic-6-retro2-item-3-correct-course-pre-deployment"
     epic: 6
@@ -704,5 +704,5 @@ action_items:
       Epic 6 line with 6.11-6.12 and this retro, last_commit = this retro commit,
       current test totals; add SVN r552 to P-3 in reviews/story-6-12/aggregated-report.md:206."
     owner: "SM"
-    status: open
+    status: done
     ref: "_bmad-output/implementation-artifacts/epic-6-retro-2026-10-08.md"
