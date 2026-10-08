@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 16:00
-last_updated: 10-08-2026 11:00
+last_updated: 10-08-2026 11:17
 project: TextToXml
 project_key: NOKEY
 tracking_system: file-system
@@ -683,3 +683,26 @@ action_items:
     status: done
     ref: "_bmad-output/implementation-artifacts/epic-6-retro-2026-10-06.md -> _bmad-output/planning-artifacts/sprint-change-proposal-2026-10-06.md
       (stories 6.11-6.12 planned, D35 + cluster e accepted)"
+  - id: "epic-6-retro3-item-1-step04-patch-needs-red-test"
+    epic: 6
+    action: "Add to _bmad-output/project-profile.md (bmad-build routing discipline):
+      a behavior-changing step-04 review patch ships with its test and a red run recorded
+      in the Spec Change Log; otherwise the spec justifies the exemption against CC-1."
+    owner: "SM"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-6-retro-2026-10-08.md"
+  - id: "epic-6-retro3-item-2-run-review-commit-types"
+    epic: 6
+    action: "Align .claude/commands/run-review.md steps 1-2 with the profile commit
+      types: match (chore|feat|fix|refactor)(story-N.M) instead of chore(story-N.M)."
+    owner: "SM"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-6-retro-2026-10-08.md"
+  - id: "epic-6-retro3-item-3-reclose-scope-6-11-6-12"
+    epic: 6
+    action: "When executing epic-6-retro2-item-1/-2, also cover 6.11-6.12: PROJECT-CLOSED.md
+      Epic 6 line with 6.11-6.12 and this retro, last_commit = this retro commit,
+      current test totals; add SVN r552 to P-3 in reviews/story-6-12/aggregated-report.md:206."
+    owner: "SM"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-6-retro-2026-10-08.md"
