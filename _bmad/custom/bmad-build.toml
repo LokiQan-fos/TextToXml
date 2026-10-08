@@ -32,8 +32,6 @@ Audit, in order:
    without an explicit human gate, or a `Never` executed → finding.
 3. Any architecture invariant (AD-x) violated → finding.
 4. Any transverse criterion (CC-x) violated → finding, citing the CC id.
-5. Any legacy firewall breach (AD-3 if applicable) — assembly reference or
-   runtime call → finding.
 
 Report ONLY findings as a JSON array. Each finding:
 
@@ -83,14 +81,16 @@ Steps:
    which changes belong to the story vs the patches), HALT and ask the user:
    `[S] Split — I'll list the story files and the patch files for you to confirm`
    | `[K] Keep single commit — accept the merged history`.
-6. On S (or when the set is unambiguous), execute the split:
+6. On S (or when the set is unambiguous), show the user the two commit
+   messages and wait for their go — never rewrite the step-05 commit silently.
+   Then execute the split:
    - `git reset --soft HEAD^` to uncommit while keeping all changes staged.
    - `git reset HEAD <patch-files>` to unstage the patch files only.
-   - Commit the story files: `chore(story-<N>.<M>): <title>` with the
-     `AC-FRx-y → FichierTest.NomDuTest` body per the project convention.
+   - Commit the story files with the subject and body required by
+     `{project-root}/_bmad-output/project-profile.md` § Conventions de commit.
    - `git add -A` to stage the patch files and any documentation updates.
-   - Commit the patches: `chore(story-<N>.<M>): apply review patches`, listing
-     each finding id and severity in the body.
+   - Commit the patches with the same convention and the subject
+     `apply review patches`, listing each finding id and severity in the body.
 7. Report the two commit hashes, or the single hash if no split happened.
 
 If any command fails or the reset state is dirty in an unexpected way, HALT and
@@ -161,7 +161,7 @@ name = "Acceptance Auditor"
 instruction = """
 Launch a context-free subagent with this prompt:
 
-Read `{project-root}/_bmad-output/project-profile.md` fully before reviewing — it lists the project's transverse criteria (CC-x) and architecture invariants (AD-x). Then read the spec file at `_bmad-output/implementation-artifacts/spec-*.md` matching the current story. Then review the changed files in the current worktree against the frozen spec.
+Read `{project-root}/_bmad-output/project-profile.md` fully before reviewing — it lists the project's transverse criteria (CC-x) and architecture invariants (AD-x). Then read the spec file referenced by the current workflow (path is passed in the session). Then review the changed files in the current worktree against the frozen spec.
 
 Audit, in order:
 
@@ -169,7 +169,6 @@ Audit, in order:
 2. Any Boundary violated: Always / Ask First / Never. An `Ask First` executed without an explicit human gate, or a `Never` executed → finding.
 3. Any architecture invariant (AD-x) violated → finding.
 4. Any transverse criterion (CC-x) violated → finding, citing the CC id.
-5. Any legacy firewall breach (AD-3 if applicable) — assembly reference or runtime call → finding.
 
 Report ONLY findings as a JSON array. Each finding:
 

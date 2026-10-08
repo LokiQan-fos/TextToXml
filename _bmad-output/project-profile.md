@@ -25,10 +25,23 @@ amont au lieu de les dupliquer — toute règle vit dans son fichier d'origine.
 
 - Build strict : `dotnet build TextToXml.sln -warnaserror`
 - Tests unitaires : `dotnet test TextToXml.sln --filter Category=Unit`
-- Tests d'intégration : `dotnet test TextToXml.sln --filter Category=Integration -m:1` (`-m:1` : un projet de test à la fois, car `Kape22Importer.Tests` et `AscoLsiJournal.Tests` partagent `SqlServerIntegrationFixture` et vident la même base `AscoLSI_Test` ; `P89Converter.Tests` n'a aucun test d'intégration ni base : journal factice)
+- Tests d'intégration : `dotnet test TextToXml.sln --filter Category=Integration -m:1 --blame-hang-timeout 2m` (`-m:1` : un projet de test à la fois, car `Kape22Importer.Tests` et `AscoLsiJournal.Tests` partagent `SqlServerIntegrationFixture` et vident la même base `AscoLSI_Test` ; `P89Converter.Tests` n'a aucun test d'intégration ni base : journal factice. `--blame-hang-timeout 2m` : un run bloqué, par exemple `bcp` sous pression mémoire, est arrêté proprement ; un run tué à la main laisse des `bcp` orphelins qui verrouillent `AscoLSI_Test` et un Launcher sur le port 5050)
+- Vérification de bout en bout (rétrospectives) : `pwsh -NoProfile -File scripts/e2e-worker-import.ps1 -SkipProductionCompare` (vrai Launcher, worker `GpaoImportP60`, broker MQTT local ; nettoie ses données sauf avec `-KeepArtifacts`)
 - Gates d'architecture (inclus dans Category=Unit) :
   `AcTraitCoverageTests`, `AcCoverageCompletenessTests`, `SolutionStructureTests`,
   `FormatIsolationTests`
+
+## Dépôts liés
+
+- `MicroServices` (SVN, `C:\Users\Administrateur\Documents\MicroServices`) : workers
+  `GpaoImportP60` / `GpaoConvertP89`, Launcher, `MicroService.Publisher`.
+  - Build strict : `dotnet build MicroServices.sln -warnaserror`
+  - Tests : `dotnet test GPAO/ImportP60.Tests`, `dotnet test GPAO/ConvertP89.Tests`,
+    `dotnet test Launcher.Tests`, `dotnet test MicroService.Tests`
+  - Tests d'intégration : `dotnet test GPAO/Gpao.IntegrationTests --blame-hang-timeout 2m`,
+    **après** les tests d'intégration de `TextToXml`, jamais en parallèle : ils utilisent les
+    mêmes bases `AscoLSI_Test` et `MQTTnetServices_Test` (`appsettings.Test.json`).
+  - Les commits SVN sont faits par l'utilisateur ; `svn status` et `svn info` en donnent l'état.
 
 ## Catégories de tests
 
@@ -49,7 +62,9 @@ amont au lieu de les dupliquer — toute règle vit dans son fichier d'origine.
 - Format : `<type>(story-N.M): <titre>` — types `feat`, `fix`, `chore`, `refactor`.
 - Corps du commit : pour chaque AC du périmètre, une ligne `AC-FRx-y → FichierTest.NomDuTest`.
 - Le gate CI refuse un commit `chore(story-*)` dont le corps (hors trailer
-  Co-Authored-By) ne mentionne ni `AC-FRx-y` ni « test » (epic-3-retro-item-2).
+  Co-Authored-By) ne mentionne pas à la fois un AC (`AC-…`) et le mot « test »
+  (`.github/workflows/ci.yml`, epic-3-retro-item-2). Cela vaut aussi pour les
+  commits de clôture de revue (`apply review patches`, `close review (no patches)`).
 
 ## Clés de configuration
 
@@ -129,6 +144,19 @@ Format d'entrée (un bloc par item déféré) :
 - `summary:` description factuelle du point différé
 - `evidence:` comment il a été constaté (revue de code, lecture legacy, etc.) et pourquoi il n'est pas bloquant
 
+## Artefact de clôture
+
+Fichier : `_bmad-output/implementation-artifacts/PROJECT-CLOSED.md`.
+
+- **Fin d'épic** (`/commit-review`, clôture de la dernière story) : bandeau en tête
+  « Epic N done <date>, story N.M; retrospective pending », ligne de l'épic dans le tableau
+  §1 (périmètre, stories x/x done, verdict « retro pending »), chiffres de test en §5. Le
+  frontmatter ne change pas.
+- **Re-clôture** (`/retro-epic`, dans le commit de la rétro) : frontmatter `status: 'closed'`,
+  `closed_date` du jour, l'ancienne date en `previous_closed_date`, `last_commit` = HEAD avant
+  le commit de la rétro ; bandeau « Re-closed <date> at Epic N closure » qui cite la rétro et
+  son verdict ; ligne de l'épic en §1 (stories, rétros, actions) ; actions encore ouvertes en
+  §3 ; chiffres de la vérification en §5 ; date et commit de clôture en §6.
 
 ## Discipline de routage bmad-build
 

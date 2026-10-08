@@ -4,43 +4,9 @@
 
 [workflow]
 
-activation_steps_prepend = [
-  """
-  Run these three steps BEFORE step-01-gather-context.md runs. Do not ask the
-  user; execute them and set the frontmatter variables directly.
-
-  STEP 1 — Determine the story key.
-  Run: git log --format='%H %s' -100
-  Scan the output from newest to oldest. The story key is the `<N>-<M>` of the
-  first subject matching `chore(story-<N>.<M>)`. Skip subjects whose verb is
-  only administrative (`mark done`, `close review`) when a non-administrative
-  subject exists for the same key within the log window. Set `{story_key}` to
-  that key.
-
-  STEP 2 — Determine the commit range.
-  From the same git log output, collect every commit whose subject matches
-  `chore(story-<N>.<M>)` for the key chosen in STEP 1. Take the OLDEST one.
-  Set the review range to `<oldest-sha>^..HEAD`. Do NOT use `HEAD~1..HEAD` or
-  the bare `<sha>..HEAD` form — the caret is required to include the oldest
-  commit itself.
-
-  STEP 3 — Determine the spec file.
-  The story key `<N>-<M>` maps to a kebab-case slug prefix `spec-<N>-<M>-`.
-  Search `{implementation_artifacts}/` for files matching
-  `spec-<N>-<M>-*.md`. If exactly one match, use it. If multiple, take the
-  most recent by LastWriteTime. Set `{spec_file}` to the absolute path.
-  Set `{review_mode}` to `"full"` unconditionally.
-
-  After these three steps: build `{diff_output}` with `git diff <range>`
-  where `<range>` is the value computed in STEP 2. Do not ask the user for
-  scope, spec, or mode — all three are now resolved. Proceed to the
-  step-01 CHECKPOINT (which remains the only user confirmation in this
-  workflow) with:
-    - Cible : <range>
-    - Mode : full
-    - Spec : <path>
-  """,
-]
+# No activation_steps_prepend: the story / range / spec resolution lives only in
+# .claude/commands/run-review.md, so it travels with the command and a plain
+# bmad-code-review run (e.g. on uncommitted changes) is not hijacked.
 
 persistent_facts = [
   "file:{project-root}/_bmad-output/project-profile.md",
@@ -64,8 +30,6 @@ Audit, in order:
    without an explicit human gate, or a `Never` executed → finding.
 3. Any architecture invariant (AD-x) violated → finding.
 4. Any transverse criterion (CC-x) violated → finding, citing the CC id.
-5. Any legacy firewall breach (AD-3 if applicable) — assembly reference or
-   runtime call → finding.
 
 Report ONLY findings as a JSON array. Each finding:
 
