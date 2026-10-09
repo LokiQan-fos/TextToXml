@@ -10,6 +10,22 @@ persistent_facts = [
   "file:{project-root}/_bmad-output/project-profile.md",
 ]
 
+# Step-03 implementation handoff. The implementation subagent starts without
+# the session context, so the ponytail SessionStart hook never reaches it:
+# this override asks it to load the ponytail skill itself, below the spec and
+# the project profile in priority.
+implementation_handoff = """
+Launch a subagent with no prior conversation context, with this prompt:
+
+> Read {spec_file} fully and implement it — the spec is the sole source of truth. Load every file listed in its frontmatter `context:` before you start.
+>
+> Before writing code, invoke the `ponytail:ponytail` skill (level full) and apply it while you implement. If that skill is not available, go on without it and say so in your report.
+>
+> Priority when they conflict: the frozen spec, then the project profile (`{project-root}/_bmad-output/project-profile.md`: transverse criteria CC-x, architecture invariants AD-x, TDD discipline), then ponytail. Ponytail never removes a test, a guard or an abstraction that the spec or the profile requires; report every such conflict.
+>
+> When done, report what you changed, how you verified it, and anything left incomplete or risky.
+"""
+
 # Ajoute la quatrième lentille de revue, absente de BMAD par défaut.
 # Le merge keyed par id garantit que les trois lentilles installées
 # (blind-hunter, edge-case-hunter, verification-gap) restent actives —
